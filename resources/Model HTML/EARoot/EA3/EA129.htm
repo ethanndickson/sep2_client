@@ -1,0 +1,92 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>EndDevice</title>
+<link href="../../css/ea.css" rel="stylesheet" type="text/css" />
+<script>
+function initPage(src) {	
+	if(parent==this&&(this.location+"").indexOf('EARoot')!=-1)
+		document.location=(this.location+"").substring(0,(this.location+"").indexOf('EARoot'))+"index"+(this.location+"").substring((this.location+"").lastIndexOf('.'))+"?goto="+((this.location+"").substring((this.location+"").indexOf('EARoot')+7,(this.location+"").lastIndexOf('.')).replace(/\//g,':').replace(/EA/g,""));
+	else
+		parent.initPage(src);
+}
+
+function nameClassifier(name, separator)
+{
+  var str = name;
+  var classifierName;
+  var node = document.getElementById('name_classifier');
+  if(node != null)
+  {
+    classifierName = node.innerHTML;
+  }
+  if(classifierName != "")
+  {
+   str += separator + classifierName;
+  }
+  
+  return str;
+}
+</script>
+</head>
+<body onload="initPage(this);" class="Content">
+<div class="PageBody">
+	
+<img src="EA130.png" usemap="#EA130" border="0" />
+
+<MAP NAME="EA130">
+<area shape="rect" coords="632,196,808,272" href="../EA5/EA154.htm" target="_self">
+<area shape="rect" coords="392,302,616,407" href="../EA4/EA144.htm" target="_self">
+<area shape="rect" coords="392,196,568,272" href="../EA4/EA145.htm" target="_self">
+<area shape="rect" coords="37,10,318,95" href="EA133.htm" target="_self">
+<area shape="rect" coords="402,545,559,584" href="../EA22/EA497.htm" target="_self">
+<area shape="rect" coords="247,506,362,616" href="EA132.htm" target="_self">
+<area shape="rect" coords="10,152,186,189" href="../EA22/EA449.htm" target="_self">
+<area shape="rect" coords="631,152,807,189" href="../EA22/EA490.htm" target="_self">
+<area shape="rect" coords="392,152,568,189" href="../EA22/EA458.htm" target="_self">
+<area shape="rect" coords="201,152,377,189" href="../EA22/EA483.htm" target="_self">
+<area shape="rect" coords="11,540,220,616" href="EA139.htm" target="_self">
+<area shape="rect" coords="11,196,187,324" href="EA134.htm" target="_self">
+<area shape="rect" coords="632,302,808,400" href="../EA5/EA153.htm" target="_self">
+<area shape="rect" coords="392,437,568,477" href="../EA4/EA143.htm" target="_self">
+<area shape="rect" coords="399,10,564,85" href="EA135.htm" target="_self">
+<area shape="rect" coords="201,196,377,298" href="EA137.htm" target="_self">
+</MAP>
+
+	<div class="ObjectTitle">EndDevice : Class diagram</div>
+	<table border="0" cellpadding="0" cellspacing="0" class="ObjectDetails">
+		<tr>
+			<td width="15%" class="ObjectDetailsTopic">Created:</td>
+			<td width="85%" class="ObjectDetailsValue">2/1/2011 5:23:09 PM</td>
+		</tr>
+		<tr>
+			<td width="15%" class="ObjectDetailsTopic">Modified:</td>
+			<td width="85%" class="ObjectDetailsValue">2/28/2018 2:05:22 PM</td>
+		</tr>
+		<tr style="padding-top: 10px;">
+			<td width="15%" class="ObjectDetailsTopic"><img src="../../images/plus03.gif" align="absmiddle" id="proj" onclick="parent.toggleData(this.id)" />Project:</td>
+			<td width="85%" class="ObjectDetailsValue"></td>			
+		</tr>
+		<tr id="proj00" style="display: none;">
+			<td width="15%" class="ObjectDetailsTopic" style="padding-left: 18px;">Author:</td>
+			<td width="85%" class="ObjectDetailsValue">svanausdall</td>
+		</tr>
+		<tr id="proj01" style="display: none;">
+			<td width="15%" class="ObjectDetailsTopic" style="padding-left: 18px;">Version:</td>
+			<td width="85%" class="ObjectDetailsValue">1.0</td>
+		</tr>
+		<tr>
+			<td width="15%" class="ObjectDetailsTopic"><img src="../../images/plus03.gif" align="absmiddle" id="adv" onclick="parent.toggleData(this.id)" />Advanced:</td>
+			<td width="85%" class="ObjectDetailsValue"></td>			
+		</tr>
+		<tr id="adv00" style="display: none;">
+			<td width="15%" class="ObjectDetailsTopic" style="padding-left: 18px;">ID:</td>
+			<td width="85%" class="ObjectDetailsValue">{A9211CE5-3BF6-4242-8800-325F1EFD5A91}</td>
+		</tr>
+	</table>
+	
+</div>
+ 
+</body>
+</html>

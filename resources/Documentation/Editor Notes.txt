@@ -1,0 +1,48 @@
+IEEE 2030.5 Editor Notes / Instructions
+=======================================
+
+* Note: I used a Mac for much of this.
+* To generate the XSD, you'll need an Enterprise Architect plug-in:
+	- http://www.cimea.org
+
+Generating Examples
+-------------------
+- For diagrams, used UMLet (www.umlet.com)
+- Validated XML with xmllint:
+	xmllint --schema ./sep.xsd INPUTFILE(s) --noout
+
+Generating Model Chapter
+------------------------
+(in Enterprise Architect):
+1. Right-click on "IEEE 2030.5" -> Documentation -> Generate Documentation
+2. Choose output format: DOCX
+3. Use "SEP 2.0 Model Report" template
+
+Generating XSD
+--------------
+(in Enterprise Architect):
+1. Right-click on "IEEE 2030.5" -> Extensions -> CIM EA -> Generate Artifacts
+2. Select "SEP2.0 XSD"
+3. Set options:
+	Namespace: urn:ieee:std:2030.5:ns
+
+Generating WADL Chapter
+-----------------------
+1. Open WADL spreadsheet (I had to use Excel 2011 for macro support)
+2. Click "Create Word" button
+
+Generating WADL XML
+-------------------
+1. Open WADL spreadsheet (I had to use Excel 2011 for macro support)
+2. Copy the contents (only to the left of the grey column) of the 'WADL Output' sheet into sep_wadl.xml
+3. Format file:
+	xmllint --format --output OUTPUTFILE INPUTFILE
+4. Remove first line of file: (<?xml ...)
+
+Updating WADL
+-------------
+1. Open WADL spreadsheet (I had to use Excel 2011 for macro support)
+2. Add rows to 'Controls' sheet (IDs are arbitrary so just increment, but sorting matters)
+3. Add rows to 'WADL Output' sheet
+4. Add rows to 'Doc Output' sheet
+5. Edit name "wadl_doc" (Insert -> Name) to include new rows

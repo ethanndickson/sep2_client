@@ -1,0 +1,5 @@
+tocTab[tocTab.length] = new Array("0.8:1", "", "DeviceInformation", "EARoot/EA8/EA175.htm", "175.png", "15", "0", "", "Logical diagram0","{36848BD2-20AE-4078-9810-1DFD53BD855E}");
+tocTab[tocTab.length] = new Array("0.8:2", "", "DeviceInformation", "EARoot/EA8/EA180.htm", "5.png", "E123", "0", "", "Class0","{2C741B93-C14F-4a48-9915-2CEF98FFCF99}");
+tocTab[tocTab.length] = new Array("0.8:3", "", "DRLCCapabilities", "EARoot/EA8/EA181.htm", "5.png", "E124", "0", "", "Class0","{8981DA49-47F6-43f6-B422-0C13D7DDD54A}");
+tocTab[tocTab.length] = new Array("0.8:4", "", "SupportedLocale", "EARoot/EA8/EA182.htm", "5.png", "E125", "0", "", "Class0","{87703513-6A5B-47b3-89BE-275C8B2C8DE8}");
+tocTab[tocTab.length] = new Array("0.8:5", "", "SupportedLocaleList", "EARoot/EA8/EA183.htm", "5.png", "E126", "0", "", "Class0","{4FB9D590-8855-458c-B126-8DDE5265D25F}");

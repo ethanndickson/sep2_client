@@ -1,0 +1,16 @@
+<DemandResponseProgramList all="2" results="2" subscribable="0" xmlns="urn:ieee:std:2030.5:ns">
+	<DemandResponseProgram href="/drp/1">
+		<mRID>0FB7</mRID>
+		<description>Operation X</description>
+		<ActiveEndDeviceControlListLink all="0" href="/drp/1/aedc"/>
+		<EndDeviceControlListLink all="1" href="/drp/1/edc"/>
+		<primacy>0</primacy>
+	</DemandResponseProgram>
+	<DemandResponseProgram href="/drp/2">
+		<mRID>80000001</mRID>
+		<description>The Wackness</description>
+		<ActiveEndDeviceControlListLink all="0" href="/drp/2/aedc"/>
+		<EndDeviceControlListLink all="0" href="/drp/2/edc"/>
+		<primacy>1</primacy>
+	</DemandResponseProgram>
+</DemandResponseProgramList>

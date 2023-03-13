@@ -1,0 +1,12 @@
+<ReadingType href="/upt/0/mr/0/rt" xmlns="urn:ieee:std:2030.5:ns">
+	<accumulationBehaviour>9</accumulationBehaviour>
+	<commodity>1</commodity>
+	<dataQualifier>0</dataQualifier>
+	<flowDirection>1</flowDirection>
+	<kind>12</kind>
+	<numberOfConsumptionBlocks>1</numberOfConsumptionBlocks>
+	<numberOfTouTiers>4</numberOfTouTiers>
+	<phase>40</phase>
+	<powerOfTenMultiplier>3</powerOfTenMultiplier>
+	<uom>72</uom>
+</ReadingType>

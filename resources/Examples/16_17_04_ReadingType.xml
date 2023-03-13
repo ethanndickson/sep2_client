@@ -1,0 +1,12 @@
+<ReadingType href="/rt/8" xmlns="urn:ieee:std:2030.5:ns">
+	<accumulationBehaviour>9</accumulationBehaviour>
+	<commodity>1</commodity>
+	<dataQualifier>12</dataQualifier>
+	<flowDirection>1</flowDirection>
+	<kind>12</kind>
+	<numberOfConsumptionBlocks>2</numberOfConsumptionBlocks>
+	<numberOfTouTiers>3</numberOfTouTiers>
+	<powerOfTenMultiplier>0</powerOfTenMultiplier>
+	<tieredConsumptionBlocks>false</tieredConsumptionBlocks>
+	<uom>72</uom>
+</ReadingType>

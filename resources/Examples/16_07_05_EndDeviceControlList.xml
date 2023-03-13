@@ -1,0 +1,25 @@
+<EndDeviceControlList all="1" results="1" subscribable="0" xmlns="urn:ieee:std:2030.5:ns">
+	<EndDeviceControl href="/drp/1/edc" replyTo="{hostname}/rsp" responseRequired="01" subscribable="0">
+		<mRID>CAFEFEED</mRID>
+		<description>Emergency One Hour Coffee Brew</description>
+		<creationTime>1234556</creationTime>
+		<EventStatus>
+			<currentStatus>0</currentStatus>
+			<dateTime>1234556</dateTime>
+			<potentiallySuperseded>false</potentiallySuperseded>
+			<reason>Need Caffeine Soon</reason>
+		</EventStatus>
+		<interval>
+			<duration>360</duration>
+			<start>1234900</start>
+		</interval>
+		<randomizeDuration>60</randomizeDuration>
+		<randomizeStart>60</randomizeStart>
+		<deviceCategory>08</deviceCategory>
+		<drProgramMandatory>true</drProgramMandatory>
+		<loadShiftForward>true</loadShiftForward>
+		<SetPoint>
+			<heatingSetpoint>10000</heatingSetpoint>
+		</SetPoint>
+	</EndDeviceControl>
+</EndDeviceControlList>

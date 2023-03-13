@@ -1,0 +1,13 @@
+<CustomerAgreementList all="1" href="/bill/1/ca" results="1" subscribable="0" xmlns="urn:ieee:std:2030.5:ns">
+	<CustomerAgreement href="/bill/1/ca/1">
+		<mRID>65f839fc951345e70000e566</mRID>
+		<description>Electric Service - 4/1/2012</description>
+		<ActiveBillingPeriodListLink all="1" href="/bill/1/ca/1/actbp"/>
+		<BillingPeriodListLink all="1" href="/bill/1/ca/1/bp"/>
+		<HistoricalReadingListLink all="1" href="/bill/1/ca/1/ver"/>
+		<ProjectionReadingListLink all="1" href="/bill/1/ca/1/pro"/>
+		<serviceLocation>Acct. XXX-XXXXX-384 (Elm St.)</serviceLocation>
+		<TariffProfileLink href="/tp/3"/>
+		<UsagePointLink href="/upt/1"/>
+	</CustomerAgreement>
+</CustomerAgreementList>

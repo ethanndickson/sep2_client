@@ -1,0 +1,4 @@
+tocTab[tocTab.length] = new Array("0.9:1", "", "PowerStatus", "EARoot/EA9/EA184.htm", "175.png", "16", "0", "", "Logical diagram0","{16DB5D8D-25F0-441e-97A9-D6955AA7A40D}");
+tocTab[tocTab.length] = new Array("0.9:2", "", "PowerStatus", "EARoot/EA9/EA187.htm", "5.png", "E128", "0", "", "Class0","{1976BE13-3354-43db-A839-E41D35A9D129}");
+tocTab[tocTab.length] = new Array("0.9:3", "", "PowerSourceType", "EARoot/EA9/EA188.htm", "5.png", "E129", "0", "", "Class0","{32B3A958-5E7C-47aa-8DA9-299F563FA653}");
+tocTab[tocTab.length] = new Array("0.9:4", "", "PEVInfo", "EARoot/EA9/EA189.htm", "5.png", "E462", "0", "", "Class0","{E48FFBE7-9C33-48a3-93C8-EEC620E12869}");

@@ -1,0 +1,16 @@
+<BillingReadingList all="24" href="/bill/1/ca/1/ver/1/brs/1/br" results="1" xmlns="urn:ieee:std:2030.5:ns">
+	<BillingReading href="/bill/1/ca/1/ver/1/brs/1/br/1">
+		<consumptionBlock>0</consumptionBlock>
+		<qualityFlags>01</qualityFlags>
+		<timePeriod>
+			<duration>3600</duration>
+			<start>1361491200</start>
+		</timePeriod>
+		<touTier>3</touTier>
+		<value>38</value>
+		<Charge>
+			<kind>0</kind>
+			<value>429400</value>
+		</Charge>
+	</BillingReading>
+</BillingReadingList>

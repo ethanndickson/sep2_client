@@ -1,0 +1,50 @@
+<ReadingList all="12" href="/upt/0/mr/2/rs/4/r" results="12" xmlns="urn:ieee:std:2030.5:ns">
+	<Reading href="/upt/0/mr/2/rs/4/r/0">
+		<value>1163</value>
+		<localID>00</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/2">
+		<value>1162</value>
+		<localID>01</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/4">
+		<value>1163</value>
+		<localID>02</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/6">
+		<value>1163</value>
+		<localID>03</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/8">
+		<value>1163</value>
+		<localID>04</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/a">
+		<value>1163</value>
+		<localID>05</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/c">
+		<value>1162</value>
+		<localID>06</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/e">
+		<value>1163</value>
+		<localID>07</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/10">
+		<value>1163</value>
+		<localID>08</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/12">
+		<value>1163</value>
+		<localID>09</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/14">
+		<value>1162</value>
+		<localID>0A</localID>
+	</Reading>
+	<Reading href="/upt/0/mr/2/rs/4/r/16">
+		<value>1163</value>
+		<localID>0B</localID>
+	</Reading>
+</ReadingList>

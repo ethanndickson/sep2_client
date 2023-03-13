@@ -1,0 +1,7 @@
+<ProjectionReadingList all="2" href="/bill/1/ca/1/pro" results="1" xmlns="urn:ieee:std:2030.5:ns">
+	<ProjectionReading href="/bill/1/ca/1/pro/1">
+		<mRID>d0b05a2e65144fca0000e566</mRID>
+		<description>Billing Projections</description>
+		<BillingReadingSetListLink all="1" href="/bill/1/ca/1/pro/1/brs"/>
+	</ProjectionReading>
+</ProjectionReadingList>

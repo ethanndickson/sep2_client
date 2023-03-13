@@ -1,0 +1,7 @@
+tocTab[tocTab.length] = new Array("0.2.2:1", "", "Events", "EARoot/EA2/EA2/EA50.htm", "175.png", "4", "0", "", "Logical diagram0","{8FA45C54-B134-435c-8AAE-3E3ED35640A4}");
+tocTab[tocTab.length] = new Array("0.2.2:2", "", "Programs", "EARoot/EA2/EA2/EA52.htm", "175.png", "6", "0", "", "Logical diagram0","{74EA1C79-9477-458d-ABDE-4D795D60AAAF}");
+tocTab[tocTab.length] = new Array("0.2.2:3", "", "Error", "EARoot/EA2/EA2/EA54.htm", "175.png", "5", "0", "", "Logical diagram0","{827715BE-8A66-4a55-8012-C9DCEA8AFC14}");
+tocTab[tocTab.length] = new Array("0.2.2:4", "", "Error", "EARoot/EA2/EA2/EA58.htm", "5.png", "E21", "0", "", "Class0","{4A63E67B-8EC2-48cd-A3E3-7A9FADAD1DE0}");
+tocTab[tocTab.length] = new Array("0.2.2:5", "", "Event", "EARoot/EA2/EA2/EA59.htm", "5.png", "E22", "0", "", "Class0","{510A09BA-54E6-4531-860E-7E897F85410A}");
+tocTab[tocTab.length] = new Array("0.2.2:6", "", "EventStatus", "EARoot/EA2/EA2/EA60.htm", "5.png", "E23", "0", "", "Class0","{D7F75421-AD44-45f7-BCB6-0855EC273BDB}");
+tocTab[tocTab.length] = new Array("0.2.2:7", "", "RandomizableEvent", "EARoot/EA2/EA2/EA61.htm", "5.png", "E24", "0", "", "Class0","{AF582F2D-E060-4d0f-AB3C-2AD8FD45208D}");

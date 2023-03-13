@@ -1,0 +1,11 @@
+<BillingPeriodList all="2" href="/bill/1/ca/1/bp" results="1" subscribable="1" xmlns="urn:ieee:std:2030.5:ns">
+	<BillingPeriod href="/bill/1/ca/1/bp">
+		<billLastPeriod>140730000</billLastPeriod>
+		<billToDate>83550000</billToDate>
+		<interval>
+			<duration>2419200</duration>
+			<start>1360195200</start>
+		</interval>
+		<statusTimeStamp>1361577600</statusTimeStamp>
+	</BillingPeriod>
+</BillingPeriodList>

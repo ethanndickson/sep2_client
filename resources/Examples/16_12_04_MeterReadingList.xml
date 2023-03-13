@@ -1,0 +1,40 @@
+<MeterReadingList all="6" href="/upt/0/mr" results="6" subscribable="0" xmlns="urn:ieee:std:2030.5:ns">
+	<MeterReading href="/upt/0/mr/5">
+		<mRID>1500006CC8</mRID>
+		<description>Instantaneous Reading for VAR's</description>
+		<ReadingLink href="/upt/0/mr/5/r"/>
+		<ReadingTypeLink href="/upt/0/mr/5/rt"/>
+	</MeterReading>
+	<MeterReading href="/upt/0/mr/4">
+		<mRID>1400006CC8</mRID>
+		<description>Instantaneous Reading for Wh</description>
+		<ReadingLink href="/upt/0/mr/4/r"/>
+		<ReadingTypeLink href="/upt/0/mr/4/rt"/>
+	</MeterReading>
+	<MeterReading href="/upt/0/mr/3">
+		<mRID>1200006CC8</mRID>
+		<description>Interval Reading for VAR's</description>
+		<ReadingSetListLink all="24" href="/upt/0/mr/3/rs"/>
+		<ReadingTypeLink href="/upt/0/mr/3/rt"/>
+	</MeterReading>
+	<MeterReading href="/upt/0/mr/2">
+		<mRID>1000006CC8</mRID>
+		<description>Interval Reading for Wh</description>
+		<ReadingSetListLink all="24" href="/upt/0/mr/2/rs"/>
+		<ReadingTypeLink href="/upt/0/mr/2/rt"/>
+	</MeterReading>
+	<MeterReading href="/upt/0/mr/1">
+		<mRID>0E00006CC8</mRID>
+		<description>Cumulative Reading for VAR's</description>
+		<ReadingLink href="/upt/0/mr/1/r"/>
+		<ReadingSetListLink all="1" href="/upt/0/mr/1/rs"/>
+		<ReadingTypeLink href="/upt/0/mr/1/rt"/>
+	</MeterReading>
+	<MeterReading href="/upt/0/mr/0">
+		<mRID>0C00006CC8</mRID>
+		<description>Cumulative Reading for Wh</description>
+		<ReadingLink href="/upt/0/mr/0/r"/>
+		<ReadingSetListLink all="1" href="/upt/0/mr/0/rs"/>
+		<ReadingTypeLink href="/upt/0/mr/0/rt"/>
+	</MeterReading>
+</MeterReadingList>

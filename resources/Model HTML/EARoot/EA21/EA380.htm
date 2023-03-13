@@ -1,0 +1,126 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>DER::DERControlType</title>
+<link href="../../css/ea.css" rel="stylesheet" type="text/css" />
+<script>
+function initPage(src) {	
+	if(parent==this&&(this.location+"").indexOf('EARoot')!=-1)
+		document.location=(this.location+"").substring(0,(this.location+"").indexOf('EARoot'))+"index"+(this.location+"").substring((this.location+"").lastIndexOf('.'))+"?goto="+((this.location+"").substring((this.location+"").indexOf('EARoot')+7,(this.location+"").lastIndexOf('.')).replace(/\//g,':').replace(/EA/g,""));
+	else
+		parent.initPage(src);
+}
+
+function nameClassifier(name, separator)
+{
+  var str = name;
+  var classifierName;
+  var node = document.getElementById('name_classifier');
+  if(node != null)
+  {
+    classifierName = node.innerHTML;
+  }
+  if(classifierName != "")
+  {
+   str += separator + classifierName;
+  }
+  
+  return str;
+}
+</script>
+</head>
+<body onload="initPage(this);" class="Content">
+<div class="pageHeader"></div>
+<div class="PageBody">
+	<div id="name_classifier" style="display: none;"></div>
+	<span class="ObjectTitle"><script type="text/javascript">document.write(nameClassifier("DERControlType", " : "))</script>  : Public   Class</span>
+	<table border="0" cellpadding="0" cellspacing="0" class="ObjectDetails">
+		<tr>
+			<td width="15%" class="ObjectDetailsTopic">Created:</td>
+			<td width="85%" class="ObjectDetailsValue">10/12/2010 2:45:44 PM</td>
+		</tr>
+		<tr>
+			<td class="ObjectDetailsTopic">Modified:</td>
+			<td class="ObjectDetailsValue">2/28/2018 11:49:14 AM</td>
+		</tr>
+		<tr style="height: 10px"><td colspan="2"></td></tr>
+		<tr>
+			<td class="ObjectDetailsTopic"><img src="../../images/plus03.gif" align="absmiddle" id="proj" onclick="parent.toggleData(this.id)" />Project:</td>
+			<td class="ObjectDetailsValue"></td>
+		</tr>
+		<tr id="proj00" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Author:</td>
+			<td class="ObjectDetailsValue"></td>
+		</tr>
+		<tr id="proj01" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Version:</td>
+			<td class="ObjectDetailsValue">1.0</td>
+		</tr>
+		<tr id="proj02" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Phase:</td>
+			<td class="ObjectDetailsValue">1.0</td>
+		</tr>
+		<tr id="proj03" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Status:</td>
+			<td class="ObjectDetailsValue">Proposed</td>
+		</tr>
+		<tr id="proj04" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Complexity:</td>
+			<td class="ObjectDetailsValue">Easy</td>
+		</tr>
+		<tr id="proj05" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Difficulty:</td>
+			<td class="ObjectDetailsValue"></td>
+		</tr>
+		<tr id="proj06" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Priority:</td>
+			<td class="ObjectDetailsValue"></td>
+		</tr>
+		<tr id="proj05" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Multiplicity:</td>
+			<td class="ObjectDetailsValue"></td>
+		</tr>
+		<tr>
+			<td class="ObjectDetailsTopic"><img src="../../images/plus03.gif" align="absmiddle" id="adv" onclick="parent.toggleData(this.id)" />Advanced:</td>
+			<td class="ObjectDetailsValue"></td>
+		</tr>
+		<tr id="adv00" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">UUID:</td>
+			<td class="ObjectDetailsValue">{855CF0C1-67FB-4610-8593-5681A5A4AEEE}</td>
+		</tr>
+		<tr id="adv01" style="display: none;">
+			<td class="ObjectDetailsTopic" style="padding-left: 18px;">Appears In:</td>
+			<td class="ObjectDetailsValue"><a href="../EA2/EA3/EA62.htm">Types</a>, <a href="EA356.htm">DER Info Types</a></td>
+		</tr>
+	</table>
+	<div class="ObjectDetailsNotes">Control modes supported by the DER.&#160;&#160;Bit positions SHALL be defined as follows:&lt;br/&gt;0 - Charge mode&lt;br/&gt;1 - Discharge mode&lt;br/&gt;2 - opModConnect (Connect / Disconnect - implies galvanic isolation)&lt;br/&gt;3 - opModEnergize (Energize / De-Energize)&lt;br/&gt;4 - opModFixedPFAbsorbW (Fixed Power Factor Setpoint when absorbing active power)&lt;br/&gt;5 - opModFixedPFInjectW (Fixed Power Factor Setpoint when injecting active power)&lt;br/&gt;6 - opModFixedVar (Reactive Power Setpoint)&lt;br/&gt;7 - opModFixedW (Charge / Discharge Setpoint)&lt;br/&gt;8 - opModFreqDroop (Frequency-Watt Parameterized Mode)&lt;br/&gt;9 - opModFreqWatt (Frequency-Watt Curve Mode)&lt;br/&gt;10 - opModHFRTMayTrip (High Frequency Ride Through, May Trip Mode)&lt;br/&gt;11 - opModHFRTMustTrip (High Frequency Ride Through, Must Trip Mode)&lt;br/&gt;12 - opModHVRTMayTrip (High Voltage Ride Through, May Trip Mode)&lt;br/&gt;13 - opModHVRTMomentaryCessation (High Voltage Ride Through, Momentary Cessation Mode)&lt;br/&gt;14 - opModHVRTMustTrip (High Voltage Ride Through, Must Trip Mode)&lt;br/&gt;15 - opModLFRTMayTrip (Low Frequency Ride Through, May Trip Mode)&lt;br/&gt;16 - opModLFRTMustTrip (Low Frequency Ride Through, Must Trip Mode)&lt;br/&gt;17 - opModLVRTMayTrip (Low Voltage Ride Through, May Trip Mode)&lt;br/&gt;18 - opModLVRTMomentaryCessation (Low Voltage Ride Through, Momentary Cessation Mode)&lt;br/&gt;19 - opModLVRTMustTrip (Low Voltage Ride Through, Must Trip Mode)&lt;br/&gt;20 - opModMaxLimW (Maximum Active Power)&lt;br/&gt;21 - opModTargetVar (Target Reactive Power)&lt;br/&gt;22 - opModTargetW (Target Active Power)&lt;br/&gt;23 - opModVoltVar (Volt-Var Mode)&lt;br/&gt;24 - opModVoltWatt (Volt-Watt Mode)&lt;br/&gt;25 - opModWattPF (Watt-PowerFactor Mode)&lt;br/&gt;26 - opModWattVar (Watt-Var Mode)&lt;br/&gt;All other values reserved.&lt;br/&gt;</div>
+
+	<div class="TableGroup" id="TableGroup">
+		<ul class="ItemTitle">
+			<li onClick="parent.toggleItem('Links');" id="LinksTitle">Other Links</li>
+		</ul>
+		<div class="ItemBody" id="LinksTable">
+			<table align="center" border="0" cellspacing="0" cellpadding="0" class="Table">
+				<tr>
+					<td width="30%" class="TableHeading">Object</td>
+					<td width="10%" class="TableHeading">Type</td>
+					<td width="10%" class="TableHeading">Connection</td>
+					<td width="10%" class="TableHeading">Direction</td>
+					<td width="40%" class="TableHeading">Notes</td>
+				</tr>
+				<tr>
+					<td width="30%" class="TableRow" valign="top"><a href="../EA2/EA4/EA105.htm">«XSDsimpleType» HexBinary32</a></td>
+					<td width="10%" class="TableRow" valign="top">Class</td>
+					<td width="10%" class="TableRow" valign="top">Generalization</td>
+					<td width="10%" class="TableRow" valign="top">To</td>
+					<td width="40%" class="TableRow" valign="top">&nbsp;</td>
+				</tr>
+
+			</table>
+		</div>
+	</div>
+<div class="pageFooter"></div>
+ 
+</body>
+</html>

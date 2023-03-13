@@ -1,0 +1,18 @@
+<FileList all="2" href="http://host1/fileList" results="2" xmlns="urn:ieee:std:2030.5:ns">
+	<File href="http://host1/myFile1">
+		<fileURI>http://host1/myfile1.bin</fileURI>
+		<mfID>37244</mfID>
+		<mfModel>123abc</mfModel>
+		<mfVer>23.48.1</mfVer>
+		<size>128000</size>
+		<type>00</type>
+	</File>
+	<File href="http://host1/myFile2">
+		<fileURI>http://host1/myfile2.bin</fileURI>
+		<mfID>37244</mfID>
+		<mfModel>123abc</mfModel>
+		<mfVer>23.47.103</mfVer>
+		<size>136000</size>
+		<type>00</type>
+	</File>
+</FileList>

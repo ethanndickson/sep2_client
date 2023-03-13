@@ -1,0 +1,7 @@
+<Subscription xmlns="urn:ieee:std:2030.5:ns">
+	<subscribedResource>/upt/0/mr/4/r</subscribedResource>
+	<encoding>0</encoding>
+	<level>+S1</level>
+	<limit>1</limit>
+	<notificationURI>/note</notificationURI>
+</Subscription>

@@ -1,0 +1,8 @@
+<ServiceSupplier href="/ss" xmlns="urn:ieee:std:2030.5:ns">
+	<mRID>cac046d1ee2a332a0000e566</mRID>
+	<description>Watts R Us</description>
+	<email>customerservice@wattsRus.com</email>
+	<phone>888.555.1212</phone>
+	<providerID>58726</providerID>
+	<web>www.WattsRus.com</web>
+</ServiceSupplier>

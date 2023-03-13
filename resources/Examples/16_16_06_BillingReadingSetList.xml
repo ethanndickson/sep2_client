@@ -1,0 +1,10 @@
+<BillingReadingSetList all="180" href="/bill/1/ca/1/ver/1/brs" results="1" subscribable="1" xmlns="urn:ieee:std:2030.5:ns">
+	<BillingReadingSet href="/bill/1/ca/1/ver/1/brs/1">
+		<mRID>82866ecc81c9638a0000e566</mRID>
+		<timePeriod>
+			<duration>86400</duration>
+			<start>1361491200</start>
+		</timePeriod>
+		<BillingReadingListLink all="24" href="/bill/1/ca/1/ver/1/brs/1/br"/>
+	</BillingReadingSet>
+</BillingReadingSetList>
