@@ -1,7 +1,0 @@
-<Subscription xmlns="urn:ieee:std:2030.5:ns">
-	<subscribedResource>http://server.example.com/derp/0/derc</subscribedResource>
-	<encoding>0</encoding>
-	<level>+S1</level>
-	<limit>0</limit>
-	<notificationURI>http://client.example.com/ntfy</notificationURI>
-</Subscription>

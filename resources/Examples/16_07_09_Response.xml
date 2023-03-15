@@ -1,6 +1,0 @@
-<DrResponse xmlns="urn:ieee:std:2030.5:ns">
-	<createdDateTime>1234900</createdDateTime>
-	<endDeviceLFDI>C0FFEE00</endDeviceLFDI>
-	<status>2</status>
-	<subject>CAFEFEED</subject>
-</DrResponse>

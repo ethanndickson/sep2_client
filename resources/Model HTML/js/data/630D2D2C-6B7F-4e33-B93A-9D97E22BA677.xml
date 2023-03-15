@@ -1,9 +1,0 @@
-tocTab[tocTab.length] = new Array("0.3:1", "", "SelfDevice", "EARoot/EA3/EA127.htm", "175.png", "10", "0", "", "Logical diagram0","{57B6426F-A2FD-4ce4-805A-3FA20B0C030D}");
-tocTab[tocTab.length] = new Array("0.3:2", "", "EndDevice", "EARoot/EA3/EA129.htm", "175.png", "9", "0", "", "Logical diagram0","{A9211CE5-3BF6-4242-8800-325F1EFD5A91}");
-tocTab[tocTab.length] = new Array("0.3:3", "", "AbstractDevice", "EARoot/EA3/EA133.htm", "5.png", "E87", "0", "", "Class0","{F7390F74-F1B2-455f-A28C-4E7F6665309C}");
-tocTab[tocTab.length] = new Array("0.3:4", "", "DeviceStatus", "EARoot/EA3/EA134.htm", "5.png", "E88", "0", "", "Class0","{AA53097A-24C4-4b42-B1E0-EC5892389C45}");
-tocTab[tocTab.length] = new Array("0.3:5", "", "EndDevice", "EARoot/EA3/EA135.htm", "5.png", "E89", "0", "", "Class0","{56008854-9107-4d9f-BF88-880905240CFA}");
-tocTab[tocTab.length] = new Array("0.3:6", "", "EndDeviceList", "EARoot/EA3/EA136.htm", "5.png", "E90", "0", "", "Class0","{28B963A6-DCBB-4be1-85B3-572E765E64B3}");
-tocTab[tocTab.length] = new Array("0.3:7", "", "Registration", "EARoot/EA3/EA137.htm", "5.png", "E91", "0", "", "Class0","{80DCB515-1BED-42f2-9036-E411233266D5}");
-tocTab[tocTab.length] = new Array("0.3:8", "", "SelfDevice", "EARoot/EA3/EA138.htm", "5.png", "E92", "0", "", "Class0","{C92C3243-4A6D-4e6e-ABAC-E86E4DB4787B}");
-tocTab[tocTab.length] = new Array("0.3:9", "", "Temperature", "EARoot/EA3/EA139.htm", "5.png", "E93", "0", "", "Class0","{217B8ADA-8229-438d-B228-B0880E6E2B3A}");

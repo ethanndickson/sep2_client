@@ -1,6 +1,0 @@
-tocTab[tocTab.length] = new Array("0.12:1", "", "Configuration", "EARoot/EA12/EA213.htm", "175.png", "19", "0", "", "Logical diagram0","{9E0759AF-BA76-4fc2-ADF5-769EF6334A2E}");
-tocTab[tocTab.length] = new Array("0.12:2", "", "Configuration", "EARoot/EA12/EA216.htm", "5.png", "E150", "0", "", "Class0","{D60A8D8D-A09E-4336-B22D-609D3832EF71}");
-tocTab[tocTab.length] = new Array("0.12:3", "", "PowerConfiguration", "EARoot/EA12/EA217.htm", "5.png", "E151", "0", "", "Class0","{00DB25AB-90D0-43a8-B7C4-028D60A1F40C}");
-tocTab[tocTab.length] = new Array("0.12:4", "", "PriceResponseCfg", "EARoot/EA12/EA218.htm", "5.png", "E152", "0", "", "Class0","{B2A0E96C-2C97-4f61-B4BE-4BB86FE3D75C}");
-tocTab[tocTab.length] = new Array("0.12:5", "", "PriceResponseCfgList", "EARoot/EA12/EA219.htm", "5.png", "E153", "0", "", "Class0","{679E6434-3520-483d-820D-3D96AE2B4E2B}");
-tocTab[tocTab.length] = new Array("0.12:6", "", "TimeConfiguration", "EARoot/EA12/EA220.htm", "5.png", "E155", "0", "", "Class0","{7DD9A70C-7F1C-4eb6-B62E-CE2A1968C171}");

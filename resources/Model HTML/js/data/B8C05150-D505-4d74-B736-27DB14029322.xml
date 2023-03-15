@@ -1,4 +1,0 @@
-tocTab[tocTab.length] = new Array("0.4:1", "", "FunctionSetAssignments", "EARoot/EA4/EA140.htm", "175.png", "11", "0", "", "Logical diagram0","{ED7D30D7-70F3-4889-AB8D-16ADB2BD4659}");
-tocTab[tocTab.length] = new Array("0.4:2", "", "FunctionSetAssignmentsBase", "EARoot/EA4/EA143.htm", "5.png", "E97", "0", "", "Class0","{CBBDC116-B940-4f5c-B897-5745B8248FFF}");
-tocTab[tocTab.length] = new Array("0.4:3", "", "FunctionSetAssignments", "EARoot/EA4/EA144.htm", "5.png", "E95", "0", "", "Class0","{A3B0D4E7-2CFF-40e9-9A02-A1F36F4A4C52}");
-tocTab[tocTab.length] = new Array("0.4:4", "", "FunctionSetAssignmentsList", "EARoot/EA4/EA145.htm", "5.png", "E96", "0", "", "Class0","{64DA2608-1F36-49f2-9CDA-91449B6697D9}");
