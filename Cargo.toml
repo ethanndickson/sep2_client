@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "IEEE-2030.5-Common/common",
+    "client"
+]
