@@ -14,18 +14,21 @@ The specification defines two methods by which clients retrieve resources from s
 The second of which has clients 'subscribe' to a resource, where by a server will then send a notification to all subscribed clients when that resource is updated.
 \cite{IEEE2030.5}
 
-\section{Use Cases}
-The IEEE 2030.5 function sets cover a wide range of applications and uses, aiming to support as many end-user energy devices as possible. A subset of these possible use cases are as follows:
-\begin{itemize}
-    \item (Smart) Electricity Meters may use the 'Metering' function set to 'exchange commodity measurement information'. \cite{IEEE2030.5}
-    \item Electric Vehicle chargers may have their power usage behaviour influenced by the 'Demand Load and Response Control' function set.
-\end{itemize}
+\section{Protocol Design}
+Resources are transmitted between clients and servers using HTTP/1.1, over TCP/IP using TLS.
+As a result, the protocol employs the usual HTTP request methods of GET, POST, PUT and DELETE for retrieving, updating, creating and deleting resources respectively.
 
-
-\section{Technical Design}
- Resources are transmitted using HTTP/1.1, over TCP/IP using TLS.
-As a result, the protocol employs the usual HTTP request methods of GET, POST, PUT and DELETE.
-
-The specification requires that TLS certificates be signed, and all encryption done, using ECC. However, the specification does permit RSA-based cipher suites to be used as a fallback, for the purpose of backwards compatibility, on devices where ECC is not possible.
+The specification requires that TLS certificates be signed, and all encryption done, using ECC. 
+However, the specification does permit RSA-based cipher suites to be used as a fallback, for the purpose of backwards compatibility, on devices where ECC is not supported.
 
 The standardised resource schema is defined using XSD, as all transmitted resources are represented using either XML, or EXI, with the HTTP/1.1 \texttt{Content-Type} header set to \texttt{sep+xml} or \texttt{sep-exi}, respectively.
+
+In order to connect to servers, clients must be able to resolve hostnames to IP addresses using DNS. Similarly, the specification permits the ability for clients to discover servers on a local network using DNS-SD.
+
+\section{Usage}
+The IEEE 2030.5 function sets cover a wide range of applications and uses, aiming to support as many end-user energy devices as possible. A subset of these possible use cases are as follows:
+\begin{itemize}
+    \item (Smart) Electricity Meters can use the 'Metering' function set to 'exchange commodity measurement information' using 2030.5 resources. \cite{IEEE2030.5}
+    \item Electric Vehicle chargers may wish to have their power usage behaviour influenced by resources belonging to the 'Demand Load and Response Control' function set.
+    \item Solar Inverters may use the 'Distributed Energy Resources' function set such that their energy output into the wider grid can be controlled by the utility.
+\end{itemize}
