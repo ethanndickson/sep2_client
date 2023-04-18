@@ -501,22 +501,12 @@ Graduate Research.
 
 % The university minimum margin requirements for theses are as follows
 
-\if@ugrad
-	%undergrad dimensions
-	\setlength{\oddsidemargin}{40mm}
-	\setlength{\evensidemargin}{25mm}
-	\setlength{\topmargin}{25mm}
-	\setlength{\headsep}{20pt}
-	\setlength{\headheight}{25pt}
-\else
-	%hdr dimensions
-	\setlength{\oddsidemargin}{40mm}
-	\setlength{\evensidemargin}{20mm}
-	\setlength{\topmargin}{30mm}
-	\setlength{\headsep}{20pt}
-	\setlength{\headheight}{25pt}
-\fi
-	
+\setlength{\oddsidemargin}{25mm}
+\setlength{\evensidemargin}{25mm}
+\setlength{\topmargin}{25mm}
+\setlength{\headsep}{20pt}
+\setlength{\headheight}{25pt}
+
 \newlength\botmargin
 \setlength{\botmargin}{20mm}
 
