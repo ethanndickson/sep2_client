@@ -1,7 +1,31 @@
 \chapter{Background}\label{ch:background}
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam tincidunt tortor vitae justo luctus cursus. Nullam sagittis, mi quis sodales aliquet, justo tortor pellentesque ante, nec sollicitudin tellus odio eget magna. Vestibulum ut erat porttitor, rutrum enim id, pharetra risus. Nam vel ex in augue eleifend posuere. Aliquam eget dui vitae enim aliquet fringilla. Ut dapibus maximus tempor. Curabitur leo velit, feugiat et tincidunt sed, dapibus eget urna. 
+\section{High-Level Architecture}
+The IEEE 2030.5 protocol is a REST API, and as such, adopts a client-server model.
 
-\section{Sample Section}
+Transmitted between clients and servers are 'Resources', all of which are defined in a standardised schema. 
+Despite the client-server model, the IEEE 2030.5 specification purposefully does not make distinctions between clients and servers, as to avoid resources having differing behaviours on each. Rather, a server simply exposes resources to clients, and clients retrieve, update, create and delete resources on servers.
+A client communicates with, at most, one server, and a server communicates with many clients.
 
-Praesent consectetur pharetra arcu sed iaculis. In sed est fringilla, placerat dolor ut, rutrum velit. Ut egestas volutpat risus, nec tincidunt libero hendrerit ac. Cras eleifend massa eget vehicula posuere. Maecenas interdum risus vitae justo pretium vestibulum. Sed mauris nibh, imperdiet vel mattis in, accumsan sit amet dolor. Morbi a risus eu purus blandit finibus. Donec faucibus rhoncus lectus. 
+Being the product of existing technologies, the IEEE 2030.5 resources cover a wide range of applications, and as such, the specification logically groups resources into discrete 'function sets', of which there are twenty-five. 
+Device manufacturers or electric utilities implementing IEEE 2030.5 need only communicate resources from function sets relevant to the purpose of the device. 
+
+The specification defines two methods by which clients retrieve resources from server. The first of which, polling, has a client contact a server, requesting updates, on a timed interval. 
+The second of which has clients 'subscribe' to a resource, where by a server will then send a notification to all subscribed clients when that resource is updated.
+\cite{IEEE2030.5}
+
+\section{Use Cases}
+The IEEE 2030.5 function sets cover a wide range of applications and uses, aiming to support as many end-user energy devices as possible. A subset of these possible use cases are as follows:
+\begin{itemize}
+    \item (Smart) Electricity Meters may use the 'Metering' function set to 'exchange commodity measurement information'. \cite{IEEE2030.5}
+    \item Electric Vehicle chargers may have their power usage behaviour influenced by the 'Demand Load and Response Control' function set.
+\end{itemize}
+
+
+\section{Technical Design}
+ Resources are transmitted using HTTP/1.1, over TCP/IP using TLS.
+As a result, the protocol employs the usual HTTP request methods of GET, POST, PUT and DELETE.
+
+The specification requires that TLS certificates be signed, and all encryption done, using ECC. However, the specification does permit RSA-based cipher suites to be used as a fallback, for the purpose of backwards compatibility, on devices where ECC is not possible.
+
+The standardised resource schema is defined using XSD, as all transmitted resources are represented using either XML, or EXI, with the HTTP/1.1 \texttt{Content-Type} header set to \texttt{sep+xml} or \texttt{sep-exi}, respectively.
