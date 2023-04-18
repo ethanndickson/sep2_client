@@ -1,15 +1,46 @@
 \chapter{Implementation Design}\label{ch:implementation}
+Given the context and background surrounding the IEEE 2030.5 Protocol, we can begin examining the considerations taken when designing our implementation.
+
+\section{Programming Language}
+The operating context of IEEE 2030.5 greatly influences the software development tools that are suitable for implementation.
+When choosing a programming language, we must consider:
+
+\begin{itemize}
+    \item \textbf{Device resource constraints} - Many existing IEEE 2030.5 compliant devices are constrained by the clockspeed of the onboard CPU, and the amount of onboard memory.
+    For example, the "Gen5 Riva" smart meter by Itron, possesses a 600Mhz processor, and 256Mb of RAM.\cite[]{Gen5Riva}
+    \hfill \break
+    Therefore, we desire a programming language with minimal runtime overhead, and low-cost abstractions.
+    \item \textbf{Cross-platform capabilities} - Given that our client may be deployed on embedded hardware, writing code in a language that can be compiled to a wider range of CPU and hardware configurations is desirable. 
+    For this reason, we saw EPRI choose to implement their client in the C programming language.
+    \item \textbf{Security} - In 2019, Microsoft attributed 70\% of all CVEs in software to be caused by memory safety issues, in the last 12 years. \cite[]{SecurityMemorySafety}
+    As we've previously established improving the security of end user energy devices is part of the core rationale behind IEEE 2030.5. For that reason, developing our client in a language that is memory safe would work towards this goal.
+    \item \textbf{Concurrent programming support} - By nature of the protocol, an IEEE 2030.5 client is an I/O bound application. For that reason, we desire a programming language that provides us with abstractions for event-driven architecture, such that operations can be performed while waiting on I/O, even on a single threaded device.
+\end{itemize}
+
+
+\subsection{Rust}
+The Rust programming language is a high-level, general purpose programming language that has been strongly influenced by the successes of other programming languages, both industrial and academic
+Rust will be used to develop our IEEE 2030.5 client implementation as it addresses all the aforementioned considerations.
+
+\begin{itemize}
+    \item \textbf{Device resource constraints} - Rust provides us with high-level abstractions, but with a focus on performance, and only 'paying' (in terms of available computer resources) for what you use. For that reason, Rust has seen usage in both application and systems level programming.
+    \item \textbf{Cross-platform capabilities} - Although Rust is by no means a universal programming language like C, it has a growing presence in embedded development, and as such has a reasonable degree of portability.
+    \item \textbf{Security} - While writing a variation of Rust called 'safe' Rust, the programming language is, outside of compiler bugs, completely memory safe, without the runtime overhead of a garbage collector. When writing 'unsafe' rust, raw pointers may be dereferenced, where by the compiler is no longer able to guarantee memory safety. For that reason, our implementation will be done using purely safe Rust.
+    \item \textbf{Concurrent programming support} - Through it's type system, Rust also eliminates the possibility of a data race when working with multiple threads of execution. Furthermore, Rust has native support for asynchronous programming, with concurrency-runtime-independent await and async syntax.
+\end{itemize}
+
+Rust's high-level abstractions furthermore lend themselves to the imposed reliability of the client, in that all expected errors are to be handled at compile-time. The Rust algebraic sum types 'Option' and 'Result' enable programmers to handle errors, in order to use the output of a process.
+This is contrasted to a language like C++, where runtime exceptions are used to denote errors in the standard library, of which the language does not force the programmer to handle at compile-time.
+
+
 
 
 \section{Operating System}
 
 
 
-\section{Programming Language}
-
-
-
 \section{Common Library}
+
 
 
 \subsection{Resource Data Types}
