@@ -503,7 +503,7 @@ Graduate Research.
 
 \setlength{\oddsidemargin}{25mm}
 \setlength{\evensidemargin}{25mm}
-\setlength{\topmargin}{25mm}
+\setlength{\topmargin}{10mm}
 \setlength{\headsep}{20pt}
 \setlength{\headheight}{25pt}
 
