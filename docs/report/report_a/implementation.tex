@@ -23,19 +23,22 @@ The Rust programming language is a high-level, general purpose programming langu
 Rust will be used to develop our IEEE 2030.5 client implementation as it addresses all the aforementioned considerations.
 
 \begin{itemize}
-    \item \textbf{Device resource constraints} - Rust provides us with high-level abstractions, but with a focus on performance, and only 'paying' (in terms of available computer resources) for what you use. For that reason, Rust has seen usage in both application and systems level programming.
-    \item \textbf{Cross-platform capabilities} - Although Rust is by no means a universal programming language like C, it has a growing presence in embedded development, and as such has a reasonable degree of portability.
-    \item \textbf{Security} - While writing a variation of Rust called 'safe' Rust, the programming language is, outside of compiler bugs, completely memory safe, without the runtime overhead of a garbage collector. When writing 'unsafe' rust, raw pointers may be dereferenced, where by the compiler is no longer able to guarantee memory safety. For that reason, our implementation will be done using purely safe Rust.
-    \item \textbf{Concurrent programming support} - Through it's type system, Rust also eliminates the possibility of a data race when working with multiple threads of execution. Furthermore, Rust has native support for asynchronous programming, with concurrency-runtime-independent await and async syntax.
+    \item Rust provides us with high-level abstractions, but with a focus on performance, and only 'paying' (in terms of available computer resources) for what you use. For that reason, Rust has seen usage in both application and systems level programming.
+    \item Although Rust is by no means a universal programming language like C, it has a growing presence in embedded development, and as such has a reasonable degree of portability.
+    \item While writing a variation of Rust called 'safe' Rust, the programming language is, outside of compiler bugs, completely memory safe, without the runtime overhead of a garbage collector. When writing 'unsafe' rust, raw pointers may be dereferenced, where by the compiler is no longer able to guarantee memory safety. For that reason, our implementation will be done using purely safe Rust.
+    \item Through it's type system, Rust also eliminates the possibility of a data race when working with multiple threads of execution. Furthermore, Rust has native support for asynchronous programming, with concurrency-runtime-independent await and async syntax.
 \end{itemize}
 
 Rust's high-level abstractions furthermore lend themselves to the imposed reliability of the client, in that all expected errors are to be handled at compile-time. The Rust algebraic sum types 'Option' and 'Result' enable programmers to handle errors, in order to use the output of a process.
 This is contrasted to a language like C++, where runtime exceptions are used to denote errors in the standard library, of which the language does not force the programmer to handle at compile-time.
 
-
-
-
 \section{Operating System}
+Despite the desire to write code that is portable, we will nonetheless require operating-system-specific functionality, and as such will need to target a single operating system. Then, we can provide an interface for device manufacturers to swap out should they want to use the client on a different operating system.
+
+Of great consideration when choosing an operating system is the aforementioned 'Aggregator' model for IEEE 2030.5, where by our client would be deployed on a dedicated server, or in the cloud. In this circumstance, it's very much likely an operating system running on the Linux kernel is to be used, due to it's prevalence in server operating-systems.
+Whilst there exist purpose built IOT-device operating systems, they are built and optimised for low-spec low-power usage devices, and as such would not be appropriate at scale such as under this model.
+
+Furthermore, there exist very lightweight Linux based operating systems for low-spec devices, making Linux the best choice for our targeted operating system.
 
 
 
