@@ -40,15 +40,31 @@ Whilst there exist purpose built IOT-device operating systems, they are built an
 
 Furthermore, there exist very lightweight Linux based operating systems for low-spec devices, making Linux the best choice for our targeted operating system.
 
-
-
 \section{Common Library}
+As discussed, the IEEE 2030.5 specification makes no distinction between clients \& servers, aside from the fact that servers expose resources, and clients interact with resources. 
+For that reason, our client implementation will also produce a common library, that would be used one by developing a IEEE 2030.5 server implementation in Rust.
 
-
+In this context, it's reasonable to draw inspiration from the EPRI implementation of an IEEE 2030.5 client, and define a series of interfaces that make use of OS specific APIs, such that a device manufacturer need only re-implement those interfaces when porting our software to a different OS.
 
 \subsection{Resource Data Types}
+The most important, and largest part of this common library is the internal representation of resources, the data communicated between client \& server. These resources are described precisely in an XSD.
+
+
 
 \subsection{Resource Serialisation \& Deserialisation}
+As we've established, resources are sent as their XML representations over HTTP. This means our common library requires the ability to serialize and deserialize resources to and from the appropriate XML.
+
+
+\subsection{Security}
+The security-focused portion of the common library includes certificate management, and an encryption interface for use in client networking.
+The specification requires that ECC, as defined in IETF RFC 7251, specifically elliptic curve secp256r1, be used to sign certificates and encrypt traffic over TLS 
+However, the specification does permit RSA-based cipher suites to be used as a fallback, for the purpose of backwards compatibility, on devices where ECC is not supported.
+For that reason, our common library will implement a security interface to be used throughout the client and server, such that it is comprehensive and can be replaced for portability.
+\subsection{Network}
+The network-focused portion of the common library includes creating and sending HTTP requests over TCP, whilst using the previously defined security interface for TLS.
+
+It's worth noting that the extent to which a server would utilise this interface is yet to be determined.  
+
 
 \subsection{Testing}
 
