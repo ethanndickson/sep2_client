@@ -48,6 +48,22 @@ In this context, it's reasonable to draw inspiration from the EPRI implementatio
 
 \subsection{Resource Data Types}
 The most important, and largest part of this common library is the internal representation of resources, the data communicated between client \& server. These resources are described precisely in an XSD.
+Resources range from data that may be used by the electric utility, such as the current load of the device, to resource metadata, such as the rate at which a client should poll a server for a given resource, or what URI endpoint can be used to access a given resource, in the case of a Link resource.
+In both specification and schema, these data structures are separated into packages, and sub-packages. 
+
+Whilst the 2030.5 specification makes no mention of the object oriented programming paradigm, OOP inheritance underpins the design of all resources, including both multi-level and hierarchial inheritance.
+As such, for the purpose of code reuse, many base types appear in the 'common' package; data structures extended by many others.
+
+\subsubsection{Representing in Rust}
+Rust, despite being influenced by OOP, does not have the notion of a class, like in languages like C++ or Java, and as such does not define shared behaviour of types through inheritance from a common parent type. 
+Rather, Rust defines shared behaviour through traits, where shared behaviour refers solely to the methods that we can call on that type, as per the traits a type implements.
+In this sense, Rust does not concern itself with what a type is or what that type stores, it concerns itself only with the traits a type possesses.
+
+Traits themselves do support inheritance. One can have traits that require other traits to be implemented for a given type. However, this does not change the fact that traits only represent behaviour. 
+There is no wa to have a data structure inherit the internal members of another.
+
+
+
 
 
 
@@ -63,7 +79,7 @@ For that reason, our common library will implement a security interface to be us
 \subsection{Network}
 The network-focused portion of the common library includes creating and sending HTTP requests over TCP, whilst using the previously defined security interface for TLS.
 
-It's worth noting that the extent to which a server would utilise this interface is yet to be determined.  
+It's worth noting that the extent to which a server would utilise this interface is yet to be determined.
 
 
 \subsection{Testing}
