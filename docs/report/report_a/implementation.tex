@@ -54,17 +54,119 @@ In both specification and schema, these data structures are separated into packa
 Whilst the 2030.5 specification makes no mention of the object oriented programming paradigm, OOP inheritance underpins the design of all resources, including both multi-level and hierarchial inheritance.
 As such, for the purpose of code reuse, many base types appear in the 'common' package; data structures extended by many others.
 
-\subsubsection{Representing in Rust}
-Rust, despite being influenced by OOP, does not have the notion of a class, like in languages like C++ or Java, and as such does not define shared behaviour of types through inheritance from a common parent type. 
+\subsubsection{Representing Resources in Rust}
+Rust, despite being influenced by OOP, does not posses the notion of a class, like in languages like C++ or Java, and as such does not define shared behaviour of types through inheritance from a common parent type. 
 Rather, Rust defines shared behaviour through traits, where shared behaviour refers solely to the methods that we can call on that type, as per the traits a type implements.
 In this sense, Rust does not concern itself with what a type is or what that type stores, it concerns itself only with the traits a type possesses.
 
 Traits themselves do support inheritance. One can have traits that require other traits to be implemented for a given type. However, this does not change the fact that traits only represent behaviour. 
-There is no wa to have a data structure inherit the internal members of another.
+There is no way to have a data structure inherit the internal members of another.
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            pub trait Resource {
+                fn get_href(&self) -> Option<&str>;
+            }
+        \end{lstlisting}
+        \caption{A Rust trait representing the IEEE 2030.5 "Resource" data type}
+    \end{center}
+\end{figure}
 
 
 
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            pub trait List : Resource {
+                fn all(&self) -> UInt32;
+                fn results(&self) -> UInt32;
+            }
+        \end{lstlisting}
+        \caption{A Rust trait representing the IEEE 2030.5 "List" data type}
+    \end{center}
+\end{figure}
 
+In Figure 5.2, we have a Rust trait that describes the behaviour of the List base type. All lists are resources, and thus we have a trait restriction that all types implementing List must first implement the Resource trait.
+
+This is the extent of native inheritance in rust. We can specify the exact behaviour of types that belong to a trait in detail, but we cannot influence how that behaviour is achieved.
+
+\subsubsection{Emulating inheritance in Rust}
+
+As a result, we're forced to emulate the inheritance of data structure members in Rust, of which there are two approaches:
+
+\begin{itemize}
+    \item Composite an instance of the base type into type definitions 
+    \item Repeat all inherited members in type definitions
+\end{itemize}
+
+Regardless of the approach, we still do not have have polymorphism using the base-types of resources.
+To allow for polymorphism a trait must be defined for each base-type, and then those trait functions need be implemented for every type that extends the base type. 
+This is unavoidable duplicate code, not ignoring the possibility of generating said code.
+The extent to which polymorphism is required in the final client implementation is yet to be determined. In this case, we can refer to the EPRI client implementation, 
+where they provide device manufacturers an interface for handling resources using polymorphism.
+Thus, when determining how we will emulate inheritance, we let the ease at which polymorphism can be allowed influence our decision
+
+
+\subsubsection{Inheritance via Composition}
+
+If we were to implement the first of the two approaches, we can make use of an existing Rust library to reduce the amount of boilerplate required to implement polymorphism.
+This library operates on the basis that inheritance can be replicated via composition. If a data type were to contain a member that implements a given trait, there is no reason for that outer struct to not be able to implement that trait by simply calling upon the underlying member.
+
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            #[inheritable]
+            pub trait Resource {
+                fn get_href(&self) -> Option<&str>;
+            }
+
+            pub struct ResourceObj {
+                href: Option<String>
+            }
+
+            impl Resource for ResourceObj {
+                fn href(&self) -> Option<&str> {
+                    self.href.as_str()
+                }
+            }
+        \end{lstlisting}
+        \label{fig:resinher}
+        \caption{The Rust code required to represent the IEEE 2030.5 "Resource" data type using 'inheritance-rs'}
+    \end{center}
+\end{figure}
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            #[derive(Inheritance)]
+            pub struct List {
+                #[inherits(Resource)]
+                res: ResourceObj,
+                all: UInt32,
+                results: UInt32,
+            }
+        \end{lstlisting}
+        \label{fig:listinher}
+        \caption{A Rust data type representing an IEEE 2030.5 "List" using 'inheritance-rs'}
+    \end{center}
+\end{figure}
+
+
+Figures 5.3 and 5.4 show how this library, 'inheritance-rs' is used to reduce the boilerplate necessary to inherit data members. 
+In Figure 5.3, we mark the Resource trait as 'inheritable' and then implement that trait on a type that holds the necessary members, our bare minimum 'base' type. 
+In Figure 5.3, we compose an instance of that base type into a type that would normally inherit from it. Then, we tell the library to generate the code, at compile-time, that would allow List to implement the Resource trait.
+This generated code simply calls the underlying ResourceObj member when the href function would be called on a list.
+
+The major flaw in this method is that for every single type that is used as a base type, a trait, and a base implementation of that trait needs to be written.
+Given that there are just under 700 data types in the IEEE 2030.5 specification schema, alternative approaches were then considered.
+
+
+\subsubsection{XSD to Rust types}
+
+If we were to implement the second approach, an existing Rust library can be used to eliminate the process of defining data types altogether.
+This of course draws on the fact that the IEEE 2030.5 XSD is entirely self-contained, and follows guidelines by W3C. As such, generating rust data types from it is a reasonable approach.
 
 
 \subsection{Resource Serialisation \& Deserialisation}
@@ -79,7 +181,7 @@ For that reason, our common library will implement a security interface to be us
 \subsection{Network}
 The network-focused portion of the common library includes creating and sending HTTP requests over TCP, whilst using the previously defined security interface for TLS.
 
-It's worth noting that the extent to which a server would utilise this interface is yet to be determined.
+It's worth noting that the extent to which a server implementation would utilise this interface is yet to be determined.
 
 
 \subsection{Testing}
