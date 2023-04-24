@@ -14,6 +14,20 @@ In this section, we will examine both, and discuss how they may influence our op
 
 
 \section{Electric Power Research Institute}
+One of the more immediately relevant adoptions of the protocol is the mostly compliant implementation of a client library by EPRI in the United States.
+Released under the BSD-3 license and written in the C programming language, the implementation comes in at just under twenty-thousand lines of C code.
+Given that a IEEE 2030.5 client would require extension by a device manufacturer for integrating with the logic of the device itself, EPRI distributed header files as the core of the client.
+For the purpose of demonstration and testing, they also bundled a client binary that can be built and executed, running as per user input.
+
+The C codebase includes a program that parses the IEEE 2030.5 XSD schema, and converts it into C data types (structs) with documentation. This is then built with the remainder of the client library.
+The implementation targets running on the Linux operating system, however, for the sake of portability, EPRI defined a set of header file interfaces that contained Linux specific API calls, such that they could be replaced for some other operating system.
+These replaceable interfaces include those for networking, TCP and UDP, and event-based architecture, using the Linux \texttt{epoll} \texttt{syscall}, among others.
+
+The IEEE 2030.5 Client implementation by EPRI states, in it's User's Manual, that it almost perfectly conforms to the IEEE 2030.5 specification according to tests written by QualityLogic.
+The one exception to this is that the implementation does not support the subscription feature, as of this report.
+This is particularly unusual given that the California SIP mandates the use of subscription/notification under the client aggregator model, a model of which this implementation targeted use in.
+For that reason, with plans for our client to implement the subscription/notification method, we would be filling a gap in existing open-source IEEE 2030.5 software. 
+
 
 
 
