@@ -4,12 +4,44 @@ Further proving that the IEEE 2030.5 protocol is worth implementing is it's adop
 Consequently, many implementations of the protocol exist already, with the vast majority of them proprietary, or implementing proprietary extensions of the standard.
 In this section, we will examine both, and discuss how they may influence our open-source implementation. 
 
-\section{Australian Renewable Energy Agency}
-
-
 \section{California Public Utilities Commission}
+'Electric Rule 21' is a tariff put forward by CPUC. Within it are a set of requirements concerning the connection of end user energy production and storage to the grid. In this tariff, it is explicitly clear that
+"The default application-level protocol shall be IEEE 2030.5, as defined in the California IEEE 2030.5 implementation guide" \cite[]{Rule21}
+Given that the state of California was among the first to make these considerations to the protocol, it's likely that future writers of legislation or tariffs will be influenced by the successes of Rule 21, particularly how they have extended the protocol to achieve scale in the realm of smart inverters.
+For that reason, we let the implementation models for the Californian IEEE 2030.5 implementation guide influence our own development of the protocol, whilst of course still adhering to the specification.
+
+Relating directly to use of the IEEE 2030.5 protocol at scale are the high level architecture models defined in the California SIP implementation guide.
+
+\subsubsection{Individual/Direct Model}
+Under this model there is a direct communication between an IEEE 2030.5 compliant client, in this case a solar inverter, and a IEEE 2030.5 compliant server, hosted by the electric utility.
+This model alone does not impose any additional restrictions over those already existing in Rule 21. It requires the inverter to be a 2030.5 Client, and be managed individually by the server.
 
 
+\subsubsection{Aggregated Clients Model}
+The aggregated clients model, outlined in the implementation guide, is one preferred for use by electric utilities. Under this model, the 2030.5 client is but an aggregator communicating with multiple smart inverters, acting on their behalf.
+The rationale behind this model is to allow utilities to manage entire geographical areas as though it were a single entity.
+
+
+
+The IEEE 2030.5 server is not aware of this aggregation, as the chosen communication protocol between an aggregator client and an end user energy device is unspecified and not relevant to the model.
+Under this model, aggregators may be communicating with thousands of IEEE 2030.5 compliant clients. For this reason, the California SIP mandates the subscription/notification retrieval method be used by clients, rather than polling.
+This is mandated in order to reduce network traffic, and of course, allow for use of the protocol to better scale.
+
+Given the circumstances of this model, the aggregator IEEE 2030.5 client is likely to be hosted in the cloud, or on some form of dedicated server.
+
+This model influences our client implementation in that it must be scalable, and take advantage of available hardware resources as required. For instance, our client must take advantage of parallel computing on multi-threaded devices.
+Likewise, it must implement the subscription/notification retrieval method.
+
+
+\section{Australian Renewable Energy Agency}
+"Common Smart Inverter Profile" (Common SIP) is an implementation guide developed by the "DER Integration API Technical Working Group" in order to "promote interoperability amongst DER and DNSPs in Australia".
+The implementation guide has DER adhere to the IEEE 2030.5 spec, whilst further leveraging the aforementioned CPUC California SIP, including support for use of the client aggregator model, and the mandated use of subscription/notification retrieval by those aggregator clients.
+
+Most importantly, the Australian Common SIP extends upon the \texttt{DERCapability} resource to support \texttt{Dynamic Operating Envelopes}, and it does so whilst still adhering to the IEEE 2030.5 specification.
+As per the specification, resource extensions are to be made under a different XML namespace, in this case \texttt{https://csipaus.org/ns}. \cite[]{CSIPAus}
+
+As such, our client implementation will allow for extended resources to be created and used, at the convenience of the device manufacturer (See Section 5.3.1). 
+However, we won't rule out the possibility of implementing the extensions, as specified by the Common SIP, as a stretch goal. 
 \section{SunSpec}
 
 
@@ -26,7 +58,8 @@ These replaceable interfaces include those for networking, TCP and UDP, and even
 The IEEE 2030.5 Client implementation by EPRI states, in it's User's Manual, that it almost perfectly conforms to the IEEE 2030.5 specification according to tests written by QualityLogic.
 The one exception to this is that the implementation does not support the subscription feature, as of this report.
 This is particularly unusual given that the California SIP mandates the use of subscription/notification under the client aggregator model, a model of which this implementation targeted use in.
-For that reason, with plans for our client to implement the subscription/notification method, we would be filling a gap in existing open-source IEEE 2030.5 software. 
+For that reason, this thesis will prioritise implementing the subscription/notification mechanism, for the purpose of filling a gap in available open-source technologies.
+\cite[]{eprimanual}
 
 
 

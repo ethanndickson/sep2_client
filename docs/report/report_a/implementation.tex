@@ -42,7 +42,7 @@ Furthermore, there exist very lightweight Linux based operating systems for low-
 
 \section{Common Library}
 As discussed, the IEEE 2030.5 specification makes no distinction between clients \& servers, aside from the fact that servers expose resources, and clients interact with resources. 
-For that reason, our client implementation will also produce a common library, that would be used one by developing a IEEE 2030.5 server implementation in Rust.
+For that reason, our client implementation will also produce a common library, that would be used by one developing a IEEE 2030.5 server implementation in Rust.
 
 In this context, it's reasonable to draw inspiration from the EPRI implementation of an IEEE 2030.5 client, and define a series of interfaces that make use of OS specific APIs, such that a device manufacturer need only re-implement those interfaces when porting our software to a different OS.
 
@@ -222,6 +222,8 @@ Figure 5.6 shows the List data type were it a concrete data type serialized into
 
 Further advocating for the use of an XSD parser is the fact that the 2030.5 XSD is updated more often than revisions of the specification itself, even if those updates are relatively infrequent.
 Using \texttt{xsd-parser-rs} will allow us to better maintain the client, by way of simply running updated schemas through the parser.
+Furthermore, as DER implementation guides choose to extend the available IEEE 2030.5 resources under new namespaces, 
+our \texttt{xsd-parser-rs} fork will be made available such that the XSD for those extensions be provided as input, and the corresponding Rust data types be generated.
 
 Regrettably, \texttt{xsd-parser-rs} does not perfectly fit our needs:
 \begin{itemize}
@@ -251,7 +253,7 @@ Figure 5.6 is an example of what the List type looks like when serialized to XML
 
 Once again, \texttt{YaSerde} does not perfectly fit our needs. Currently, the library serializes enums as a string representation of their variant. IEEE 2030.5 requires that the underlying integer representation be used, as the variants are but annotations in the schema.
 
-Rather than go and manually implement XML serialization/deserialization for all enums, we can simply maintain a fork of YaSerde, and modify the library's behaviour.
+Rather than go and manually implement XML serialization/deserialization for all enums, we can simply maintain a fork of YaSerde, and modify the library's behaviour there.
 
 
 \subsection{Security}
