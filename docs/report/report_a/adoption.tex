@@ -6,8 +6,8 @@ In this section, we will examine both, and discuss how they may influence our op
 
 \section{California Public Utilities Commission}
 'Electric Rule 21' is a tariff put forward by CPUC. Within it are a set of requirements concerning the connection of end-user energy production and storage to the grid. In this tariff, it is explicitly clear that
-"The default application-level protocol shall be IEEE 2030.5, as defined in the California IEEE 2030.5 implementation guide" \cite[]{Rule21}
-Given that the state of California was among the first to make these considerations to the protocol, it's likely that future writers of legislation or tariffs will be influenced by the successes of Rule 21, particularly how they have extended the protocol to achieve scale in the realm of smart inverters.
+"The default application-level protocol shall be IEEE 2030.5, as defined in the California IEEE 2030.5 implementation guide" \cite[]{Rule21}.
+Given that the state of California was among the first to make these considerations to the protocol, it's likely that future writers of legislation or tariffs will be influenced by Rule 21, particularly how they have extended the protocol to achieve scale in the realm of smart inverters.
 For that reason, we let the implementation models for the Californian IEEE 2030.5 implementation guide influence our own development of the protocol, whilst of course still adhering to the specification.
 
 Relating directly to use of the IEEE 2030.5 protocol at scale are the high level architecture models defined in the California SIP implementation guide.
@@ -107,40 +107,44 @@ The rationale behind this model is to allow utilities to manage entire geographi
 
 The IEEE 2030.5 server is not aware of this aggregation, as the chosen communication protocol between an aggregator client and an end-user energy device is unspecified and not relevant to the model, as indicated in Figure 4.2.
 Under this model, aggregators may be communicating with thousands of IEEE 2030.5 compliant clients. For this reason, the California SIP mandates the subscription/notification retrieval method be used by clients, rather than polling.
-This is mandated in order to reduce network traffic, and of course, allow for use of the protocol to better scale.
+This is mandated in order to reduce network traffic, and of course, allow for use of the protocol at scale.
 
 Given the circumstances of this model, the aggregator IEEE 2030.5 client is likely to be hosted in the cloud, or on some form of dedicated server.
 
-This model influences our client implementation in that it must be scalable, and take advantage of available hardware resources as required. For instance, our client must take advantage of parallel computing on multi-threaded devices.
+This model influences our client implementation in that it must be scalable, and take advantage of available hardware resources where possible. For instance, our client must take advantage of parallel computing on multi-threaded devices.
 Likewise, it must implement the subscription/notification retrieval method.
 
 
 \section{Australian Renewable Energy Agency}
 "Common Smart Inverter Profile" (Common SIP) is an implementation guide developed by the "DER Integration API Technical Working Group" in order to "promote interoperability amongst DER and DNSPs in Australia".
-The implementation guide has DER adhere to the IEEE 2030.5 spec, whilst further leveraging the aforementioned CPUC California SIP, including support for use of the client aggregator model, and the mandated use of subscription/notification retrieval by those aggregator clients.
+The implementation guide has DER adhere to the IEEE 2030.5 spec, whilst further leveraging the aforementioned CPUC California SIP, including support for use of the client aggregator model, and the mandated use of subscription/notification retrieval by those aggregator clients. \cite[]{CSIPAus}
 
 Most importantly, the Australian Common SIP extends upon the \texttt{DERCapability} resource to support \texttt{Dynamic Operating Envelopes}, and it does so whilst still adhering to the IEEE 2030.5 specification.
 As per the specification, resource extensions are to be made under a different XML namespace, in this case \texttt{https://csipaus.org/ns}. \cite[]{CSIPAus}
 
 As such, our client implementation will allow for extended resources to be created and used, at the convenience of the device manufacturer (See Section 5.3.1). 
 However, we won't rule out the possibility of implementing the extensions, as specified by the Common SIP, as a stretch goal. 
-\section{SunSpec}
+\section{SunSpec Alliance}
+
+As of present, the specification behind the aforementioned SunSpec Modbus is still available and distributed, as it's "semantically identical and thus fully interoperable with IEEE 2030.5". 
+The primary motivation for implementing SunSpec Modbus is it's compliance with IEEE 1547, the standard for the interconnection of DER into the grid. \cite[]{SunSpecModbus}
 
 
 \section{Electric Power Research Institute}
-One of the more immediately relevant adoptions of the protocol is the mostly compliant implementation of a client library by EPRI in the United States.
+One of the more immediately relevant adoptions of the protocol is the mostly compliant implementation of a client by EPRI in the United States.
 Released under the BSD-3 license and written in the C programming language, the implementation comes in at just under twenty-thousand lines of C code.
-Given that a IEEE 2030.5 client would require extension by a device manufacturer for integrating with the logic of the device itself, EPRI distributed header files as the core of the client.
+Given that a IEEE 2030.5 client would require extension by a device manufacturer, as to integrate it with the logic of the device itself, EPRI distributed header files as the core of the client.
 For the purpose of demonstration and testing, they also bundled a client binary that can be built and executed, running as per user input.
 
-The C codebase includes a program that parses the IEEE 2030.5 XSD schema, and converts it into C data types (structs) with documentation. This is then built with the remainder of the client library.
-The implementation targets running on the Linux operating system, however, for the sake of portability, EPRI defined a set of header file interfaces that contained Linux specific API calls, such that they could be replaced for some other operating system.
+The C codebase includes a program that parses the IEEE 2030.5 XSD and converts it into C data types (structs) with documentation. This is then built with the remainder of the client library.
+
+The implementation targets the Linux operating system, however, for the sake of portability, EPRI defined a set of header file interfaces that contained Linux specific API calls, such that they could be replaced for some other operating system.
 These replaceable interfaces include those for networking, TCP and UDP, and event-based architecture, using the Linux \texttt{epoll} \texttt{syscall}, among others.
 
 The IEEE 2030.5 Client implementation by EPRI states, in it's User's Manual, that it almost perfectly conforms to the IEEE 2030.5 specification according to tests written by QualityLogic.
-The one exception to this is that the implementation does not support the subscription feature, as of this report.
-This is particularly unusual given that the California SIP mandates the use of subscription/notification under the client aggregator model, a model of which this implementation targeted use in.
-For that reason, this thesis will prioritise implementing the subscription/notification mechanism, for the purpose of filling a gap in available open-source technologies.
+The one exception to this is that the implementation does not support the subscription/notification mechanism for resource retrieval, as of this report.
+This is particularly unusual given that the California SIP mandates the use of subscription/notification under the client aggregator model, a model of which this implementation was targeted for use in.
+For that reason, this thesis will prioritise implementing the subscription/notification mechanism, with the purpose of filling a gap in available open-source technologies.
 \cite[]{eprimanual}
 
 

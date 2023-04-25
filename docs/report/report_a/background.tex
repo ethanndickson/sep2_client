@@ -16,9 +16,9 @@ The second of which has clients 'subscribe' to a resource, where by a server wil
 
 \section{Protocol Design}
 Resources are transmitted between clients and servers using HTTP/1.1, over TCP/IP using TLS.
-As a result, the protocol employs the usual HTTP request methods of GET, POST, PUT and DELETE for retrieving, updating, creating and deleting resources respectively.
+As a result, the protocol employs the usual HTTP request methods of GET, POST, PUT and DELETE for retrieving, updating, creating and deleting resources, respectively.
 
-The specification requires that TLS certificates be signed, and all encryption done, using ECC (or RSA as a fallback)
+The specification requires that TLS certificates be signed, and all encryption done, using ECC cipher suites, with the ability to use RSA cipher suites as a fallback.
 
 The standardised resource schema is defined using XSD, as all transmitted resources are represented using either XML, or EXI, with the HTTP/1.1 \texttt{Content-Type} header set to \texttt{sep+xml} or \texttt{sep-exi}, respectively.
 
