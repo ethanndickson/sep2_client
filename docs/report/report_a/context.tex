@@ -1,6 +1,6 @@
 \chapter{Context}\label{ch:context}
 
-IEEE 2030.5 is but one protocol designed for communication between end user energy devices and electric utilities. 
+IEEE 2030.5 is but one protocol designed for communication between end-user energy devices and electric utilities. 
 Although IEEE 2030.5 is a modern protocol, it is not wholly new or original, rather it is the product of historically successful protocols, designed with the same aim.
 In this section we'll examine the predecessors to IEEE 2030.5, and their influence on the standard.
 
@@ -8,15 +8,26 @@ In this section we'll examine the predecessors to IEEE 2030.5, and their influen
 Developed by ZigBee Alliance, and published in 2008, Smart Energy Profile 1.x was a specification for an application-layer communication protocol between end-user energy devices and electric utilities. 
 The specification called for the usage of the "ZigBee" communication protocol, based off the IEEE 802.15.4 specification for physical layer communication.\cite[]{ZigBeeSEP} \hfill \break
 The specification was adopted by utilities worldwide, including the Southern California Edison Company, who purchased usage of the system for \$400 million USD.\cite[]{SEP1Article} \hfill \break
-Unlike IEEE 2030.5 and more modern end-user energy device protocols, SEP 1.x created a HAN using ZigBee, and then used Internet Protocol to communicate data from that HAN to an electric utility.
+
+According to SunSpec in 2019, over 60 million smart meters are deployed under ZigBee Smart Energy 1.x, with 550 certified SEP 1.x products. \cite[]{20305workshop}
+
 
 \section{SunSpec Modbus}
-
+Referenced in the specification as the foundations for IEEE 2030.5 is the Sunspec Alliance Inverter Control Model, which encompasses the SunSpec Modbus Protocol.
+Sunspec Modbus is an extension of the Modbus communication protocol designed for end-user energy devices, and was published, yet not standardised, in 2010. The protocol set out to accomplish many of the same goals as IEEE 2030.5 does today. 
+Tom Tansy, chairman of the SunSpec Alliance pins the goal of the protocol as to create a 'common language that all distributed energy component manufacturers could use to enable communication interoperability'.
+\cite[]{SunspecModbusArticle}
 
 \section{IEEE 2030}
-
+IEEE 2030 was a guide, published in 2011, putting together a plan to standardise smart grid communication and interoperability, and how potential solutions could be evaluated. A major goal of these potential solutions is that, by their nature of existing in the end-user environment, they were to prioritise the security of all data stored and transmitted.
+\cite[]{2030} 
 
 \section{Producing IEEE 2030.5}
 
+In the interest of interoperability with a future standard, the SunSpec alliance donated their SunSpec Modbus protocol to form IEEE 2030.5. Simultaneously, ZigBee Alliance was looking to develop Smart Energy Profile 2.0, which would use TCP/IP.
+At this point the SunSpec Alliance formed a partnership with ZigBee Alliance, and IEEE 2030.5 was created as a TCP/IP communication protocol that is both SEP 2.0, and interoperable with SunSpec Modbus. \cite[]{SunspecModbusArticle}
+Likewise, IEEE 2030.5 works to improve the security of end-user energy devices, as put forward by IEEE 2030. 
+
+With IEEE 2030.5 extending and combining these existing, widely used, protocols, we're reassured it actually solves the problems faced by utilities and smart grid device manufacturers alike, and wasn't created in a vacuum, unaware of real world requirements, or the needs of device manufacturers and electric utilities.
 
 
