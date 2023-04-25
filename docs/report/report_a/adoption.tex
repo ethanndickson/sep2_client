@@ -5,7 +5,7 @@ Consequently, many implementations of the protocol exist already, with the vast 
 In this section, we will examine both, and discuss how they may influence our open-source implementation. 
 
 \section{California Public Utilities Commission}
-'Electric Rule 21' is a tariff put forward by CPUC. Within it are a set of requirements concerning the connection of end user energy production and storage to the grid. In this tariff, it is explicitly clear that
+'Electric Rule 21' is a tariff put forward by CPUC. Within it are a set of requirements concerning the connection of end-user energy production and storage to the grid. In this tariff, it is explicitly clear that
 "The default application-level protocol shall be IEEE 2030.5, as defined in the California IEEE 2030.5 implementation guide" \cite[]{Rule21}
 Given that the state of California was among the first to make these considerations to the protocol, it's likely that future writers of legislation or tariffs will be influenced by the successes of Rule 21, particularly how they have extended the protocol to achieve scale in the realm of smart inverters.
 For that reason, we let the implementation models for the Californian IEEE 2030.5 implementation guide influence our own development of the protocol, whilst of course still adhering to the specification.
@@ -16,14 +16,96 @@ Relating directly to use of the IEEE 2030.5 protocol at scale are the high level
 Under this model there is a direct communication between an IEEE 2030.5 compliant client, in this case a solar inverter, and a IEEE 2030.5 compliant server, hosted by the electric utility.
 This model alone does not impose any additional restrictions over those already existing in Rule 21. It requires the inverter to be a 2030.5 Client, and be managed individually by the server.
 
+\begin{figure}[H]
+    \begin{center}
+        \begin{tikzpicture}
+            \node [draw,
+                minimum width=2cm, 
+                minimum height=1.2cm, 
+                align=center
+            ]  (client) {IEEE 2030.5\\Client};
+            \node [below=of client] {End-user Energy Device};
+            \node [draw,
+                minimum width=2cm, 
+                minimum height=1.2cm, 
+                right = 3cm of client,
+                align = center
+            ]  (server) {IEEE 2030.5\\Server};
+            \draw[-stealth] (client.east) -- (server.west)
+                node[midway,above, align=center]{IEEE 2030.5\\Protocol};
+            \draw[-stealth] (server.west) -- (client.east);
+        \end{tikzpicture}
+        \caption{The Individual/Direct IEEE 2030.5 Model, as defined by California SIP}
+    \end{center}
+\end{figure}
+
 
 \subsubsection{Aggregated Clients Model}
 The aggregated clients model, outlined in the implementation guide, is one preferred for use by electric utilities. Under this model, the 2030.5 client is but an aggregator communicating with multiple smart inverters, acting on their behalf.
 The rationale behind this model is to allow utilities to manage entire geographical areas as though it were a single entity.
 
 
+\begin{figure}[H]
+    \begin{center}
+        \begin{tikzpicture}
+            \node [draw,
+                minimum width=2cm, 
+                minimum height=1.2cm, 
+                align=center
+            ]  (client) {IEEE 2030.5\\Server};
+            \node [draw,
+                minimum width=2cm, 
+                minimum height=1.2cm, 
+                right = 2.5cm of client,
+                align = center
+            ]  (server) {IEEE 2030.5\\Client\\(Aggregator)};
+            \node [draw,
+                minimum width=2cm, 
+                minimum height=1.2cm, 
+                below right = 2cm of server,
+                align = center
+            ]  (d3) {DER};
+            \node [draw,
+                minimum width=2cm, 
+                minimum height=1.2cm, 
+                right = 1.4cm of server,
+                align = center
+            ]  (d2) {DER};
+            \node [draw,
+                minimum width=2cm, 
+                minimum height=1.2cm, 
+                above right = 2cm of server,
+                align = center
+            ]  (d1) {DER};
+            % Server <-> client
+            \draw[-stealth] (client.east) -- (server.west)
+            node[midway,above, align=center]{IEEE 2030.5\\Protocol};
+            \draw[-stealth] (server.west) -- (client.east);
 
-The IEEE 2030.5 server is not aware of this aggregation, as the chosen communication protocol between an aggregator client and an end user energy device is unspecified and not relevant to the model.
+            % Server <-> DER1
+            \draw[-stealth] (server.east) -- (d1.west)
+            node[midway,above, align=center]{?};
+            \draw[-stealth] (d1.west) -- (server.east);
+
+
+            % Server <-> DER2
+            \draw[-stealth] (server.east) -- (d2.west)
+            node[midway,above, align=center]{?};
+            \draw[-stealth] (d2.west) -- (server.east);
+
+            % Server <-> DER3
+            \draw[-stealth] (server.east) -- (d3.west)
+            node[midway,above, align=center]{?};
+            \draw[-stealth] (d3.west) -- (server.east);
+            
+        \end{tikzpicture}
+    \end{center}
+        \caption{The Aggregated Clients IEEE 2030.5 Model, as defined by California SIP}
+\end{figure}
+
+
+
+The IEEE 2030.5 server is not aware of this aggregation, as the chosen communication protocol between an aggregator client and an end-user energy device is unspecified and not relevant to the model, as indicated in Figure 4.2.
 Under this model, aggregators may be communicating with thousands of IEEE 2030.5 compliant clients. For this reason, the California SIP mandates the subscription/notification retrieval method be used by clients, rather than polling.
 This is mandated in order to reduce network traffic, and of course, allow for use of the protocol to better scale.
 
