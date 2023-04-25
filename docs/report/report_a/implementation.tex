@@ -7,29 +7,29 @@ When choosing a programming language, we must consider:
 
 \begin{itemize}
     \item \textbf{Device resource constraints} - Many existing IEEE 2030.5 compliant devices are constrained by the clockspeed of the onboard CPU, and the amount of onboard memory.
-    For example, the "Gen5 Riva" smart meter by Itron, possesses a 600Mhz processor, and 256Mb of RAM.\cite[]{Gen5Riva}
+    For example, the "Gen5 Riva" smart meter by Itron, possesses a 600Mhz processor, and 256Mb of RAM. \cite[]{Gen5Riva}
     \hfill \break
     Therefore, we desire a programming language with minimal runtime overhead, and low-cost abstractions.
     \item \textbf{Cross-platform capabilities} - Given that our client may be deployed on embedded hardware, writing code in a language that can be compiled to a wider range of CPU and hardware configurations is desirable. 
     For this reason, we saw EPRI choose to implement their client in the C programming language.
-    \item \textbf{Security} - In 2019, Microsoft attributed 70\% of all CVEs in software to be caused by memory safety issues, in the last 12 years. \cite[]{SecurityMemorySafety}
-    As we've previously established improving the security of end-user energy devices is part of the core rationale behind IEEE 2030.5. For that reason, developing our client in a language that is memory safe would more easily align our implementation with the goals of the specification.
+    \item \textbf{Security} - In 2019, Microsoft attributed 70\% of all CVEs in software in the last 12 years to be caused by memory safety issues. \cite[]{SecurityMemorySafety}
+    As we've previously established, improving the security of end-user energy devices is part of the core rationale behind IEEE 2030.5. For that reason, developing our client in a language that is memory safe would better align our implementation with the goals of the specification.
     \item \textbf{Concurrent programming support} - By nature of the protocol, an IEEE 2030.5 client is an I/O bound application. For that reason, we desire a programming language that provides us with abstractions for event-driven architecture, such that operations can be performed while waiting on I/O, even on a single threaded device.
 \end{itemize}
 
 
 \subsection{Rust}
-The Rust programming language is a high-level, general purpose programming language that has been strongly influenced by the successes of other programming languages, both industrial and academic
+Rust is a high-level, general purpose programming language.
 Rust will be used to develop our IEEE 2030.5 client implementation as it addresses all the aforementioned considerations.
 
 \begin{itemize}
     \item Rust provides us with high-level abstractions, but with a focus on performance, and only 'paying' (in terms of available computer resources) for what you use. For that reason, Rust has seen usage in both application and systems level programming.
     \item Although Rust is by no means a universal programming language like C, it has a growing presence in embedded development, and as such has a reasonable degree of portability.
-    \item While writing a variation of Rust called 'safe' Rust, the programming language is, outside of compiler bugs, completely memory safe, without the runtime overhead of a garbage collector. When writing 'unsafe' rust, raw pointers may be dereferenced, where by the compiler is no longer able to guarantee memory safety. For that reason, our implementation will be done using purely safe Rust.
+    \item While writing a variation of Rust called 'safe' Rust, the programming language is, outside of compiler bugs, completely memory safe, accomplished without the runtime overhead of a garbage collector. When writing 'unsafe' rust, raw pointers may be dereferenced, where by the compiler is no longer able to guarantee memory safety. For that reason, our implementation will be done using purely safe Rust.
     \item Through it's type system, Rust also eliminates the possibility of a data race when working with multiple threads of execution. Furthermore, Rust has native support for asynchronous programming, with concurrency-runtime agnostic await and async syntax.
 \end{itemize}
 
-Rust's high-level abstractions furthermore lend themselves to the imposed reliability of the client, in that all expected errors are to be handled at compile-time. The Rust algebraic sum types 'Option' and 'Result' enable programmers to handle errors, in order to use the output of a process.
+Rust's high-level abstractions furthermore lend themselves to the imposed reliability of the client, in that all expected errors are to be handled at compile-time. The Rust algebraic sum types 'Option' and 'Result' force programmers to handle error cases in order to use the output of a process.
 This is contrasted to a language like C++, where runtime exceptions are used to denote errors in the standard library, of which the language does not force the programmer to handle at compile-time.
 
 \section{Operating System}
@@ -38,16 +38,17 @@ Despite the desire to write code that is portable, we will nonetheless require o
 Of great consideration when choosing an operating system is the aforementioned 'Aggregator' model for IEEE 2030.5, where by our client would be deployed on a dedicated server, or in the cloud. In this circumstance, it's very much likely an operating system running on the Linux kernel is to be used, due to it's prevalence in server operating-systems.
 Whilst there exist purpose built IOT-device operating systems, they are built and optimised for low-spec low-power usage devices, and as such would not be appropriate at scale such as under this model.
 
-Furthermore, there exist very lightweight Linux based operating systems for low-spec devices, making Linux the best choice for our targeted operating system.
+Furthermore, there exist very lightweight Linux based operating systems for low-spec devices, making those Linux based operating systems the best candidate for our targeted operating system.
+
+Here, it's reasonable to draw inspiration from the EPRI implementation of an IEEE 2030.5 client, and still define a series of interfaces that call upon OS specific APIs, such that a device manufacturer need only re-implement those interfaces when porting our software to a different OS.
+
 
 \section{Common Library}
 As discussed, the IEEE 2030.5 specification makes no distinction between clients \& servers, aside from the fact that servers expose resources, and clients interact with resources. 
 For that reason, our client implementation will also produce a common library, that would be used by one developing a IEEE 2030.5 server implementation in Rust.
 
-In this context, it's reasonable to draw inspiration from the EPRI implementation of an IEEE 2030.5 client, and define a series of interfaces that make use of OS specific APIs, such that a device manufacturer need only re-implement those interfaces when porting our software to a different OS.
-
 \subsection{Resource Data Types}
-The most important, and largest part of this common library is the internal representation of resources, the data communicated between client \& server. These resources are described precisely in an XSD.
+The largest aspect of this common library is the internal representation of resources, the data communicated between client \& server. These resources are described precisely in an XSD.
 Resources range from data that may be used by the electric utility, such as the current load of the device, to resource metadata, such as the rate at which a client should poll a server for a given resource, or what URI endpoint can be used to access a given resource, in the case of a Link resource.
 In both specification and schema, these data structures are separated into packages, and sub-packages. 
 
@@ -101,7 +102,7 @@ As a result, we're forced to emulate the inheritance of data structure members i
 \end{itemize}
 
 Regardless of the approach, we still do not have have polymorphism using the base-types of resources.
-To allow for polymorphism a trait must be defined for each base-type, and then those trait functions need be implemented for every type that extends the base type. 
+To allow for polymorphism a trait must be defined for each base-type, and then those trait functions need be implemented for every type that extends that base type. 
 This is unavoidable duplicate code, not ignoring the possibility of generating said code.
 The extent to which polymorphism is required in the final client implementation is yet to be determined. In this case, we can refer to the EPRI client implementation, 
 where they provide device manufacturers an interface for handling resources using polymorphism.
@@ -156,7 +157,7 @@ This library operates on the basis that inheritance can be replicated via compos
 
 Figures 5.3 and 5.4 show how this library, 'inheritance-rs' \cite[]{inheritancers} is used to reduce the boilerplate necessary to inherit data members. 
 In Figure 5.3, we mark the Resource trait as 'inheritable' and then implement that trait on a type that holds the necessary members, our bare minimum 'base' type. 
-In Figure 5.3, we compose an instance of that base type into a type that would normally inherit from it. Then, we tell the library to generate the code, at compile-time, that would allow List to implement the Resource trait.
+In Figure 5.3, we compose an instance of that base type into a type that would normally inherit from it. Then, we tell the library to generate the code, at compile time, that would allow List to implement the Resource trait.
 This generated code simply calls the underlying ResourceObj member when the href function would be called on a list.
 
 The major flaw in this approach is that for every single type that is used as a base type, a trait, and a base implementation of that trait needs to be written.
@@ -258,8 +259,9 @@ Rather than go and manually implement XML serialization/deserialization for all 
 
 \subsection{Security}
 The security-focused portion of the common library includes certificate management, and an encryption interface for use in client networking.
-The specification requires that ECC, as defined in IETF RFC 7251, specifically elliptic curve \texttt{secp256r1}, be used to sign certificates and encrypt traffic over TLS 
+The specification requires that ECC, as defined in IETF RFC 7251, specifically elliptic curve \texttt{secp256r1}, be used to sign certificates and encrypt traffic over TLS.
 However, the specification does permit RSA-based cipher suites to be used as a fallback, for the purpose of backwards compatibility, on devices where ECC is not supported.
+
 For that reason, our common library will implement a security interface to be used throughout the client and server, such that it is comprehensive and can be replaced for portability.
 
 \subsection{Network}
@@ -270,7 +272,7 @@ It's worth noting that the extent to which a server implementation would utilise
 
 \subsection{Testing}
 The goal for this thesis is to produce a IEEE 2030.5 client that is well-tested for correctness, and conformance to the IEEE 2030.5 specification.
-As such, our common library will be developed alongside a suite of tests, written with the goal to maximise test code coverage, as a percentage of lines of code.
+As such, our common library will be developed alongside a suite of tests, written with the goal to maximise code coverage, measured by lines of code.
 All testing for the Common Library will be done via unit testing.
 
 \subsubsection{Testing YaSerde}
@@ -316,8 +318,8 @@ These device manufacturers would simply, in Rust or otherwise, call upon the doc
 The exact details of this client library interface are yet to be determined, but what a developer should be able to achieve with that interface is fairly straight forward. They'll require:
 
 \begin{itemize}
-    \item A mechanism for discovering or connecting to a specific server
-    \item The ability to retrieve resources from a specific URI, and have it deserialized into a local data type
+    \item A mechanism for discovering or connecting to a specific server.
+    \item The ability to retrieve resources from a specific URI, and have it deserialized into a local data type.
     \item The ability to create or update a resource, and have it included as a PUT or POST request to a connected server.
     \item A mechanism to automate this process, using event-driven architecture, to handle timer events, such as for polling, or network events for resource subscription.
 \end{itemize}
@@ -330,14 +332,14 @@ The EPRI IEEE 2030.5 client manual indicates the same perception.\cite[]{epriman
 As such, the implementation of this functionality will be left as a thesis stretch goal. Nonetheless, it will need to be implemented for conformance to IEEE 2030.5.
 
 Connecting to a server is, otherwise, as expected. We use the cipher suite interface and the TCP interface, as built in the common library, to connect to the server using TCP/TLS.
-This of course requires certificates, signed by a common library cipher suite. This certificate exchange will determine the parameters by which the cipher suite will be used to encrypt traffic.
+This of course requires certificates signed by a common library cipher suite. This certificate exchange will determine the parameters by which the cipher suite will be used to encrypt traffic.
 
 \subsection{Event-driven Architecture}
 With the IEEE 2030.5 Client being an I/O bound application, we are to implement concurrency using an event-driven architecture, such that many operations can performed concurrently on a single threaded machine when waiting on I/O.
 
 Although the client does not connect to multiple servers, we require event-based architecture to handle:
 \begin{itemize}
-    \item Input from the client device, such as the creating or updating of resources
+    \item Input from the client device, such as the creating or updating of resources.
     \item Timed events, such as to poll for a resource update on a given schedule.
     \item Network events, such as an updated resource being pushed to the client via the subscription/notification mechanism, or receiving the response from a sent HTTP request.
 \end{itemize}
@@ -346,7 +348,7 @@ An event-based architecture furthermore enables us to take advantage of multiple
 As mentioned previously, Rust supports asynchronous programming, with runtime-agnostic support for await and async syntax, of which there are multiple Rust async runtime available.
 
 The specifics of this asynchronous programming architecture are yet to be learned, and as such we can look to the EPRI client implementation, where they've chosen to use the Linux native \texttt{epoll} \texttt{syscall}.
-Fortunately, \texttt{epoll} is the driver behind the two most popular async runtimes for Rust, \texttt{Tokio} and \texttt{std-async}. As such, we'll determine which is most suitable for our client.
+Fortunately, \texttt{epoll} is the driver behind the two most popular async runtimes for Rust, \texttt{Tokio} and \texttt{std-async}. As such, we'll need to determine which is most suitable for our client.
 
 \subsection{Function Sets}
 As established, function sets are logical groupings of IEEE 2030.5 resources by their functionality, of which there are twenty-five.
