@@ -1,5 +1,5 @@
 \chapter{Implementation Design}\label{ch:implementation}
-Given the context and background surrounding the IEEE 2030.5 Protocol, we can begin examining the considerations taken when designing our implementation.
+Given the context and background surrounding the IEEE 2030.5 protocol, we can begin examining the considerations taken when designing our implementation.
 
 \section{Programming Language}
 The operating context of IEEE 2030.5 greatly influences the software development tools that are suitable for implementation.
@@ -36,7 +36,7 @@ This is contrasted to a language like C++, where runtime exceptions are used to 
 Despite the desire to write code that is portable, we will nonetheless require operating-system-specific functionality, and as such will need to target a single operating system. Then, we can provide an interface for device manufacturers to swap out should they want to use the client on a different operating system.
 
 Of great consideration when choosing an operating system is the aforementioned 'Aggregator' model for IEEE 2030.5, where by our client would be deployed on a dedicated server, or in the cloud. In this circumstance, it's very much likely an operating system running on the Linux kernel is to be used, due to it's prevalence in server operating-systems.
-Whilst there exist purpose built IOT-device operating systems, they are built and optimised for low-spec low-power usage devices, and as such would not be appropriate at scale such as under this model.
+Whilst there exist purpose built IOT-device operating systems, they are built and optimised for low-spec, low-power usage devices, and as such would not be appropriate at scale - such as under this model.
 
 Furthermore, there exist very lightweight Linux based operating systems for low-spec devices, making those Linux based operating systems the best candidate for our targeted operating system.
 
@@ -344,7 +344,7 @@ Although the client does not connect to multiple servers, we require event-based
     \item Network events, such as an updated resource being pushed to the client via the subscription/notification mechanism, or receiving the response from a sent HTTP request.
 \end{itemize}
 
-An event-based architecture furthermore enables us to take advantage of multiple OS threads, and therefore multiple CPU cores, as to best accommodate the scale required by the aforementioned client aggregator model.
+An event-based architecture furthermore enables us to take advantage of multiple OS threads, and therefore multiple CPU cores, as to best accommodate the scale required by the client aggregator model.
 As mentioned previously, Rust supports asynchronous programming, with runtime-agnostic support for await and async syntax, of which there are multiple Rust async runtime available.
 
 The specifics of this asynchronous programming architecture are yet to be learned, and as such we can look to the EPRI client implementation, where they've chosen to use the Linux native \texttt{epoll} \texttt{syscall}.
@@ -380,10 +380,10 @@ The actual software framework to be used for conducting system tests is yet to b
 
 
 \subsubsection{Test Client Binary}
-In order to perform system tests we will need to wrap our client library in code that can be used to produce a binary that matches a potential use case.
+In order to perform system tests we will need to wrap our client library and produce a binary that will connect to a server, simulating a potential use case.
 This binary client will be a demonstration of all implemented functionality.
 Furthermore, this client binary will act as documentation for device manufacturers using our library.
-Producing a test client binary for demonstration was an approach also taken by EPRI in their IEEE 2030.5 client implementation.
+Likewise, EPRI produced a test client binary for demonstration purposes in their IEEE 2030.5 client implementation.
 
 \subsubsection{Mock Server}
 
