@@ -17,3 +17,6 @@ Cargo.lock
 # System files
 .DS_Store
 **/*Zone.Identifier
+
+# SSL Certificates
+certs/
