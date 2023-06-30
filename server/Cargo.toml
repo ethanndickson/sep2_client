@@ -1,0 +1,15 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hyper = { version = "0.14.27", features = ["server", "http1", "http2", "tcp"] }
+common = { path = "../IEEE-2030.5-Common/common" }
+openssl = "0.10.55"
+tokio = { version = "1.29.1", features = ["full"] }
+tokio-openssl = "0.6.3"
+log = "0.4.19"
+clap = { version = "4.3.10", features = ["derive"] }
