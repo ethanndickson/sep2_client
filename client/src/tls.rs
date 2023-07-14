@@ -9,16 +9,10 @@ pub(crate) type Connector = HttpsConnector<HttpConnector>;
 pub(crate) type TlsConfig = SslConnectorBuilder;
 pub(crate) type HTTPSClient = Client<Connector, Body>;
 
-pub(crate) fn create_tls_config(
-    ca_path: &str,
-    cert_path: &str,
-    pk_path: &str,
-) -> Result<TlsConfig> {
+pub(crate) fn create_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsConfig> {
     let mut builder = SslConnector::builder(SslMethod::tls_client())?;
     debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
-    debug!("Loading CA File");
-    builder.set_ca_file(ca_path)?;
     debug!("Loading Certificate File");
     builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
     debug!("Loading Private Key File");

@@ -7,7 +7,6 @@ mod tls;
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let client = Client::new(
         "127.0.0.1:1337",
-        "../certs/serca_cert.pem",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
     )?;

@@ -41,9 +41,11 @@ impl Server {
             // Perform TLS handshake
             stream.as_mut().accept().await?;
             // Bind connection to a service
-            tokio::task::spawn(
-                async move { Http::new().serve_connection(stream, service_fn(router)) },
-            );
+            tokio::task::spawn(async move {
+                Http::new()
+                    .serve_connection(stream, service_fn(router))
+                    .await
+            });
         }
     }
 }
