@@ -9,13 +9,8 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(
-        server_addr: &str,
-        ca_path: &str,
-        cert_path: &str,
-        pk_path: &str,
-    ) -> std::io::Result<Self> {
-        let cfg = create_tls_config(ca_path, cert_path, pk_path)?;
+    pub fn new(server_addr: &str, cert_path: &str, pk_path: &str) -> std::io::Result<Self> {
+        let cfg = create_tls_config(cert_path, pk_path)?;
         Ok(Client {
             addr: server_addr.to_owned(),
             http: create_client(cfg),
