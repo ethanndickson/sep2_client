@@ -5,7 +5,6 @@ use std::error::Error;
 pub(crate) type TlsConfig = SslAcceptorBuilder;
 
 pub(crate) fn create_tls_config(
-    addr: &str,
     cert_path: &str,
     pk_path: &str,
 ) -> Result<TlsConfig, Box<dyn Error + Send + Sync>> {

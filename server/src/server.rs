@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::net::SocketAddr;
 
+use common::packages::xsd::DeviceCapability;
+use common::serialize;
 use hyper::server::conn::Http;
 use hyper::{service::service_fn, Request, Response};
 use hyper::{Body, Method, StatusCode};
@@ -21,7 +23,7 @@ impl Server {
         cert_path: &str,
         pk_path: &str,
     ) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let cfg = create_tls_config(addr, cert_path, pk_path)?;
+        let cfg = create_tls_config(cert_path, pk_path)?;
         Ok(Server {
             addr: addr.parse()?,
             cfg,
@@ -54,7 +56,7 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let mut response = Response::new(Body::empty());
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
-            *response.body_mut() = Body::from("Hello World!\n");
+            *response.body_mut() = Body::from(serialize(DeviceCapability::default()));
         }
         (&Method::POST, "/echo") => {
             *response.body_mut() = req.into_body();
