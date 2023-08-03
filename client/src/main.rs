@@ -1,12 +1,31 @@
-use common::packages::xsd::DeviceCapability;
+use common::{
+    packages::xsd::DeviceCapability,
+    server::{ClientNotifServer, NotifHandler},
+};
 
 use crate::client::Client;
-use std::error::Error;
+use anyhow::Result;
+use async_trait::async_trait;
 mod client;
 mod tls;
 
+struct Handler {}
+#[async_trait]
+impl NotifHandler for Handler {
+    async fn notif_handler(&self, name: &str, resource: &str) -> Result<()> {
+        Ok(())
+    }
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn main() -> Result<()> {
+    let notifs = ClientNotifServer::new(
+        "127.0.0.1:1338",
+        "../certs/client_cert.pem",
+        " ../certs/client_private_key.pem",
+        Handler {},
+    )?;
+    tokio::task::spawn(notifs.run());
     let client = Client::new(
         "127.0.0.1:1337",
         "../certs/client_cert.pem",

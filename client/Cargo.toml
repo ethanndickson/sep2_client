@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.72"
+async-trait = "0.1.72"
 common = { path = "../IEEE-2030.5-Common/common" }
 hyper = { version = "0.14.26", features = ["full"] }
 hyper-openssl = "0.9.2"

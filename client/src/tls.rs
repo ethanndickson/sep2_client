@@ -1,15 +1,15 @@
+use anyhow::Result;
 use hyper::client::HttpConnector;
 use hyper::{Body, Client};
 use hyper_openssl::HttpsConnector;
 use log::debug;
 use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod};
-use std::io::Result;
 
 pub(crate) type Connector = HttpsConnector<HttpConnector>;
-pub(crate) type TlsConfig = SslConnectorBuilder;
 pub(crate) type HTTPSClient = Client<Connector, Body>;
+pub(crate) type TlsClientConfig = SslConnectorBuilder;
 
-pub(crate) fn create_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsConfig> {
+pub(crate) fn create_client_tls_cfg(cert_path: &str, pk_path: &str) -> Result<TlsClientConfig> {
     let mut builder = SslConnector::builder(SslMethod::tls_client())?;
     debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
@@ -20,7 +20,7 @@ pub(crate) fn create_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsCon
     Ok(builder)
 }
 
-pub(crate) fn create_client(tls_config: TlsConfig) -> Client<Connector, Body> {
+pub(crate) fn create_client(tls_config: TlsClientConfig) -> Client<Connector, Body> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
     let https = HttpsConnector::with_connector(http, tls_config).unwrap();
