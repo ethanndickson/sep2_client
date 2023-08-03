@@ -35,10 +35,7 @@ pub struct TestHandler {}
 
 #[async_trait]
 impl NotifHandler for TestHandler {
-    async fn notif_handler(&self, name: &str, resource: &str) -> Result<()> {
-        Ok(())
-    }
-    async fn request_service(self: Arc<Self>, req: Request<Body>) -> Result<Response<Body>> {
+    async fn request_service(&self, req: Request<Body>) -> Result<Response<Body>> {
         let mut response = Response::new(Body::empty());
         match (req.method(), req.uri().path()) {
             (&Method::GET, "/dcap") => {
