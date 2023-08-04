@@ -1,6 +1,6 @@
 use anyhow::Result;
-use common::{deserialize, packages::traits::SEResource};
-use hyper::Uri;
+use common::{deserialize, packages::traits::SEResource, serialize};
+use hyper::{Body, Method, Request, Uri};
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 pub struct Client {
@@ -18,9 +18,13 @@ impl Client {
     }
     pub async fn get<R: SEResource>(&self, path: &str) -> Result<R> {
         let uri: Uri = format!("https://{}{}", self.addr, path).parse()?;
-        let res = self.http.get(uri).await?;
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(uri)
+            .body(Body::default())?;
+        let res = self.http.request(req).await?;
         let body = hyper::body::to_bytes(res.into_body()).await?;
         let xml = String::from_utf8_lossy(&body);
-        Ok(deserialize(&xml))
+        deserialize(&xml)
     }
 }

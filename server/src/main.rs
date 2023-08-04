@@ -1,7 +1,7 @@
 use anyhow::{Ok, Result};
 use async_trait::async_trait;
 use clap::Parser;
-use client::subscription::{ClientNotifServer, NotifHandler};
+use client::pubsub::{ClientNotifServer, NotifHandler};
 use common::packages::xsd::{DeviceCapability, EndDevice};
 use common::serialize;
 use hyper::{Body, Method, StatusCode};
@@ -37,10 +37,10 @@ impl NotifHandler for TestHandler {
         let mut response = Response::new(Body::empty());
         match (req.method(), req.uri().path()) {
             (&Method::GET, "/dcap") => {
-                *response.body_mut() = Body::from(serialize(DeviceCapability::default()));
+                *response.body_mut() = Body::from(serialize(DeviceCapability::default())?);
             }
             (&Method::GET, "/edev/1/") => {
-                *response.body_mut() = Body::from(serialize(EndDevice::default()));
+                *response.body_mut() = Body::from(serialize(EndDevice::default())?);
             }
             _ => {
                 *response.status_mut() = StatusCode::NOT_FOUND;

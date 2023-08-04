@@ -1,3 +1,3 @@
 pub mod client;
-pub mod subscription;
+pub mod pubsub;
 pub mod tls;
