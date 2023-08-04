@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use client::{
     client::Client,
-    subscription::{ClientNotifServer, NotifHandler},
+    pubsub::{ClientNotifServer, NotifHandler},
 };
 use common::packages::xsd::DeviceCapability;
 
@@ -19,15 +19,15 @@ async fn main() -> Result<()> {
     let notifs = ClientNotifServer::new(
         "127.0.0.1:1338",
         "../certs/client_cert.pem",
-        " ../certs/client_private_key.pem",
+        "../certs/client_private_key.pem",
         Handler {},
     )?;
-    tokio::task::spawn(notifs.run());
+    let a = tokio::task::spawn(notifs.run());
     let client = Client::new(
         "127.0.0.1:1337",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
     )?;
-    println!("{:?}", client.get::<DeviceCapability>("/").await?);
-    Ok(())
+    println!("{:?}", client.get::<DeviceCapability>("/dcap").await?);
+    a.await?
 }
