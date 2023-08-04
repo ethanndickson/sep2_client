@@ -1,13 +1,10 @@
-use common::{
-    packages::xsd::DeviceCapability,
-    server::{ClientNotifServer, NotifHandler},
-};
-
-use crate::client::Client;
 use anyhow::Result;
 use async_trait::async_trait;
-mod client;
-mod tls;
+use client::{
+    client::Client,
+    subscription::{ClientNotifServer, NotifHandler},
+};
+use common::packages::xsd::DeviceCapability;
 
 struct Handler {}
 #[async_trait]
