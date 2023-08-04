@@ -1,11 +1,9 @@
-use std::sync::Arc;
-
 use anyhow::{Ok, Result};
 use async_trait::async_trait;
 use clap::Parser;
+use client::subscription::{ClientNotifServer, NotifHandler};
 use common::packages::xsd::{DeviceCapability, EndDevice};
 use common::serialize;
-use common::server::{ClientNotifServer, NotifHandler};
 use hyper::{Body, Method, StatusCode};
 use hyper::{Request, Response};
 use log::info;
@@ -35,7 +33,7 @@ pub struct TestHandler {}
 
 #[async_trait]
 impl NotifHandler for TestHandler {
-    async fn request_service(&self, req: Request<Body>) -> Result<Response<Body>> {
+    async fn router(&self, req: Request<Body>) -> Result<Response<Body>> {
         let mut response = Response::new(Body::empty());
         match (req.method(), req.uri().path()) {
             (&Method::GET, "/dcap") => {

@@ -3,8 +3,9 @@ use hyper::client::HttpConnector;
 use hyper::{Body, Client};
 use hyper_openssl::HttpsConnector;
 use log::debug;
-use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod};
-
+use openssl::ssl::{
+    SslAcceptor, SslAcceptorBuilder, SslConnector, SslConnectorBuilder, SslFiletype, SslMethod,
+};
 pub(crate) type Connector = HttpsConnector<HttpConnector>;
 pub(crate) type HTTPSClient = Client<Connector, Body>;
 pub(crate) type TlsClientConfig = SslConnectorBuilder;
@@ -25,4 +26,17 @@ pub(crate) fn create_client(tls_config: TlsClientConfig) -> Client<Connector, Bo
     http.enforce_http(false);
     let https = HttpsConnector::with_connector(http, tls_config).unwrap();
     Client::builder().build::<Connector, hyper::Body>(https)
+}
+
+pub type TlsServerConfig = SslAcceptorBuilder;
+
+pub fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerConfig> {
+    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
+    debug!("Setting CipherSuite");
+    builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
+    debug!("Loading Certificate File");
+    builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
+    debug!("Loading Private Key File");
+    builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
+    Ok(builder)
 }
