@@ -34,18 +34,20 @@ pub struct TestHandler {}
 #[async_trait]
 impl NotifHandler for TestHandler {
     async fn router(&self, req: Request<Body>) -> Result<Response<Body>> {
+        println!("Incoming Request: {:?}", req);
         let mut response = Response::new(Body::empty());
         match (req.method(), req.uri().path()) {
             (&Method::GET, "/dcap") => {
-                *response.body_mut() = Body::from(serialize(DeviceCapability::default())?);
+                *response.body_mut() = Body::from(serialize(&DeviceCapability::default())?);
             }
             (&Method::GET, "/edev/1/") => {
-                *response.body_mut() = Body::from(serialize(EndDevice::default())?);
+                *response.body_mut() = Body::from(serialize(&EndDevice::default())?);
             }
             _ => {
                 *response.status_mut() = StatusCode::NOT_FOUND;
             }
         };
+        println!("Outgoing Response: {:?}", response);
         Ok(response)
     }
 }
