@@ -5,7 +5,7 @@ use common::{
     examples::{ED_16_01_08, REG_16_01_10},
     packages::{
         primitives::{Int64, Uint32, Uint40},
-        xsd::{EndDevice, EndDeviceList, Registration},
+        xsd::{EndDevice, EndDeviceList, FunctionSetAssignmentsList, Registration},
     },
 };
 
@@ -59,4 +59,21 @@ async fn registration_local() {
     } else {
         panic!("Expected 201 Created from server, not 204 No Content");
     }
+}
+
+#[tokio::test]
+async fn function_set_assignment() {
+    let (_, _, client) = test_setup();
+    let edr: EndDevice = client.get("/edev/4").await.unwrap();
+    let fsal = edr.function_set_assignments_list_link.unwrap();
+    let fsal: FunctionSetAssignmentsList = client
+        .get(&format!("{}?l={}", fsal.href, fsal.all.unwrap()))
+        .await
+        .unwrap();
+    let fsa = fsal
+        .function_set_assignments
+        .iter()
+        .find(|e| e.demand_response_program_list_link.is_some())
+        .unwrap();
+    fsa.demand_response_program_list_link.as_ref().unwrap();
 }
