@@ -2,8 +2,10 @@ use anyhow::{Ok, Result};
 use async_trait::async_trait;
 use clap::Parser;
 use client::pubsub::{ClientNotifServer, NotifHandler};
-use common::packages::xsd::{DeviceCapability, EndDevice};
+use common::examples::{EDL_16_02_08, ED_16_01_08, REG_16_01_10};
+use common::packages::xsd::DeviceCapability;
 use common::serialize;
+use hyper::header::LOCATION;
 use hyper::{Body, Method, StatusCode};
 use hyper::{Request, Response};
 use log::info;
@@ -40,8 +42,20 @@ impl NotifHandler for TestHandler {
             (&Method::GET, "/dcap") => {
                 *response.body_mut() = Body::from(serialize(&DeviceCapability::default())?);
             }
-            (&Method::GET, "/edev/1/") => {
-                *response.body_mut() = Body::from(serialize(&EndDevice::default())?);
+            (&Method::GET, "/edev") => {
+                *response.body_mut() = Body::from(EDL_16_02_08);
+            }
+            (&Method::POST, "/edev") => {
+                *response.status_mut() = StatusCode::CREATED;
+                response
+                    .headers_mut()
+                    .insert(LOCATION, "/edev/4".parse().unwrap());
+            }
+            (&Method::GET, "/edev/3") => {
+                *response.body_mut() = Body::from(ED_16_01_08);
+            }
+            (&Method::GET, "/edev/3/reg") => {
+                *response.body_mut() = Body::from(REG_16_01_10);
             }
             _ => {
                 *response.status_mut() = StatusCode::NOT_FOUND;

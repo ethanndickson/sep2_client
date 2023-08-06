@@ -1,12 +1,20 @@
-use anyhow::{bail, Ok, Result};
+use anyhow::{anyhow, bail, Ok, Result};
 use common::{deserialize, packages::traits::SEResource, serialize};
 use hyper::{
-    header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE},
+    header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
     Body, Method, Request, StatusCode, Uri,
 };
 use log::{debug, info};
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
+
+pub enum SepResponse {
+    // HTTP 201 w/ Location header value
+    Created(String),
+    // HTTP 204
+    NoContent,
+}
+
 pub struct Client {
     addr: String,
     http: HTTPSClient,
@@ -35,6 +43,7 @@ impl Client {
         // TODO: Improve erorr handling
         match res.status() {
             StatusCode::OK => (),
+            StatusCode::NOT_FOUND => bail!("404 Not Found"),
             _ => bail!("Unexpected HTTP response from server"),
         }
         let body = hyper::body::to_bytes(res.into_body()).await?;
@@ -42,7 +51,7 @@ impl Client {
         deserialize(&xml)
     }
 
-    pub async fn post<R: SEResource>(&self, path: &str, resource: &R) -> Result<()> {
+    pub async fn post<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
         self.put_post(path, resource, Method::POST).await
     }
 
@@ -65,7 +74,7 @@ impl Client {
         }
     }
 
-    pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<()> {
+    pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
         self.put_post(path, resource, Method::PUT).await
     }
 
@@ -75,7 +84,7 @@ impl Client {
         path: &str,
         resource: &R,
         method: Method,
-    ) -> Result<()> {
+    ) -> Result<SepResponse> {
         let uri: Uri = format!("https://{}{}", self.addr, path).parse()?;
         info!("POST {} to {}", R::name(), uri);
         let rsrce = serialize(resource)?;
@@ -91,8 +100,16 @@ impl Client {
         debug!("Incoming HTTP Response: {:?}", res);
         // TODO: Improve erorr handling
         match res.status() {
-            StatusCode::CREATED => Ok(()),
-            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::CREATED => {
+                let loc = res
+                    .headers()
+                    .get(LOCATION)
+                    .ok_or(anyhow!("201 Created - Missing Location Header"))?
+                    .to_str()?
+                    .to_string();
+                Ok(SepResponse::Created(loc))
+            }
+            StatusCode::NO_CONTENT => Ok(SepResponse::NoContent),
             StatusCode::BAD_REQUEST => bail!("400 Bad Request"),
             StatusCode::NOT_FOUND => bail!("404 Not Found"),
             _ => bail!("Unexpected HTTP response from server"),
