@@ -2,7 +2,7 @@ use anyhow::{Ok, Result};
 use async_trait::async_trait;
 use clap::Parser;
 use client::pubsub::{ClientNotifServer, NotifHandler};
-use common::examples::{EDL_16_02_08, ED_16_01_08, REG_16_01_10};
+use common::examples::{EDL_16_02_08, ED_16_01_08, ED_16_03_06, FSAL_16_03_11, REG_16_01_10};
 use common::packages::xsd::DeviceCapability;
 use common::serialize;
 use hyper::header::LOCATION;
@@ -53,6 +53,12 @@ impl NotifHandler for TestHandler {
             }
             (&Method::GET, "/edev/3") => {
                 *response.body_mut() = Body::from(ED_16_01_08);
+            }
+            (&Method::GET, "/edev/4/fsal") => {
+                *response.body_mut() = Body::from(FSAL_16_03_11);
+            }
+            (&Method::GET, "/edev/4") => {
+                *response.body_mut() = Body::from(ED_16_03_06);
             }
             (&Method::GET, "/edev/3/reg") => {
                 *response.body_mut() = Body::from(REG_16_01_10);
