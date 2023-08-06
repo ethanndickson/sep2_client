@@ -5,12 +5,16 @@ use common::{
     examples::{ED_16_01_08, REG_16_01_10},
     packages::{
         primitives::{Int64, Uint32, Uint40},
-        xsd::{EndDevice, EndDeviceList, FunctionSetAssignmentsList, Registration},
+        xsd::{
+            DeviceCapability, EndDevice, EndDeviceList, FunctionSetAssignmentsList, Registration,
+        },
     },
 };
 
+// Possible Happy Path Example Tests from the IEEE 2030.5 Specification
+
+// Supplied to client as starting resources (out of band)
 fn test_setup() -> (EndDevice, Registration, Client) {
-    // SETUP: Supplied to client (out of band)
     let mut edr = EndDevice::default();
     edr.changed_time = Int64(1379905200);
     edr.s_fdi = Uint40(987654321005);
@@ -43,6 +47,7 @@ async fn registration_remote() {
     assert_eq!(own_reg.p_in, reg.p_in);
 }
 
+/// IEEE 2030.5-2018 - Table C.3
 #[tokio::test]
 async fn registration_local() {
     let (mut own_edr, _, client) = test_setup();
@@ -54,6 +59,7 @@ async fn registration_local() {
         assert_ne!(each_ed.s_fdi, own_edr.s_fdi);
     }
     let res = client.post("/edev", &own_edr).await.unwrap();
+    // Header should return location of newly posted resource
     if let Created(loc) = res {
         assert_eq!(loc, "/edev/4");
     } else {
@@ -61,19 +67,39 @@ async fn registration_local() {
     }
 }
 
+/// IEEE 2030.5-2018 - Table C.4
 #[tokio::test]
 async fn function_set_assignment() {
     let (_, _, client) = test_setup();
+    // Get own EndDevice resource
     let edr: EndDevice = client.get("/edev/4").await.unwrap();
+    // Get link to Function Set Assignment List
     let fsal = edr.function_set_assignments_list_link.unwrap();
+    // Query FSA List
     let fsal: FunctionSetAssignmentsList = client
         .get(&format!("{}?l={}", fsal.href, fsal.all.unwrap()))
         .await
         .unwrap();
+    // Search list for Demand Response Program List Link
     let fsa = fsal
         .function_set_assignments
         .iter()
         .find(|e| e.demand_response_program_list_link.is_some())
         .unwrap();
+    // Get Demand Response Program List Link
     fsa.demand_response_program_list_link.as_ref().unwrap();
+}
+
+/// IEEE 2030.5-2018 - table C.5
+#[tokio::test]
+async fn no_function_set_assignment() {
+    let (_, _, client) = test_setup();
+    // Get EDR
+    let edr: EndDevice = client.get("/edev/5").await.unwrap();
+    // Discover there is no FSA
+    assert!(edr.function_set_assignments_list_link.is_none());
+    // Fallback and get DeviceCapabilities (URI determined out of band or during DNS-SD)
+    let dc: DeviceCapability = client.get("/dcap").await.unwrap();
+    // Get DRPLL
+    dc.demand_response_program_list_link.unwrap();
 }
