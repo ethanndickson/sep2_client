@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use hyper::client::HttpConnector;
 use hyper::{Body, Client};
@@ -21,9 +23,13 @@ pub(crate) fn create_client_tls_cfg(cert_path: &str, pk_path: &str) -> Result<Tl
     Ok(builder)
 }
 
-pub(crate) fn create_client(tls_config: TlsClientConfig) -> Client<Connector, Body> {
+pub(crate) fn create_client(
+    tls_config: TlsClientConfig,
+    tcp_keepalive: Option<Duration>,
+) -> Client<Connector, Body> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
+    http.set_keepalive(tcp_keepalive);
     let https = HttpsConnector::with_connector(http, tls_config).unwrap();
     Client::builder().build::<Connector, hyper::Body>(https)
 }

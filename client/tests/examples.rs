@@ -23,9 +23,10 @@ fn test_setup() -> (EndDevice, Registration, Client) {
     reg.p_in = Uint32(123455);
     // Create client
     let client = Client::new(
-        "127.0.0.1:1337",
+        "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
+        None,
     )
     .unwrap();
     (edr, reg, client)

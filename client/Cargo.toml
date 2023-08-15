@@ -15,3 +15,4 @@ log = "0.4.17"
 openssl = "0.10.52"
 tokio = {version = "1.28.1", features = ["full"] }
 tokio-openssl = "0.6.3"
+typemap_rev = "0.3.0"

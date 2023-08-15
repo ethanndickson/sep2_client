@@ -5,8 +5,6 @@ use client::pubsub::{ClientNotifServer, NotifHandler};
 use common::examples::{
     DC_16_04_11, EDL_16_02_08, ED_16_01_08, ED_16_03_06, ER_16_04_06, FSAL_16_03_11, REG_16_01_10,
 };
-use common::packages::xsd::DeviceCapability;
-use common::serialize;
 use hyper::header::LOCATION;
 use hyper::{Body, Method, StatusCode};
 use hyper::{Request, Response};
