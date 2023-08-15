@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::{anyhow, bail, Ok, Result};
 use common::{deserialize, packages::traits::SEResource, serialize};
 use hyper::{
@@ -8,11 +10,43 @@ use log::{debug, info};
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
+/// Possible HTTP Responses for a IEE 2030.5 Client
 pub enum SepResponse {
-    // HTTP 201 w/ Location header value
+    // HTTP 201 w/ Location header value - 2030.5-2018 - 5.5.2.4
     Created(String),
-    // HTTP 204
+    // HTTP 204 - 2030.5-2018 - 5.5.2.5
     NoContent,
+    // HTTP 400 - 2030.5-2018 - 5.5.2.9
+    BadRequest,
+    // HTTP 404 - 2030.5-2018 - 5.5.2.11
+    NotFound,
+    // HTTP 405 - 2030.5-2018 - 5.5.2.12
+    MethodNotAllowed,
+}
+
+impl From<SepResponse> for hyper::Response<Body> {
+    fn from(value: SepResponse) -> Self {
+        let mut res = hyper::Response::new(Body::empty());
+        match value {
+            SepResponse::Created(loc) => {
+                *res.status_mut() = StatusCode::CREATED;
+                res.headers_mut().insert(LOCATION, loc.parse().unwrap());
+            }
+            SepResponse::NoContent => {
+                *res.status_mut() = StatusCode::NO_CONTENT;
+            }
+            SepResponse::BadRequest => {
+                *res.status_mut() = StatusCode::BAD_REQUEST;
+            }
+            SepResponse::NotFound => {
+                *res.status_mut() = StatusCode::NOT_FOUND;
+            }
+            SepResponse::MethodNotAllowed => {
+                *res.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
+            }
+        };
+        res
+    }
 }
 
 pub struct Client {
@@ -21,16 +55,21 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(server_addr: &str, cert_path: &str, pk_path: &str) -> Result<Self> {
+    pub fn new(
+        server_addr: &str,
+        cert_path: &str,
+        pk_path: &str,
+        tcp_keepalive: Option<Duration>,
+    ) -> Result<Self> {
         let cfg = create_client_tls_cfg(cert_path, pk_path)?;
         Ok(Client {
             addr: server_addr.to_owned(),
-            http: create_client(cfg),
+            http: create_client(cfg, tcp_keepalive),
         })
     }
 
     pub async fn get<R: SEResource>(&self, path: &str) -> Result<R> {
-        let uri: Uri = format!("https://{}{}", self.addr, path).parse()?;
+        let uri: Uri = format!("{}{}", self.addr, path).parse()?;
         info!("GET {} from {}", R::name(), uri);
         let req = Request::builder()
             .method(Method::GET)
@@ -56,7 +95,7 @@ impl Client {
     }
 
     pub async fn delete(&self, path: &str) -> Result<()> {
-        let uri: Uri = format!("https://{}{}", self.addr, path).parse()?;
+        let uri: Uri = format!("{}{}", self.addr, path).parse()?;
         info!("DELETE at {}", uri);
         let req = Request::builder()
             .method(Method::DELETE)
@@ -85,7 +124,7 @@ impl Client {
         resource: &R,
         method: Method,
     ) -> Result<SepResponse> {
-        let uri: Uri = format!("https://{}{}", self.addr, path).parse()?;
+        let uri: Uri = format!("{}{}", self.addr, path).parse()?;
         info!("POST {} to {}", R::name(), uri);
         let rsrce = serialize(resource)?;
         let rsrce_size = rsrce.as_bytes().len();

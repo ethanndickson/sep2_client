@@ -1,12 +1,13 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use crate::client::SepResponse;
 use crate::tls::{create_server_tls_config, TlsServerConfig};
 use anyhow::Result;
 use async_trait::async_trait;
 use hyper::server::conn::Http;
 use hyper::{service::service_fn, Request, Response};
-use hyper::{Body, Method, StatusCode};
+use hyper::{Body, Method};
 use log::info;
 use openssl::ssl::Ssl;
 use tokio::net::TcpListener;
@@ -62,24 +63,23 @@ impl<H: NotifHandler> ClientNotifServer<H> {
 pub trait NotifHandler: Send + Sync + 'static {
     /// Default router when server is used to receive notifications
     async fn router(&self, req: Request<Body>) -> Result<Response<Body>> {
-        let mut response = Response::new(Body::empty());
-        match (req.method(), req.uri().path()) {
-            (&Method::POST, "/note") => {
-                *response.status_mut() = StatusCode::CREATED;
+        let path = req.uri().path().to_owned();
+        match req.method() {
+            &Method::POST => {
+                let body = req.into_body();
+                let bytes = hyper::body::to_bytes(body).await?;
+                Ok(self
+                    .notif_handler(&path, &String::from_utf8(bytes.to_vec())?)
+                    .await
+                    .into())
             }
-            (_, "/note") => {
-                *response.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
-            }
-            _ => {
-                *response.status_mut() = StatusCode::NOT_FOUND;
-            }
-        };
-        Ok(response)
+            _ => Ok(SepResponse::MethodNotAllowed.into()),
+        }
     }
 
     /// Function to be called in router to filter incoming notifications
     #[allow(unused_variables)]
-    async fn notif_handler(&self, resource_name: &str, resource: &str) -> Result<()> {
-        Ok(())
+    async fn notif_handler(&self, path: &str, resource: &str) -> SepResponse {
+        SepResponse::NoContent
     }
 }
