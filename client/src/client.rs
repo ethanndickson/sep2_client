@@ -1,13 +1,16 @@
-use std::time::Duration;
-
-use anyhow::{anyhow, bail, Ok, Result};
-use common::{deserialize, packages::traits::SEResource, serialize};
+use anyhow::{anyhow, bail, Context, Result};
+use common::{
+    deserialize,
+    packages::{primitives::Uint32, traits::SEResource},
+    serialize,
+};
 use hyper::{
     header::{ACCEPT, ALLOW, CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
     http::HeaderValue,
     Body, Method, Request, StatusCode, Uri,
 };
-use log::{debug, info};
+use log::{debug, error, info};
+use std::{future::Future, time::Duration};
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
@@ -45,19 +48,22 @@ impl From<SepResponse> for hyper::Response<Body> {
             SepResponse::MethodNotAllowed(methods) => {
                 *res.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
                 res.headers_mut()
-                    .insert(ALLOW, HeaderValue::from_static(&methods));
+                    .insert(ALLOW, HeaderValue::from_static(methods));
             }
         };
         res
     }
 }
-
+/// An IEEE 2030.5 Client
+#[derive(Clone)]
 pub struct Client {
     addr: String,
     http: HTTPSClient,
 }
 
 impl Client {
+    const DEFAULT_POLLRATE: Uint32 = Uint32(900);
+
     pub fn new(
         server_addr: &str,
         cert_path: &str,
@@ -72,7 +78,9 @@ impl Client {
     }
 
     pub async fn get<R: SEResource>(&self, path: &str) -> Result<R> {
-        let uri: Uri = format!("{}{}", self.addr, path).parse()?;
+        let uri: Uri = format!("{}{}", self.addr, path)
+            .parse()
+            .context("Failed to parse address")?;
         info!("GET {} from {}", R::name(), uri);
         let req = Request::builder()
             .method(Method::GET)
@@ -82,7 +90,7 @@ impl Client {
         debug!("Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
         debug!("Incoming HTTP Response: {:?}", res);
-        // TODO: Improve erorr handling
+        // TODO: Improve error handling
         match res.status() {
             StatusCode::OK => (),
             StatusCode::NOT_FOUND => bail!("404 Not Found"),
@@ -98,7 +106,9 @@ impl Client {
     }
 
     pub async fn delete(&self, path: &str) -> Result<()> {
-        let uri: Uri = format!("{}{}", self.addr, path).parse()?;
+        let uri: Uri = format!("{}{}", self.addr, path)
+            .parse()
+            .context("Failed to parse address")?;
         info!("DELETE at {}", uri);
         let req = Request::builder()
             .method(Method::DELETE)
@@ -107,7 +117,7 @@ impl Client {
         debug!("Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
         debug!("Incoming HTTP Response: {:?}", res);
-        // TODO: Improve erorr handling
+        // TODO: Improve error handling
         match res.status() {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::BAD_REQUEST => bail!("400 Bad Request"),
@@ -120,6 +130,41 @@ impl Client {
         self.put_post(path, resource, Method::PUT).await
     }
 
+    pub async fn start_poll<R: SEResource, F, Res>(
+        &self,
+        path: &str,
+        poll_rate: Option<Uint32>,
+        mut callback: F,
+    ) where
+        R: SEResource + Send,
+        F: FnMut(R) -> Res + Send + Sync + 'static,
+        Res: Future<Output = ()> + Send + 'static,
+    {
+        let client = self.clone();
+        let path = path.to_owned();
+        tokio::task::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(
+                    *poll_rate.unwrap_or(Self::DEFAULT_POLLRATE) as u64,
+                ))
+                .await;
+                let res = client.get::<R>(&path).await;
+                match res {
+                    Ok(rsrc) => {
+                        info!("Scheduled poll for Resource {} successful.", R::name());
+                        callback(rsrc).await;
+                    }
+                    Err(_) => error!(
+                        "Scheduled poll for Resource {} at {} failed. Retrying in {} seconds.",
+                        R::name(),
+                        &path,
+                        &poll_rate.unwrap_or(Self::DEFAULT_POLLRATE)
+                    ),
+                }
+            }
+        });
+    }
+
     // Create a PUT or POST request
     async fn put_post<R: SEResource>(
         &self,
@@ -127,7 +172,9 @@ impl Client {
         resource: &R,
         method: Method,
     ) -> Result<SepResponse> {
-        let uri: Uri = format!("{}{}", self.addr, path).parse()?;
+        let uri: Uri = format!("{}{}", self.addr, path)
+            .parse()
+            .context("Failed to parse address")?;
         info!("POST {} to {}", R::name(), uri);
         let rsrce = serialize(resource)?;
         let rsrce_size = rsrce.as_bytes().len();
@@ -140,7 +187,7 @@ impl Client {
         debug!("Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
         debug!("Incoming HTTP Response: {:?}", res);
-        // TODO: Improve erorr handling
+        // TODO: Improve error handling
         match res.status() {
             StatusCode::CREATED => {
                 let loc = res
