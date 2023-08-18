@@ -73,7 +73,7 @@ pub trait NotifHandler: Send + Sync + 'static {
                     .await
                     .into())
             }
-            _ => Ok(SepResponse::MethodNotAllowed.into()),
+            _ => Ok(SepResponse::MethodNotAllowed("POST").into()),
         }
     }
 
