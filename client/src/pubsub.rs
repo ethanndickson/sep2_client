@@ -33,17 +33,19 @@ impl<H: NotifHandler> ClientNotifServer<H> {
     }
 
     pub async fn run(self) -> Result<()> {
-        info!("NotifServer listening on {}", self.addr);
-        let listener = TcpListener::bind(self.addr).await?;
         let acceptor = self.cfg.build();
         let handler = Arc::new(self.handler);
+        let listener = TcpListener::bind(self.addr).await?;
+        info!("NotifServer listening on {}", self.addr);
         loop {
             // Accept TCP Connection
-            let (stream, _) = listener.accept().await?;
+            let (stream, addr) = listener.accept().await?;
+            info!("Remote connecting from {}", addr);
+
+            // Perform TLS handshake
             let ssl = Ssl::new(acceptor.context())?;
             let stream = SslStream::new(ssl, stream)?;
             let mut stream = Box::pin(stream);
-            // Perform TLS handshake
             stream.as_mut().accept().await?;
 
             // Bind connection to service

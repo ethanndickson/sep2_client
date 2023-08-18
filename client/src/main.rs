@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use client::{
@@ -9,11 +7,12 @@ use client::{
 use common::{
     deserialize,
     packages::{
+        primitives::Uint32,
         pubsub::Notification,
         xsd::{DeviceCapability, Reading},
     },
 };
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 use typemap_rev::{TypeMap, TypeMapKey};
 
 struct ReadingResource;
@@ -21,8 +20,10 @@ impl TypeMapKey for ReadingResource {
     type Value = Reading;
 }
 
+#[derive(Default)]
 struct Handler {
-    state: Arc<RwLock<TypeMap>>,
+    // Store any form of state in your handler, and have it accessible in your notification handler
+    state: RwLock<TypeMap>,
 }
 
 impl Handler {
@@ -42,13 +43,6 @@ impl Handler {
     }
 }
 
-impl Default for Handler {
-    fn default() -> Self {
-        Self {
-            state: Default::default(),
-        }
-    }
-}
 #[async_trait]
 impl NotifHandler for Handler {
     async fn notif_handler(&self, path: &str, resource: &str) -> SepResponse {
@@ -69,12 +63,26 @@ async fn main() -> Result<()> {
     )?;
     let notif_handle = tokio::task::spawn(notifs.run());
     let client = Client::new(
-        "127.0.0.1:1337",
+        "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
         None,
     )?;
-    println!("{:?}", client.get::<DeviceCapability>("/dcap").await?);
+    let dcap = client.get::<DeviceCapability>("/dcap").await?;
+    let (tx, mut rx) = mpsc::channel::<String>(100);
+    client
+        .start_poll(
+            &dcap.href.unwrap(),
+            Some(Uint32(3)),
+            move |dcap: DeviceCapability| {
+                let tx = tx.clone();
+                async move { tx.send(dcap.href.unwrap()).await.unwrap() }
+            },
+        )
+        .await;
+    while let Some(url) = rx.recv().await {
+        println!("Updated href: {}", url);
+    }
     // Join notif task
     notif_handle.await?
 }
