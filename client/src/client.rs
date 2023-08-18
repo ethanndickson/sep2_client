@@ -3,7 +3,8 @@ use std::time::Duration;
 use anyhow::{anyhow, bail, Ok, Result};
 use common::{deserialize, packages::traits::SEResource, serialize};
 use hyper::{
-    header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
+    header::{ACCEPT, ALLOW, CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
+    http::HeaderValue,
     Body, Method, Request, StatusCode, Uri,
 };
 use log::{debug, info};
@@ -20,8 +21,8 @@ pub enum SepResponse {
     BadRequest,
     // HTTP 404 - 2030.5-2018 - 5.5.2.11
     NotFound,
-    // HTTP 405 - 2030.5-2018 - 5.5.2.12
-    MethodNotAllowed,
+    // HTTP 405 w/ Allow header value - 2030.5-2018 - 5.5.2.12
+    MethodNotAllowed(&'static str),
 }
 
 impl From<SepResponse> for hyper::Response<Body> {
@@ -41,8 +42,10 @@ impl From<SepResponse> for hyper::Response<Body> {
             SepResponse::NotFound => {
                 *res.status_mut() = StatusCode::NOT_FOUND;
             }
-            SepResponse::MethodNotAllowed => {
+            SepResponse::MethodNotAllowed(methods) => {
                 *res.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
+                res.headers_mut()
+                    .insert(ALLOW, HeaderValue::from_static(&methods));
             }
         };
         res
