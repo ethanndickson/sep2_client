@@ -11,10 +11,11 @@ use hyper::{
 };
 use log::{debug, error, info};
 use std::{future::Future, time::Duration};
+use tokio::sync::broadcast::{self, Sender};
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
-/// Possible HTTP Responses for a IEE 2030.5 Client
+/// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
 pub enum SepResponse {
     // HTTP 201 w/ Location header value - 2030.5-2018 - 5.5.2.4
     Created(String),
@@ -54,11 +55,18 @@ impl From<SepResponse> for hyper::Response<Body> {
         res
     }
 }
-/// An IEEE 2030.5 Client
+
+#[derive(Clone)]
+enum PollTask {
+    ForceRun,
+    Cancel,
+}
+/// Represents an IEEE 2030.5 Client.
 #[derive(Clone)]
 pub struct Client {
     addr: String,
     http: HTTPSClient,
+    broadcaster: Sender<PollTask>,
 }
 
 impl Client {
@@ -71,12 +79,17 @@ impl Client {
         tcp_keepalive: Option<Duration>,
     ) -> Result<Self> {
         let cfg = create_client_tls_cfg(cert_path, pk_path)?;
+        let (tx, _) = broadcast::channel::<PollTask>(1);
         Ok(Client {
             addr: server_addr.to_owned(),
             http: create_client(cfg, tcp_keepalive),
+            broadcaster: tx,
         })
     }
 
+    /// Retrieve the resource at the given path.
+    ///
+    /// Returns an error if the resource could not be retrieved or deserialized.
     pub async fn get<R: SEResource>(&self, path: &str) -> Result<R> {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
@@ -101,10 +114,23 @@ impl Client {
         deserialize(&xml)
     }
 
+    /// Update a resource at the given path.
+    ///
+    /// Returns an error if the server does not respond with 204 No Content or 201 Created.
     pub async fn post<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
         self.put_post(path, resource, Method::POST).await
     }
 
+    /// Create a resource at the given path.
+    ///
+    /// Returns an error if the server does not respond with 204 No Content or 201 Created.
+    pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
+        self.put_post(path, resource, Method::PUT).await
+    }
+
+    /// Delete the resource at the given path.
+    ///
+    /// Returns an error if the server does not respond with 204 No Content.
     pub async fn delete(&self, path: &str) -> Result<()> {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
@@ -126,28 +152,40 @@ impl Client {
         }
     }
 
-    pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
-        self.put_post(path, resource, Method::PUT).await
-    }
-
+    /// Begin polling the given route on a regular interval, passing the returned resource to the given callback.
+    ///
+    /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
+    ///
+    /// All poll events created can be forcibly run using `force_poll`.
     pub async fn start_poll<R: SEResource, F, Res>(
         &self,
-        path: &str,
+        path: String,
         poll_rate: Option<Uint32>,
         mut callback: F,
     ) where
         R: SEResource + Send,
         F: FnMut(R) -> Res + Send + Sync + 'static,
-        Res: Future<Output = ()> + Send + 'static,
+        Res: Future<Output = ()> + Send,
     {
         let client = self.clone();
-        let path = path.to_owned();
+        let mut rx = self.broadcaster.subscribe();
         tokio::task::spawn(async move {
             loop {
-                tokio::time::sleep(Duration::from_secs(
-                    *poll_rate.unwrap_or(Self::DEFAULT_POLLRATE) as u64,
-                ))
-                .await;
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_secs(
+                        *poll_rate.unwrap_or(Self::DEFAULT_POLLRATE) as u64,
+                    )) => (),
+                    flag = rx.recv() => {
+                        if let Ok(v) = flag {
+                            match v {
+                                PollTask::ForceRun => (),
+                                PollTask::Cancel => break,
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
                 let res = client.get::<R>(&path).await;
                 match res {
                     Ok(rsrc) => {
@@ -163,6 +201,16 @@ impl Client {
                 }
             }
         });
+    }
+
+    /// Forcibly poll & run the callbacks of all routes polled using `start_poll`
+    pub async fn force_poll(&self) {
+        let _ = self.broadcaster.send(PollTask::ForceRun);
+    }
+
+    /// Cancel all poll tasks created using `start_poll`
+    pub async fn cancel_polls(&self) {
+        let _ = self.broadcaster.send(PollTask::Cancel);
     }
 
     // Create a PUT or POST request

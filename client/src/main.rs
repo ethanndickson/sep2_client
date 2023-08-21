@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use client::{
@@ -72,17 +74,21 @@ async fn main() -> Result<()> {
     let (tx, mut rx) = mpsc::channel::<String>(100);
     client
         .start_poll(
-            &dcap.href.unwrap(),
-            Some(Uint32(3)),
+            dcap.href.unwrap(),
+            Some(Uint32(1)),
             move |dcap: DeviceCapability| {
                 let tx = tx.clone();
                 async move { tx.send(dcap.href.unwrap()).await.unwrap() }
             },
         )
         .await;
-    while let Some(url) = rx.recv().await {
-        println!("Updated href: {}", url);
-    }
+    tokio::task::spawn(async move {
+        while let Some(url) = rx.recv().await {
+            println!("Updated href: {}", url);
+        }
+    });
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    client.cancel_polls().await;
     // Join notif task
     notif_handle.await?
 }
