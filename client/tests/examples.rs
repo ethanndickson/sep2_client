@@ -17,7 +17,7 @@ use common::{
 fn test_setup() -> (EndDevice, Registration, Client) {
     let mut edr = EndDevice::default();
     edr.changed_time = Int64(1379905200);
-    edr.s_fdi = Uint40(987654321005);
+    edr.sfdi = Uint40(987654321005);
     let mut reg = Registration::default();
     reg.date_time_registered = Int64(1364774400);
     reg.p_in = Uint32(123455);
@@ -40,7 +40,7 @@ async fn registration_remote() {
     let edr: EndDevice = client.get("/edev/3").await.unwrap();
     let expected_edr: EndDevice = deserialize(ED_16_01_08).unwrap();
     assert_eq!(expected_edr, edr);
-    assert_eq!(own_edr.s_fdi, edr.s_fdi);
+    assert_eq!(own_edr.sfdi, edr.sfdi);
     // Verify pin matches
     let reg: Registration = client.get("/edev/3/reg").await.unwrap();
     let expected_reg: Registration = deserialize(REG_16_01_10).unwrap();
@@ -53,11 +53,11 @@ async fn registration_remote() {
 async fn registration_local() {
     let (mut own_edr, _, client) = test_setup();
     // Test-specific SFDI
-    own_edr.s_fdi = Uint40(789654321005);
+    own_edr.sfdi = Uint40(789654321005);
     // Verify our SFDI isn't in the server's list
     let edrl: EndDeviceList = client.get("/edev").await.unwrap();
     for each_ed in edrl.end_device {
-        assert_ne!(each_ed.s_fdi, own_edr.s_fdi);
+        assert_ne!(each_ed.sfdi, own_edr.sfdi);
     }
     let res = client.post("/edev", &own_edr).await.unwrap();
     // Header should return location of newly posted resource
