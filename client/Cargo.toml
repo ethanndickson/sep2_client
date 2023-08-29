@@ -13,6 +13,7 @@ hyper = { version = "0.14.26", features = ["full"] }
 hyper-openssl = "0.9.2"
 log = "0.4.17"
 openssl = "0.10.52"
+rand = "0.8.5"
 tokio = {version = "1.28.1", features = ["full"] }
 tokio-openssl = "0.6.3"
 typemap_rev = "0.3.0"
