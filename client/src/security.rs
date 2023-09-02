@@ -1,8 +1,5 @@
 use anyhow::Result;
-use common::packages::{
-    primitives::{HexBinary160, Uint40},
-    xsd::SFDIType,
-};
+use common::packages::{primitives::HexBinary160, types::SFDIType};
 use openssl::sha::Sha256;
 
 /// Generate a LFDI hash value from a certificate file
@@ -22,7 +19,7 @@ pub fn sfdi_gen(lfdi: &HexBinary160) -> SFDIType {
         sfdi = (sfdi << 8) + u64::from(lfdi[i]);
     }
     sfdi >>= 4;
-    Uint40(sfdi * 10 + check_digit(sfdi))
+    SFDIType::new(sfdi * 10 + check_digit(sfdi)).unwrap()
 }
 
 pub fn security_init(cert_path: &str) -> Result<(HexBinary160, SFDIType)> {

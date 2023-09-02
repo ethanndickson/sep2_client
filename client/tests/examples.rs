@@ -4,7 +4,8 @@ use common::{
     deserialize,
     examples::{ED_16_01_08, REG_16_01_10},
     packages::{
-        primitives::{Int64, Uint32, Uint40},
+        primitives::Int64,
+        types::{PINType, SFDIType},
         xsd::{
             DeviceCapability, EndDevice, EndDeviceList, FunctionSetAssignmentsList, Registration,
         },
@@ -17,10 +18,10 @@ use common::{
 fn test_setup() -> (EndDevice, Registration, Client) {
     let mut edr = EndDevice::default();
     edr.changed_time = Int64(1379905200);
-    edr.sfdi = Uint40(987654321005);
+    edr.sfdi = SFDIType::new(987654321005).unwrap();
     let mut reg = Registration::default();
     reg.date_time_registered = Int64(1364774400);
-    reg.p_in = Uint32(123455);
+    reg.p_in = PINType::new(123455).unwrap();
     // Create client
     let client = Client::new(
         "https://127.0.0.1:1337",
@@ -53,7 +54,7 @@ async fn registration_remote() {
 async fn registration_local() {
     let (mut own_edr, _, client) = test_setup();
     // Test-specific SFDI
-    own_edr.sfdi = Uint40(789654321005);
+    own_edr.sfdi = SFDIType::new(789654321005).unwrap();
     // Verify our SFDI isn't in the server's list
     let edrl: EndDeviceList = client.get("/edev").await.unwrap();
     for each_ed in edrl.end_device {
