@@ -1,21 +1,51 @@
 use std::{collections::HashMap, sync::Arc};
 
 use common::packages::{
-    traits::{SEEvent, SERandomizableEvent},
+    identification::ResponseStatus,
+    objects::EventStatusType,
+    traits::SEEvent,
     types::{Mridtype, OneHourRangeType, PrimacyType},
     xsd::EndDevice,
 };
+use log::error;
 use rand::Rng;
 use tokio::sync::RwLock;
 
-use crate::client::Client;
+use crate::{client::Client, time::current_time};
 
 struct EventInstance<E: SEEvent> {
-    event: E,
     start: i64,
     end: i64,
     primacy: PrimacyType,
+    status: EventInstanceStatus,
+    event: E,
 }
+
+enum EventInstanceStatus {
+    Scheduled,
+    Active,
+    Cancelled,
+    CancelledRandom,
+    Superseded,
+    // Add more as needed
+    // Aborted,
+    // Completed,
+    // InProgress,
+    // ScheduleSuperseded,
+}
+
+impl From<EventStatusType> for EventInstanceStatus {
+    fn from(value: EventStatusType) -> Self {
+        match value {
+            EventStatusType::Scheduled => EventInstanceStatus::Scheduled,
+            EventStatusType::Active => EventInstanceStatus::Active,
+            EventStatusType::Cancelled => EventInstanceStatus::Cancelled,
+            EventStatusType::CancelledRandom => EventInstanceStatus::CancelledRandom,
+            EventStatusType::Superseded => EventInstanceStatus::Superseded,
+        }
+    }
+}
+
 // Compare EventInstances (Non-Active (Scheduled / Superseded)) by their effective start time
 impl<E: SEEvent> PartialEq for EventInstance<E> {
     fn eq(&self, other: &Self) -> bool {
@@ -63,9 +93,10 @@ impl<E: SEEvent> Ord for ActiveEventInstance<E> {
 
 impl<E: SEEvent> EventInstance<E> {
     pub fn new(event: E, primacy: PrimacyType) -> Self {
-        let start: i64 = *event.interval().start;
+        let start: i64 = event.interval().start.get();
         let end: i64 = start + i64::from(*event.interval().duration);
         EventInstance {
+            status: event.event_status().current_status.clone().into(),
             event,
             primacy,
             start,
@@ -79,9 +110,10 @@ impl<E: SEEvent> EventInstance<E> {
         rand_start: Option<OneHourRangeType>,
         event: E,
     ) -> Self {
-        let start: i64 = *event.interval().start + randomize(rand_duration);
+        let start: i64 = event.interval().start.get() + randomize(rand_duration);
         let end: i64 = start + i64::from(*event.interval().duration) + randomize(rand_start);
         EventInstance {
+            status: event.event_status().current_status.clone().into(),
             event,
             primacy,
             start,
@@ -129,30 +161,55 @@ impl<E: SEEvent> Schedule<E> {
         }
     }
 
-    pub fn schedule_event(&mut self, event: E, primacy: PrimacyType) {
-        let ev = self.events.get_mut(event.mrid());
-        if let Some(ev) = ev {
-            ev.primacy = primacy;
-        } else {
-            let ei = EventInstance::new(event, primacy);
-        }
+    pub async fn schedule_event(&mut self, event: E, primacy: PrimacyType) {
+        self.schedule_rand_event(event, primacy, None, None).await
     }
 
-    pub fn schedule_rand_event<RE: SERandomizableEvent>(
+    pub async fn schedule_rand_event(
         &mut self,
-        event: RE,
+        event: E,
         primacy: PrimacyType,
+        // Ideally we would have a seperate function for RandomizableEvents,
+        // however there is noway to downcast a generic ST: SERandomizableEvent to a T: SEEvent,
+        // even if SERandomizableEvent : SEEvent.
+        // Instead we take the extra fields from that RandomizableEvent
+        randomize_duration: Option<OneHourRangeType>,
+        randomize_start: Option<OneHourRangeType>,
     ) {
-        let ev = self.events.get_mut(event.mrid());
+        let mrid = event.mrid().clone();
+        let ev = self.events.get_mut(&mrid);
+
         if let Some(ev) = ev {
             ev.primacy = primacy;
         } else {
-            let ei = EventInstance::new_rand(
-                primacy,
-                event.randomize_duration(),
-                event.randomize_start(),
-                event,
-            );
+            // Inform server event was scheduled
+            self.send_schedule_resp(&event, ResponseStatus::EventReceived)
+                .await;
+            // Calculate start & end times
+            let ei = EventInstance::new_rand(primacy, randomize_duration, randomize_start, event);
+            // The event may have expired already
+            if ei.end <= current_time().get() {
+                self.send_schedule_resp(&ei.event, ResponseStatus::EventExpired)
+                    .await;
+                return;
+            }
+            // Add it to our schedule
+            self.events.insert(mrid, ei);
+        }
+
+        // TODO: Handle event status
+    }
+
+    // Schedule a new event, logging if it fails
+    async fn send_schedule_resp(&mut self, event: &E, status: ResponseStatus) {
+        if let Some(lfdi) = { self.device.read().await.lfdi } {
+            let _ = self
+                .client
+                .send_der_response(lfdi, event, status)
+                .await
+                .map_err(|e| error!("DER response POST attempt failed with reason: {}", e));
+        } else {
+            error!("Attempted to send DER response for EndDevice that does not have an LFDI")
         }
     }
 }
