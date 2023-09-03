@@ -224,7 +224,7 @@ impl Client {
     pub async fn send_der_response<E: SEEvent>(
         &self,
         lfdi: HexBinary160,
-        event: E,
+        event: &E,
         status: ResponseStatus,
     ) -> Result<SepResponse> {
         if matches!(status, ResponseStatus::EventReceived)
