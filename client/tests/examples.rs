@@ -21,7 +21,7 @@ fn test_setup() -> (EndDevice, Registration, Client) {
     edr.sfdi = SFDIType::new(987654321005).unwrap();
     let mut reg = Registration::default();
     reg.date_time_registered = Int64(1364774400);
-    reg.p_in = PINType::new(123455).unwrap();
+    reg.pin = PINType::new(123455).unwrap();
     // Create client
     let client = Client::new(
         "https://127.0.0.1:1337",
@@ -46,7 +46,7 @@ async fn registration_remote() {
     let reg: Registration = client.get("/edev/3/reg").await.unwrap();
     let expected_reg: Registration = deserialize(REG_16_01_10).unwrap();
     assert_eq!(expected_reg, reg);
-    assert_eq!(own_reg.p_in, reg.p_in);
+    assert_eq!(own_reg.pin, reg.pin);
 }
 
 /// IEEE 2030.5-2018 - Table C.3
