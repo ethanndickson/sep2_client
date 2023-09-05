@@ -57,7 +57,7 @@ impl<E: SEEvent> Eq for EventInstance<E> {}
 
 impl<E: SEEvent> PartialOrd for EventInstance<E> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.start.partial_cmp(&other.start)
+        Some(self.cmp(other))
     }
 }
 
@@ -94,7 +94,7 @@ impl<E: SEEvent> Ord for ActiveEventInstance<E> {
 impl<E: SEEvent> EventInstance<E> {
     pub fn new(event: E, primacy: PrimacyType) -> Self {
         let start: i64 = event.interval().start.get();
-        let end: i64 = start + i64::from(*event.interval().duration);
+        let end: i64 = start + i64::from(event.interval().duration.get());
         EventInstance {
             status: event.event_status().current_status.clone().into(),
             event,
@@ -111,7 +111,7 @@ impl<E: SEEvent> EventInstance<E> {
         event: E,
     ) -> Self {
         let start: i64 = event.interval().start.get() + randomize(rand_duration);
-        let end: i64 = start + i64::from(*event.interval().duration) + randomize(rand_start);
+        let end: i64 = start + i64::from(event.interval().duration.get()) + randomize(rand_start);
         EventInstance {
             status: event.event_status().current_status.clone().into(),
             event,
