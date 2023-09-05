@@ -181,7 +181,7 @@ impl Client {
             loop {
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_secs(
-                        *poll_rate.unwrap_or(Self::DEFAULT_POLLRATE) as u64,
+                        poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as u64,
                     )) => (),
                     flag = rx.recv() => {
                         if let Ok(v) = flag {
