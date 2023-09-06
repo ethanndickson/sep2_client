@@ -1,12 +1,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use common::{
     deserialize,
-    packages::{
-        identification::{ResponseRequired, ResponseStatus},
-        primitives::{HexBinary160, Uint32},
-        response::DercontrolResponse,
-        traits::{SEEvent, SEResource},
-    },
+    packages::{primitives::Uint32, traits::SEResource},
     serialize,
 };
 use hyper::{
@@ -18,10 +13,7 @@ use log::{debug, error, info};
 use std::{future::Future, time::Duration};
 use tokio::sync::broadcast::{self, Sender};
 
-use crate::{
-    time::current_time,
-    tls::{create_client, create_client_tls_cfg, HTTPSClient},
-};
+use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
 pub enum SepResponse {
@@ -219,43 +211,6 @@ impl Client {
     /// Cancel all poll tasks created using `start_poll`
     pub async fn cancel_polls(&self) {
         let _ = self.broadcaster.send(PollTask::Cancel);
-    }
-
-    pub async fn send_der_response<E: SEEvent>(
-        &self,
-        lfdi: HexBinary160,
-        event: &E,
-        status: ResponseStatus,
-    ) -> Result<SepResponse> {
-        if matches!(status, ResponseStatus::EventReceived)
-            && event
-                .response_required()
-                .map(|rr| {
-                    rr.contains(
-                        ResponseRequired::SpecificResponse | ResponseRequired::ResponseRequired,
-                    )
-                })
-                .ok_or(anyhow!("Event does not contain a ResponseRequired field"))?
-        {
-            let resp = DercontrolResponse {
-                created_date_time: Some(current_time()),
-                end_device_lfdi: lfdi,
-                status: Some(status),
-                subject: *event.mrid(),
-                href: None,
-            };
-            self.post(
-                event
-                    .reply_to()
-                    .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
-                &resp,
-            )
-            .await
-        } else {
-            Err(anyhow!(
-                "Attempted to send a response for an event that did not require one."
-            ))
-        }
     }
 
     // Create a PUT or POST request
