@@ -27,14 +27,14 @@ struct EventInstance<E: SEEvent> {
 }
 
 impl EventInstance<Dercontrol> {
-    pub fn der_supersedes(&self, other: Self) -> bool {
+    pub fn der_supersedes(&self, other: &Self) -> bool {
+        // TODO: Confirm this is correct
         if self.primacy == other.primacy && self.event.creation_time() > other.event.creation_time()
             || self.primacy < other.primacy
         {
-            return self
-                .event
+            self.event
                 .der_control_base
-                .same_target(&other.event.der_control_base);
+                .same_target(&other.event.der_control_base)
         } else {
             false
         }
@@ -46,7 +46,7 @@ impl<E: SEEvent> EventInstance<E> {
         let start: i64 = event.interval().start.get();
         let end: i64 = start + i64::from(event.interval().duration.get());
         EventInstance {
-            status: event.event_status().current_status.clone().into(),
+            status: event.event_status().current_status,
             event,
             primacy,
             start,
@@ -63,7 +63,7 @@ impl<E: SEEvent> EventInstance<E> {
         let start: i64 = event.interval().start.get() + randomize(rand_duration);
         let end: i64 = start + i64::from(event.interval().duration.get()) + randomize(rand_start);
         EventInstance {
-            status: event.event_status().current_status.clone().into(),
+            status: event.event_status().current_status,
             event,
             primacy,
             start,
@@ -71,7 +71,7 @@ impl<E: SEEvent> EventInstance<E> {
         }
     }
 
-    pub fn supersedes(&self, other: Self) -> bool {
+    pub fn supersedes(&self, other: &Self) -> bool {
         self.primacy == other.primacy && self.event.creation_time() > other.event.creation_time()
             || self.primacy < other.primacy
     }
@@ -95,7 +95,7 @@ pub struct Schedule<E: SEEvent> {
     // Send + Sync end device, as the EndDevice resource may be updated
     device: Arc<RwLock<EndDevice>>,
     // Lookup by MRID
-    events: HashMap<Mridtype, EventInstance<E>>,
+    events: HashMap<Mridtype, Arc<RwLock<EventInstance<E>>>>,
 }
 
 impl<E: SEEvent> Schedule<E> {
@@ -112,15 +112,18 @@ impl<E: SEEvent> Schedule<E> {
 // Distributed Energy Resources Function Set
 impl Schedule<Dercontrol> {
     pub async fn schedule_event(&mut self, event: Dercontrol, primacy: PrimacyType) {
-        let mrid = event.mrid.clone();
+        let mrid = event.mrid;
         let ev = self.events.get_mut(&mrid);
         let incoming_status = event.event_status.current_status;
 
-        if let Some(ev) = ev {
-            ev.primacy = primacy;
+        // If the event already exists in the schedule
+        let ei = if let Some(ei) = ev {
+            // "Editing events shall NOT be allowed, except for updating status"
+            // ev.primacy = primacy;
+            ei.clone()
         } else {
             // Inform server event was scheduled
-            self.send_schedule_resp(&event, ResponseStatus::EventReceived)
+            self.send_der_resp(&event, ResponseStatus::EventReceived)
                 .await;
             // Calculate start & end times
             let ei = EventInstance::new_rand(
@@ -132,31 +135,36 @@ impl Schedule<Dercontrol> {
             // The event may have expired already
             if ei.end <= current_time().get() {
                 // Do not add event to schedule
-                self.send_schedule_resp(&ei.event, ResponseStatus::EventExpired)
+                self.send_der_resp(&ei.event, ResponseStatus::EventExpired)
                     .await;
                 return;
             }
             // Add it to our schedule
-            self.events.insert(mrid, ei);
-        }
+            let ei = Arc::new(RwLock::new(ei));
+            self.events.insert(mrid, ei.clone());
+            ei
+        };
 
-        // Guaranteed to exist
-        let ei = self.events.get_mut(&mrid).unwrap();
-
-        // Handle current status transitions
-        match (ei.status, incoming_status) {
+        // Handle status transitions
+        let current_status = ei.read().await.status;
+        match (current_status, incoming_status) {
             // (Cancelled | CancelledRandom | Superseded) -> Any
             (
                 EventStatusType::Cancelled
                 | EventStatusType::CancelledRandom
                 | EventStatusType::Superseded,
                 _,
-            ) => return,
+            ) => (),
             // Scheduled -> (Cancelled || CancelledRandom)
             (
                 EventStatusType::Scheduled,
-                EventStatusType::Cancelled | EventStatusType::CancelledRandom,
-            ) => todo!(),
+                s @ (EventStatusType::Cancelled | EventStatusType::CancelledRandom),
+            ) => {
+                // Respond EventCancelled
+                self.send_der_resp(&ei.read().await.event, s.into()).await;
+                // TODO: What do we need to keep the cancelled event for?
+                self.events.remove(&mrid);
+            }
             // Scheduled -> Active
             (EventStatusType::Scheduled, EventStatusType::Active) => todo!(),
             // Active -> Superseded
@@ -177,7 +185,7 @@ impl Schedule<Dercontrol> {
     }
 
     // Schedule a new event, logging if it fails
-    async fn send_schedule_resp(&mut self, event: &Dercontrol, status: ResponseStatus) {
+    async fn send_der_resp(&self, event: &Dercontrol, status: ResponseStatus) {
         if let Some(lfdi) = { self.device.read().await.lfdi } {
             let _ = self
                 .send_response(lfdi, event, status)
@@ -225,6 +233,36 @@ impl Schedule<Dercontrol> {
             ))
         }
     }
+
+    async fn start_event(&mut self, mrid: &Mridtype) {
+        // Guaranteed to exist, remove to avoid double mut borrow
+        let target_event = self.events.remove(mrid).unwrap();
+        let mut superseded: Vec<Mridtype> = vec![];
+        // Mark required events as superseded
+        for (mrid, ei) in &mut self.events {
+            let ei = &mut *ei.write().await;
+            if (target_event.read().await).der_supersedes(ei) {
+                // Notify client active event has ended
+                if matches!(ei.status, EventStatusType::Active) {
+                    // TODO: Callback w/ EVENT END
+                }
+                ei.status = EventStatusType::Superseded;
+                superseded.push(*mrid);
+            }
+        }
+        // Notify server
+        for mrid in superseded {
+            let event = &self.events.get(&mrid).unwrap().read().await.event;
+            self.send_der_resp(event, ResponseStatus::EventSuperseded)
+                .await;
+        }
+        target_event.write().await.status = EventStatusType::Active;
+        // TODO: Callback W/ EVENT START
+        self.events.insert(*mrid, target_event);
+    }
+
+    // Events may be cancelled before they complete.
+    async fn cancel_event(&mut self, mrid: &Mridtype) {}
 }
 
 // Demand Response Load Control Function Set
