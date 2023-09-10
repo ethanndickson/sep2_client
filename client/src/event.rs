@@ -8,7 +8,7 @@ use std::{
 use crate::{client::Client, time::current_time};
 use common::packages::{
     identification::ResponseStatus,
-    objects::{Dercontrol, EndDeviceControl, EventStatusType, TextMessage, TimeTariffInterval},
+    objects::{DERControl, EndDeviceControl, EventStatusType, TextMessage, TimeTariffInterval},
     traits::SEEvent,
     types::{Mridtype, OneHourRangeType, PrimacyType},
     xsd::{EndDevice, FlowReservationResponse},
@@ -17,32 +17,62 @@ use rand::Rng;
 use tokio::sync::oneshot::{self, Receiver, Sender};
 use tokio::sync::RwLock;
 
+/// A wrapper around an [`SEEvent`] resource.
 pub struct EventInstance<E: SEEvent> {
     pub start: i64,
     pub end: i64,
     pub primacy: PrimacyType,
-    pub status: EventStatusType,
+    /// The current status of the Event,
+    pub status: EIStatus,
     pub event: E,
-    oneshot: (Sender<EventUpdate>, Option<Receiver<EventUpdate>>),
+    oneshot: (Sender<EIStatus>, Option<Receiver<EIStatus>>),
 }
 
-/// Started denotes the event has started, for any reason.
-/// Finished denotes the event has ended, for any reason.
-pub enum EventUpdate {
-    Started,
-    Complete,
+/// The current state of an [`EventInstance`] in the schedule.
+/// Can be created from a [`EventStatusType`] for the purpose of reading [`SEEvent`] resources.
+/// Can be converted to a [`ResponseStatus`] for the purpose of creating [`SEResponse`] resources.
+///
+/// [`SEResponse`]: common::packages::traits::SEResponse
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum EIStatus {
+    Scheduled,
+    Active,
     Cancelled,
+    Complete,
+    CancelledRandom,
     Superseded,
+    // This likely needs to be removed, and the case where the sender is dropped before the receiver handled
     InternalError,
 }
 
-impl From<EventUpdate> for ResponseStatus {
-    fn from(value: EventUpdate) -> Self {
-        todo!()
+impl From<EIStatus> for ResponseStatus {
+    fn from(value: EIStatus) -> Self {
+        match value {
+            EIStatus::Scheduled => Self::EventReceived, // TODO:  Maybe
+            EIStatus::Active => Self::EventStarted,
+            EIStatus::Cancelled => Self::EventCancelled,
+            EIStatus::CancelledRandom => Self::EventCancelled,
+            EIStatus::Superseded => Self::EventSuperseded,
+            EIStatus::Complete => Self::EventCompleted,
+            EIStatus::InternalError => Self::EventAbortedProgram,
+        }
     }
 }
 
-impl EventInstance<Dercontrol> {
+impl From<EventStatusType> for EIStatus {
+    fn from(value: EventStatusType) -> Self {
+        match value {
+            EventStatusType::Scheduled => Self::Scheduled,
+            EventStatusType::Active => Self::Active,
+            EventStatusType::Cancelled => Self::Cancelled,
+            EventStatusType::CancelledRandom => Self::CancelledRandom,
+            EventStatusType::Superseded => Self::Superseded,
+        }
+    }
+}
+
+impl EventInstance<DERControl> {
     fn der_supersedes(&self, other: &Self) -> bool {
         // TODO: Confirm this is correct
         if self.primacy == other.primacy && self.event.creation_time() > other.event.creation_time()
@@ -63,7 +93,7 @@ impl<E: SEEvent> EventInstance<E> {
         let end: i64 = start + i64::from(event.interval().duration.get());
         let (send, recv) = oneshot::channel();
         EventInstance {
-            status: event.event_status().current_status,
+            status: event.event_status().current_status.into(),
             event,
             primacy,
             start,
@@ -82,7 +112,7 @@ impl<E: SEEvent> EventInstance<E> {
         let end: i64 = start + i64::from(event.interval().duration.get()) + randomize(rand_start);
         let (send, recv) = oneshot::channel();
         EventInstance {
-            status: event.event_status().current_status,
+            status: event.event_status().current_status.into(),
             event,
             primacy,
             start,
@@ -109,7 +139,7 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
 pub struct Schedule<E, F, Res>
 where
     E: SEEvent,
-    F: FnMut(Arc<RwLock<EventInstance<E>>>, EventUpdate) -> Res + Send + Sync + Clone + 'static,
+    F: FnMut(Arc<RwLock<EventInstance<E>>>, EIStatus) -> Res + Send + Sync + Clone + 'static,
     Res: Future<Output = ResponseStatus> + Send,
 {
     client: Client,
@@ -124,7 +154,7 @@ where
 impl<E, F, Res> Schedule<E, F, Res>
 where
     E: SEEvent,
-    F: FnMut(Arc<RwLock<EventInstance<E>>>, EventUpdate) -> Res + Send + Sync + Clone + 'static,
+    F: FnMut(Arc<RwLock<EventInstance<E>>>, EIStatus) -> Res + Send + Sync + Clone + 'static,
     Res: Future<Output = ResponseStatus> + Send,
 {
     /// Create a schedule for the given client & it's EndDevice representation
@@ -139,16 +169,18 @@ where
 }
 
 // Distributed Energy Resources Function Set
-impl<F, Res> Schedule<Dercontrol, F, Res>
+impl<F, Res> Schedule<DERControl, F, Res>
 where
-    F: FnMut(Arc<RwLock<EventInstance<Dercontrol>>>, EventUpdate) -> Res
+    F: FnMut(Arc<RwLock<EventInstance<DERControl>>>, EIStatus) -> Res
         + Send
         + Sync
         + Clone
         + 'static,
     Res: Future<Output = ResponseStatus> + Send,
 {
-    pub async fn schedule_event(&mut self, event: Dercontrol, primacy: PrimacyType) {
+    /// Add a [`DERControl`] Event to the schedule.
+    /// Events are to be rescheduled on retrieval
+    pub async fn schedule_event(&mut self, event: DERControl, primacy: PrimacyType) {
         let mrid = event.mrid;
         let ev = self.events.get_mut(&mrid);
         let incoming_status = event.event_status.current_status;
@@ -195,15 +227,10 @@ where
         let current_status = ei.read().await.status;
         match (current_status, incoming_status) {
             // (Cancelled | CancelledRandom | Superseded) -> Any
-            (
-                EventStatusType::Cancelled
-                | EventStatusType::CancelledRandom
-                | EventStatusType::Superseded,
-                _,
-            ) => (),
+            (EIStatus::Cancelled | EIStatus::CancelledRandom | EIStatus::Superseded, _) => (),
             // Scheduled -> (Cancelled || CancelledRandom)
             (
-                EventStatusType::Scheduled,
+                EIStatus::Scheduled,
                 s @ (EventStatusType::Cancelled | EventStatusType::CancelledRandom),
             ) => {
                 // Respond EventCancelled
@@ -218,21 +245,33 @@ where
                 self.events.remove(&mrid);
             }
             // Active -> Active - Do nothing
-            (EventStatusType::Active, EventStatusType::Active) => (),
+            (EIStatus::Active, EventStatusType::Active) => (),
             // Scheduled -> Active - Start event early
-            (EventStatusType::Scheduled, EventStatusType::Active) => todo!(),
+            (EIStatus::Scheduled, EventStatusType::Active) => todo!(),
             // Active -> Superseded
-            (EventStatusType::Active, EventStatusType::Superseded) => todo!(),
+            (EIStatus::Active, EventStatusType::Superseded) => todo!(),
             // Scheduled -> Superseded
-            (EventStatusType::Scheduled, EventStatusType::Superseded) => todo!(),
+            (EIStatus::Scheduled, EventStatusType::Superseded) => todo!(),
             // Active -> Scheduled
-            (EventStatusType::Active, EventStatusType::Scheduled) => todo!(),
+            (EIStatus::Active, EventStatusType::Scheduled) => todo!(),
             // Active -> Cancelled
-            (EventStatusType::Active, EventStatusType::Cancelled) => todo!(),
+            (EIStatus::Active, EventStatusType::Cancelled) => todo!(),
             // Active -> CancelledRandom
-            (EventStatusType::Active, EventStatusType::CancelledRandom) => todo!(),
+            (EIStatus::Active, EventStatusType::CancelledRandom) => todo!(),
             // Scheduled -> Scheduled
-            (EventStatusType::Scheduled, EventStatusType::Scheduled) => todo!(),
+            (EIStatus::Scheduled, EventStatusType::Scheduled) => todo!(),
+            (EIStatus::Scheduled, EventStatusType::Cancelled) => todo!(),
+            (EIStatus::Scheduled, EventStatusType::CancelledRandom) => todo!(),
+            (EIStatus::Complete, EventStatusType::Scheduled) => todo!(),
+            (EIStatus::Complete, EventStatusType::Active) => todo!(),
+            (EIStatus::Complete, EventStatusType::Cancelled) => todo!(),
+            (EIStatus::Complete, EventStatusType::CancelledRandom) => todo!(),
+            (EIStatus::Complete, EventStatusType::Superseded) => todo!(),
+            (EIStatus::InternalError, EventStatusType::Scheduled) => todo!(),
+            (EIStatus::InternalError, EventStatusType::Active) => todo!(),
+            (EIStatus::InternalError, EventStatusType::Cancelled) => todo!(),
+            (EIStatus::InternalError, EventStatusType::CancelledRandom) => todo!(),
+            (EIStatus::InternalError, EventStatusType::Superseded) => todo!(),
         }
     }
 
@@ -246,10 +285,10 @@ where
             let ei = &mut *ei.write().await;
             if (target_ei.read().await).der_supersedes(ei) {
                 // Notify client active event has ended
-                if matches!(ei.status, EventStatusType::Active) {
+                if matches!(ei.status, EIStatus::Active) {
                     // TODO: Callback w/ EVENT END
                 }
-                ei.status = EventStatusType::Superseded;
+                ei.status = EIStatus::Superseded;
                 superseded.push(*mrid);
             }
         }
@@ -265,7 +304,7 @@ where
                 .await;
         }
         // Update event status
-        target_ei.write().await.status = EventStatusType::Active;
+        target_ei.write().await.status = EIStatus::Active;
         // Setup task data
         let event_duration = (target_ei.read().await.end
             - (SystemTime::now()
@@ -283,14 +322,14 @@ where
             let ei = target_event_c.clone();
             let resp = tokio::select! {
                     // Wait until event end, then inform client.
-                    _ = tokio::time::sleep(Duration::from_secs(event_duration)) => callback(ei, EventUpdate::Complete),
+                    _ = tokio::time::sleep(Duration::from_secs(event_duration)) => callback(ei, EIStatus::Complete),
                     // Unless we're told to cancel the event
                     status = rx => {
                         if let Ok(status) = status {
                             callback(ei, status)
                         } else {
                             // TODO: Can this be replaced with an unwrap? Can the Sender be dropped before the receiver?
-                            callback(ei, EventUpdate::InternalError)
+                            callback(ei, EIStatus::InternalError)
                         }
 
                     }
@@ -302,7 +341,7 @@ where
         });
 
         // Inform client of event start
-        (self.callback)(target_ei.clone(), EventUpdate::Started);
+        (self.callback)(target_ei.clone(), EIStatus::Active);
         // Store event
         self.events.insert(*mrid, target_ei);
     }
@@ -316,7 +355,7 @@ where
 // Demand Response Load Control Function Set
 impl<F, Res> Schedule<EndDeviceControl, F, Res>
 where
-    F: FnMut(Arc<RwLock<EventInstance<EndDeviceControl>>>, EventUpdate) -> Res
+    F: FnMut(Arc<RwLock<EventInstance<EndDeviceControl>>>, EIStatus) -> Res
         + Send
         + Sync
         + Clone
@@ -328,7 +367,7 @@ where
 // Messaging Function Set
 impl<F, Res> Schedule<TextMessage, F, Res>
 where
-    F: FnMut(Arc<RwLock<EventInstance<TextMessage>>>, EventUpdate) -> Res
+    F: FnMut(Arc<RwLock<EventInstance<TextMessage>>>, EIStatus) -> Res
         + Send
         + Sync
         + Clone
@@ -340,7 +379,7 @@ where
 // Flow Reservation Function Set
 impl<F, Res> Schedule<FlowReservationResponse, F, Res>
 where
-    F: FnMut(Arc<RwLock<EventInstance<FlowReservationResponse>>>, EventUpdate) -> Res
+    F: FnMut(Arc<RwLock<EventInstance<FlowReservationResponse>>>, EIStatus) -> Res
         + Send
         + Sync
         + Clone
@@ -352,7 +391,7 @@ where
 // Pricing Function Set
 impl<F, Res> Schedule<TimeTariffInterval, F, Res>
 where
-    F: FnMut(Arc<RwLock<EventInstance<TimeTariffInterval>>>, EventUpdate) -> Res
+    F: FnMut(Arc<RwLock<EventInstance<TimeTariffInterval>>>, EIStatus) -> Res
         + Send
         + Sync
         + Clone
