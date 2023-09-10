@@ -246,6 +246,7 @@ where
             }
             // Active -> Active - Do nothing
             (EIStatus::Active, EventStatusType::Active) => (),
+            (EIStatus::Complete, _) => todo!(),
             // Scheduled -> Active - Start event early
             (EIStatus::Scheduled, EventStatusType::Active) => todo!(),
             // Active -> Superseded
@@ -260,13 +261,6 @@ where
             (EIStatus::Active, EventStatusType::CancelledRandom) => todo!(),
             // Scheduled -> Scheduled
             (EIStatus::Scheduled, EventStatusType::Scheduled) => todo!(),
-            (EIStatus::Scheduled, EventStatusType::Cancelled) => todo!(),
-            (EIStatus::Scheduled, EventStatusType::CancelledRandom) => todo!(),
-            (EIStatus::Complete, EventStatusType::Scheduled) => todo!(),
-            (EIStatus::Complete, EventStatusType::Active) => todo!(),
-            (EIStatus::Complete, EventStatusType::Cancelled) => todo!(),
-            (EIStatus::Complete, EventStatusType::CancelledRandom) => todo!(),
-            (EIStatus::Complete, EventStatusType::Superseded) => todo!(),
             (EIStatus::InternalError, EventStatusType::Scheduled) => todo!(),
             (EIStatus::InternalError, EventStatusType::Active) => todo!(),
             (EIStatus::InternalError, EventStatusType::Cancelled) => todo!(),
