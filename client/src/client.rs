@@ -1,7 +1,13 @@
 use anyhow::{anyhow, bail, Context, Result};
 use common::{
     deserialize,
-    packages::{primitives::Uint32, traits::SEResource},
+    packages::{
+        identification::{ResponseRequired, ResponseStatus},
+        objects::Dercontrol,
+        primitives::{HexBinary160, Uint32},
+        response::DercontrolResponse,
+        traits::{SEResource, SERespondableResource},
+    },
     serialize,
 };
 use hyper::{
@@ -10,15 +16,18 @@ use hyper::{
     Body, Method, Request, StatusCode, Uri,
 };
 use log::{debug, error, info};
-use std::{future::Future, time::Duration};
+use std::{fmt::Display, future::Future, time::Duration};
 use tokio::sync::broadcast::{self, Sender};
 
-use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
+use crate::{
+    time::current_time,
+    tls::{create_client, create_client_tls_cfg, HTTPSClient},
+};
 
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
 pub enum SepResponse {
     // HTTP 201 w/ Location header value - 2030.5-2018 - 5.5.2.4
-    Created(String),
+    Created(String), // TODO: This might need to handle non-existent location header for Responses??
     // HTTP 204 - 2030.5-2018 - 5.5.2.5
     NoContent,
     // HTTP 400 - 2030.5-2018 - 5.5.2.9
@@ -27,6 +36,20 @@ pub enum SepResponse {
     NotFound,
     // HTTP 405 w/ Allow header value - 2030.5-2018 - 5.5.2.12
     MethodNotAllowed(&'static str),
+}
+
+impl Display for SepResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SepResponse::Created(loc) => write!(f, "201 Created - Location Header {}", loc),
+            SepResponse::NoContent => write!(f, "204 No Content"),
+            SepResponse::BadRequest => write!(f, "400 Bad Request"),
+            SepResponse::NotFound => write!(f, "404 Not Found"),
+            SepResponse::MethodNotAllowed(allow) => {
+                write!(f, "405 Method Not Allowed - Allow Header {}", allow)
+            }
+        }
+    }
 }
 
 impl From<SepResponse> for hyper::Response<Body> {
@@ -250,6 +273,70 @@ impl Client {
             StatusCode::BAD_REQUEST => bail!("400 Bad Request"),
             StatusCode::NOT_FOUND => bail!("404 Not Found"),
             _ => bail!("Unexpected HTTP response from server"),
+        }
+    }
+
+    pub async fn send_der_response(
+        &self,
+        lfdi: Option<HexBinary160>,
+        event: &Dercontrol,
+        status: ResponseStatus,
+    ) {
+        match self.do_der_response(lfdi, event, status).await {
+            Ok(
+                e @ (SepResponse::BadRequest
+                | SepResponse::NotFound
+                | SepResponse::MethodNotAllowed(_)),
+            ) => {
+                error!(
+                    "DER response POST attempt failed with HTTP status code: {}",
+                    e
+                );
+            }
+            Err(e) => error!("DER response POST attempt failed with reason: {}", e),
+            Ok(r @ (SepResponse::Created(_) | SepResponse::NoContent)) => {
+                info!("DER response POST attempt succeeded with reason: {}", r)
+            }
+        }
+    }
+
+    #[inline(always)]
+    async fn do_der_response(
+        &self,
+        lfdi: Option<HexBinary160>,
+        event: &Dercontrol,
+        status: ResponseStatus,
+    ) -> Result<SepResponse> {
+        if matches!(status, ResponseStatus::EventReceived)
+            && event
+                .response_required
+                .map(|rr| {
+                    rr.contains(
+                        ResponseRequired::MessageReceived | ResponseRequired::SpecificResponse,
+                    )
+                })
+                .ok_or(anyhow!("Event does not contain a ResponseRequired field"))?
+        {
+            let resp = DercontrolResponse {
+                created_date_time: Some(current_time()),
+                end_device_lfdi: lfdi.ok_or(anyhow!(
+                    "Attempted to send DER response for EndDevice that does not have an LFDI"
+                ))?,
+                status: Some(status),
+                subject: event.mrid,
+                href: None,
+            };
+            self.post(
+                event
+                    .reply_to()
+                    .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
+                &resp,
+            )
+            .await
+        } else {
+            Err(anyhow!(
+                "Attempted to send a response for an event that did not require one."
+            ))
         }
     }
 }
