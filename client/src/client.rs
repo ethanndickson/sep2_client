@@ -3,7 +3,7 @@ use common::{
     deserialize,
     packages::{
         identification::{ResponseRequired, ResponseStatus},
-        objects::Dercontrol,
+        objects::{Dercontrol, Error},
         primitives::{HexBinary160, Uint32},
         response::DercontrolResponse,
         traits::{SEResource, SERespondableResource},
@@ -31,7 +31,7 @@ pub enum SepResponse {
     // HTTP 204 - 2030.5-2018 - 5.5.2.5
     NoContent,
     // HTTP 400 - 2030.5-2018 - 5.5.2.9
-    BadRequest,
+    BadRequest(Option<Error>),
     // HTTP 404 - 2030.5-2018 - 5.5.2.11
     NotFound,
     // HTTP 405 w/ Allow header value - 2030.5-2018 - 5.5.2.12
@@ -43,7 +43,10 @@ impl Display for SepResponse {
         match self {
             SepResponse::Created(loc) => write!(f, "201 Created - Location Header {}", loc),
             SepResponse::NoContent => write!(f, "204 No Content"),
-            SepResponse::BadRequest => write!(f, "400 Bad Request"),
+            SepResponse::BadRequest(e) => match e {
+                Some(e) => write!(f, "400 Bad Request - Error: {}", e),
+                None => write!(f, "400 Bad Request"),
+            },
             SepResponse::NotFound => write!(f, "404 Not Found"),
             SepResponse::MethodNotAllowed(allow) => {
                 write!(f, "405 Method Not Allowed - Allow Header {}", allow)
@@ -63,7 +66,7 @@ impl From<SepResponse> for hyper::Response<Body> {
             SepResponse::NoContent => {
                 *res.status_mut() = StatusCode::NO_CONTENT;
             }
-            SepResponse::BadRequest => {
+            SepResponse::BadRequest(_) => {
                 *res.status_mut() = StatusCode::BAD_REQUEST;
             }
             SepResponse::NotFound => {
@@ -284,7 +287,7 @@ impl Client {
     ) {
         match self.do_der_response(lfdi, event, status).await {
             Ok(
-                e @ (SepResponse::BadRequest
+                e @ (SepResponse::BadRequest(_)
                 | SepResponse::NotFound
                 | SepResponse::MethodNotAllowed(_)),
             ) => {

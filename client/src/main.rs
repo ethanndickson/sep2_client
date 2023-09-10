@@ -40,7 +40,7 @@ impl Handler {
                 SepResponse::Created("/reading".to_owned())
             }
             // "Undesired subscription ... SHALL return an HTTP 400 error"
-            Err(_) => SepResponse::BadRequest,
+            Err(_) => SepResponse::BadRequest(None),
         }
     }
 }
