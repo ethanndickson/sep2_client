@@ -1,33 +1,49 @@
-use std::{collections::HashMap, sync::Arc};
-
-use crate::{
-    client::{Client, SepResponse},
-    time::current_time,
+use std::{
+    collections::HashMap,
+    future::Future,
+    sync::Arc,
+    time::{Duration, SystemTime},
 };
-use anyhow::{anyhow, Result};
+
+use crate::{client::Client, time::current_time};
 use common::packages::{
-    identification::{ResponseRequired, ResponseStatus},
+    identification::ResponseStatus,
     objects::{Dercontrol, EndDeviceControl, EventStatusType, TextMessage, TimeTariffInterval},
-    primitives::HexBinary160,
-    response::DercontrolResponse,
-    traits::{SEEvent, SERespondableResource},
+    traits::SEEvent,
     types::{Mridtype, OneHourRangeType, PrimacyType},
     xsd::{EndDevice, FlowReservationResponse},
 };
-use log::error;
 use rand::Rng;
+use tokio::sync::oneshot::{self, Receiver, Sender};
 use tokio::sync::RwLock;
 
-struct EventInstance<E: SEEvent> {
-    start: i64,
-    end: i64,
-    primacy: PrimacyType,
-    status: EventStatusType,
-    event: E,
+pub struct EventInstance<E: SEEvent> {
+    pub start: i64,
+    pub end: i64,
+    pub primacy: PrimacyType,
+    pub status: EventStatusType,
+    pub event: E,
+    oneshot: (Sender<EventUpdate>, Option<Receiver<EventUpdate>>),
+}
+
+/// Started denotes the event has started, for any reason.
+/// Finished denotes the event has ended, for any reason.
+pub enum EventUpdate {
+    Started,
+    Complete,
+    Cancelled,
+    Superseded,
+    InternalError,
+}
+
+impl From<EventUpdate> for ResponseStatus {
+    fn from(value: EventUpdate) -> Self {
+        todo!()
+    }
 }
 
 impl EventInstance<Dercontrol> {
-    pub fn der_supersedes(&self, other: &Self) -> bool {
+    fn der_supersedes(&self, other: &Self) -> bool {
         // TODO: Confirm this is correct
         if self.primacy == other.primacy && self.event.creation_time() > other.event.creation_time()
             || self.primacy < other.primacy
@@ -42,19 +58,21 @@ impl EventInstance<Dercontrol> {
 }
 
 impl<E: SEEvent> EventInstance<E> {
-    pub fn new(event: E, primacy: PrimacyType) -> Self {
+    fn new(event: E, primacy: PrimacyType) -> Self {
         let start: i64 = event.interval().start.get();
         let end: i64 = start + i64::from(event.interval().duration.get());
+        let (send, recv) = oneshot::channel();
         EventInstance {
             status: event.event_status().current_status,
             event,
             primacy,
             start,
             end,
+            oneshot: (send, Some(recv)),
         }
     }
 
-    pub fn new_rand(
+    fn new_rand(
         primacy: PrimacyType,
         rand_duration: Option<OneHourRangeType>,
         rand_start: Option<OneHourRangeType>,
@@ -62,22 +80,20 @@ impl<E: SEEvent> EventInstance<E> {
     ) -> Self {
         let start: i64 = event.interval().start.get() + randomize(rand_duration);
         let end: i64 = start + i64::from(event.interval().duration.get()) + randomize(rand_start);
+        let (send, recv) = oneshot::channel();
         EventInstance {
             status: event.event_status().current_status,
             event,
             primacy,
             start,
             end,
+            oneshot: (send, Some(recv)),
         }
     }
 
-    pub fn supersedes(&self, other: &Self) -> bool {
+    fn supersedes(&self, other: &Self) -> bool {
         self.primacy == other.primacy && self.event.creation_time() > other.event.creation_time()
             || self.primacy < other.primacy
-    }
-
-    pub fn update_primacy(&mut self, primacy: PrimacyType) {
-        self.primacy = primacy;
     }
 }
 
@@ -90,27 +106,48 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
     })
 }
 
-pub struct Schedule<E: SEEvent> {
+pub struct Schedule<E, F, Res>
+where
+    E: SEEvent,
+    F: FnMut(Arc<RwLock<EventInstance<E>>>, EventUpdate) -> Res + Send + Sync + Clone + 'static,
+    Res: Future<Output = ResponseStatus> + Send,
+{
     client: Client,
     // Send + Sync end device, as the EndDevice resource may be updated
     device: Arc<RwLock<EndDevice>>,
     // Lookup by MRID
     events: HashMap<Mridtype, Arc<RwLock<EventInstance<E>>>>,
+    // User-defined callback for informing user of event state transitions
+    callback: F,
 }
 
-impl<E: SEEvent> Schedule<E> {
+impl<E, F, Res> Schedule<E, F, Res>
+where
+    E: SEEvent,
+    F: FnMut(Arc<RwLock<EventInstance<E>>>, EventUpdate) -> Res + Send + Sync + Clone + 'static,
+    Res: Future<Output = ResponseStatus> + Send,
+{
     /// Create a schedule for the given client & it's EndDevice representation
-    pub fn new(client: Client, device: Arc<RwLock<EndDevice>>) -> Self {
+    pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, callback: F) -> Self {
         Schedule {
             client,
             device,
             events: HashMap::new(),
+            callback,
         }
     }
 }
 
 // Distributed Energy Resources Function Set
-impl Schedule<Dercontrol> {
+impl<F, Res> Schedule<Dercontrol, F, Res>
+where
+    F: FnMut(Arc<RwLock<EventInstance<Dercontrol>>>, EventUpdate) -> Res
+        + Send
+        + Sync
+        + Clone
+        + 'static,
+    Res: Future<Output = ResponseStatus> + Send,
+{
     pub async fn schedule_event(&mut self, event: Dercontrol, primacy: PrimacyType) {
         let mrid = event.mrid;
         let ev = self.events.get_mut(&mrid);
@@ -119,11 +156,15 @@ impl Schedule<Dercontrol> {
         // If the event already exists in the schedule
         let ei = if let Some(ei) = ev {
             // "Editing events shall NOT be allowed, except for updating status"
-            // ev.primacy = primacy;
             ei.clone()
         } else {
             // Inform server event was scheduled
-            self.send_der_resp(&event, ResponseStatus::EventReceived)
+            self.client
+                .send_der_response(
+                    self.device.read().await.lfdi,
+                    &event,
+                    ResponseStatus::EventReceived,
+                )
                 .await;
             // Calculate start & end times
             let ei = EventInstance::new_rand(
@@ -135,7 +176,12 @@ impl Schedule<Dercontrol> {
             // The event may have expired already
             if ei.end <= current_time().get() {
                 // Do not add event to schedule
-                self.send_der_resp(&ei.event, ResponseStatus::EventExpired)
+                self.client
+                    .send_der_response(
+                        self.device.read().await.lfdi,
+                        &ei.event,
+                        ResponseStatus::EventExpired,
+                    )
                     .await;
                 return;
             }
@@ -161,11 +207,19 @@ impl Schedule<Dercontrol> {
                 s @ (EventStatusType::Cancelled | EventStatusType::CancelledRandom),
             ) => {
                 // Respond EventCancelled
-                self.send_der_resp(&ei.read().await.event, s.into()).await;
+                self.client
+                    .send_der_response(
+                        self.device.read().await.lfdi,
+                        &ei.read().await.event,
+                        s.into(),
+                    )
+                    .await;
                 // TODO: What do we need to keep the cancelled event for?
                 self.events.remove(&mrid);
             }
-            // Scheduled -> Active
+            // Active -> Active - Do nothing
+            (EventStatusType::Active, EventStatusType::Active) => (),
+            // Scheduled -> Active - Start event early
             (EventStatusType::Scheduled, EventStatusType::Active) => todo!(),
             // Active -> Superseded
             (EventStatusType::Active, EventStatusType::Superseded) => todo!(),
@@ -177,71 +231,20 @@ impl Schedule<Dercontrol> {
             (EventStatusType::Active, EventStatusType::Cancelled) => todo!(),
             // Active -> CancelledRandom
             (EventStatusType::Active, EventStatusType::CancelledRandom) => todo!(),
-            // Active -> Active
-            (EventStatusType::Active, EventStatusType::Active) => todo!(),
             // Scheduled -> Scheduled
             (EventStatusType::Scheduled, EventStatusType::Scheduled) => todo!(),
         }
     }
 
-    // Schedule a new event, logging if it fails
-    async fn send_der_resp(&self, event: &Dercontrol, status: ResponseStatus) {
-        if let Some(lfdi) = { self.device.read().await.lfdi } {
-            let _ = self
-                .send_response(lfdi, event, status)
-                .await
-                .map_err(|e| error!("DER response POST attempt failed with reason: {}", e));
-        } else {
-            error!("Attempted to send DER response for EndDevice that does not have an LFDI")
-        }
-    }
-
-    async fn send_response(
-        &self,
-        lfdi: HexBinary160,
-        event: &Dercontrol,
-        status: ResponseStatus,
-    ) -> Result<SepResponse> {
-        if matches!(status, ResponseStatus::EventReceived)
-            && event
-                .response_required
-                .map(|rr| {
-                    rr.contains(
-                        ResponseRequired::MessageReceived | ResponseRequired::SpecificResponse,
-                    )
-                })
-                .ok_or(anyhow!("Event does not contain a ResponseRequired field"))?
-        {
-            let resp = DercontrolResponse {
-                created_date_time: Some(current_time()),
-                end_device_lfdi: lfdi,
-                status: Some(status),
-                subject: event.mrid,
-                href: None,
-            };
-            self.client
-                .post(
-                    event
-                        .reply_to()
-                        .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
-                    &resp,
-                )
-                .await
-        } else {
-            Err(anyhow!(
-                "Attempted to send a response for an event that did not require one."
-            ))
-        }
-    }
-
+    // Internal Event State transitions forbid this function from running multiple times for a single event
     async fn start_event(&mut self, mrid: &Mridtype) {
-        // Guaranteed to exist, remove to avoid double mut borrow
-        let target_event = self.events.remove(mrid).unwrap();
+        // Guaranteed to exist, avoid double mut borrow
+        let target_ei = self.events.remove(mrid).unwrap();
         let mut superseded: Vec<Mridtype> = vec![];
         // Mark required events as superseded
         for (mrid, ei) in &mut self.events {
             let ei = &mut *ei.write().await;
-            if (target_event.read().await).der_supersedes(ei) {
+            if (target_ei.read().await).der_supersedes(ei) {
                 // Notify client active event has ended
                 if matches!(ei.status, EventStatusType::Active) {
                     // TODO: Callback w/ EVENT END
@@ -253,26 +256,107 @@ impl Schedule<Dercontrol> {
         // Notify server
         for mrid in superseded {
             let event = &self.events.get(&mrid).unwrap().read().await.event;
-            self.send_der_resp(event, ResponseStatus::EventSuperseded)
+            self.client
+                .send_der_response(
+                    self.device.read().await.lfdi,
+                    event,
+                    ResponseStatus::EventSuperseded,
+                )
                 .await;
         }
-        target_event.write().await.status = EventStatusType::Active;
-        // TODO: Callback W/ EVENT START
-        self.events.insert(*mrid, target_event);
+        // Update event status
+        target_ei.write().await.status = EventStatusType::Active;
+        // Setup task data
+        let event_duration = (target_ei.read().await.end
+            - (SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs() as i64))
+            .max(0) as u64;
+        let mut callback = self.callback.clone();
+        let target_event_c = target_ei.clone();
+        let client = self.client.clone();
+        let lfdi = self.device.read().await.lfdi;
+        let rx = target_ei.write().await.oneshot.1.take().unwrap();
+        // Create task that waits until the event is finished, with the ability to end it early
+        tokio::spawn(async move {
+            let ei = target_event_c.clone();
+            let resp = tokio::select! {
+                    // Wait until event end, then inform client.
+                    _ = tokio::time::sleep(Duration::from_secs(event_duration)) => callback(ei, EventUpdate::Complete),
+                    // Unless we're told to cancel the event
+                    status = rx => {
+                        if let Ok(status) = status {
+                            callback(ei, status)
+                        } else {
+                            // TODO: Can this be replaced with an unwrap? Can the Sender be dropped before the receiver?
+                            callback(ei, EventUpdate::InternalError)
+                        }
+
+                    }
+                }.await;
+            // Return the user-defined response
+            client
+                .send_der_response(lfdi, &target_event_c.read().await.event, resp)
+                .await;
+        });
+
+        // Inform client of event start
+        (self.callback)(target_ei.clone(), EventUpdate::Started);
+        // Store event
+        self.events.insert(*mrid, target_ei);
     }
 
     // Events may be cancelled before they complete.
-    async fn cancel_event(&mut self, mrid: &Mridtype) {}
+    async fn cancel_event(&mut self, mrid: &Mridtype) {
+        todo!()
+    }
 }
 
 // Demand Response Load Control Function Set
-impl Schedule<EndDeviceControl> {}
+impl<F, Res> Schedule<EndDeviceControl, F, Res>
+where
+    F: FnMut(Arc<RwLock<EventInstance<EndDeviceControl>>>, EventUpdate) -> Res
+        + Send
+        + Sync
+        + Clone
+        + 'static,
+    Res: Future<Output = ResponseStatus> + Send,
+{
+}
 
 // Messaging Function Set
-impl Schedule<TextMessage> {}
+impl<F, Res> Schedule<TextMessage, F, Res>
+where
+    F: FnMut(Arc<RwLock<EventInstance<TextMessage>>>, EventUpdate) -> Res
+        + Send
+        + Sync
+        + Clone
+        + 'static,
+    Res: Future<Output = ResponseStatus> + Send,
+{
+}
 
 // Flow Reservation Function Set
-impl Schedule<FlowReservationResponse> {}
+impl<F, Res> Schedule<FlowReservationResponse, F, Res>
+where
+    F: FnMut(Arc<RwLock<EventInstance<FlowReservationResponse>>>, EventUpdate) -> Res
+        + Send
+        + Sync
+        + Clone
+        + 'static,
+    Res: Future<Output = ResponseStatus> + Send,
+{
+}
 
 // Pricing Function Set
-impl Schedule<TimeTariffInterval> {}
+impl<F, Res> Schedule<TimeTariffInterval, F, Res>
+where
+    F: FnMut(Arc<RwLock<EventInstance<TimeTariffInterval>>>, EventUpdate) -> Res
+        + Send
+        + Sync
+        + Clone
+        + 'static,
+    Res: Future<Output = ResponseStatus> + Send,
+{
+}
