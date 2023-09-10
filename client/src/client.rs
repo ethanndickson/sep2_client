@@ -3,9 +3,9 @@ use common::{
     deserialize,
     packages::{
         identification::{ResponseRequired, ResponseStatus},
-        objects::{Dercontrol, Error},
+        objects::{DERControl, Error},
         primitives::{HexBinary160, Uint32},
-        response::DercontrolResponse,
+        response::DERControlResponse,
         traits::{SEResource, SERespondableResource},
     },
     serialize,
@@ -282,7 +282,7 @@ impl Client {
     pub async fn send_der_response(
         &self,
         lfdi: Option<HexBinary160>,
-        event: &Dercontrol,
+        event: &DERControl,
         status: ResponseStatus,
     ) {
         match self.do_der_response(lfdi, event, status).await {
@@ -307,7 +307,7 @@ impl Client {
     async fn do_der_response(
         &self,
         lfdi: Option<HexBinary160>,
-        event: &Dercontrol,
+        event: &DERControl,
         status: ResponseStatus,
     ) -> Result<SepResponse> {
         if matches!(status, ResponseStatus::EventReceived)
@@ -320,7 +320,7 @@ impl Client {
                 })
                 .ok_or(anyhow!("Event does not contain a ResponseRequired field"))?
         {
-            let resp = DercontrolResponse {
+            let resp = DERControlResponse {
                 created_date_time: Some(current_time()),
                 end_device_lfdi: lfdi.ok_or(anyhow!(
                     "Attempted to send DER response for EndDevice that does not have an LFDI"
