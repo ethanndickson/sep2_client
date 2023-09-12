@@ -8,7 +8,6 @@ use common::examples::{
 use hyper::header::LOCATION;
 use hyper::{Body, Method, StatusCode};
 use hyper::{Request, Response};
-use log::info;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -27,7 +26,7 @@ async fn main() -> Result<()> {
     let addr = format!("127.0.0.1:{}", args.port);
     let handler = TestHandler {};
     let server = ClientNotifServer::new(&addr, &args.cert, &args.key, handler).unwrap();
-    info!("Server listening on {addr}");
+    log::info!("Server listening on {addr}");
     server.run().await
 }
 

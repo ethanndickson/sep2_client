@@ -8,7 +8,6 @@ use async_trait::async_trait;
 use hyper::server::conn::Http;
 use hyper::{service::service_fn, Request, Response};
 use hyper::{Body, Method};
-use log::info;
 use openssl::ssl::Ssl;
 use tokio::net::TcpListener;
 use tokio_openssl::SslStream;
@@ -36,11 +35,11 @@ impl<H: NotifHandler> ClientNotifServer<H> {
         let acceptor = self.cfg.build();
         let handler = Arc::new(self.handler);
         let listener = TcpListener::bind(self.addr).await?;
-        info!("NotifServer listening on {}", self.addr);
+        log::info!("NotifServer listening on {}", self.addr);
         loop {
             // Accept TCP Connection
             let (stream, addr) = listener.accept().await?;
-            info!("Remote connecting from {}", addr);
+            log::info!("Remote connecting from {}", addr);
 
             // Perform TLS handshake
             let ssl = Ssl::new(acceptor.context())?;
