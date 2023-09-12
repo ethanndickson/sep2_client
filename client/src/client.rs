@@ -15,7 +15,6 @@ use hyper::{
     http::HeaderValue,
     Body, Method, Request, StatusCode, Uri,
 };
-use log::{debug, error, info};
 use std::{fmt::Display, future::Future, time::Duration};
 use tokio::sync::broadcast::{self, Sender};
 
@@ -120,15 +119,15 @@ impl Client {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
             .context("Failed to parse address")?;
-        info!("GET {} from {}", R::name(), uri);
+        log::info!("GET {} from {}", R::name(), uri);
         let req = Request::builder()
             .method(Method::GET)
             .header(ACCEPT, "application/sep+xml")
             .uri(uri)
             .body(Body::default())?;
-        debug!("Outgoing HTTP Request: {:?}", req);
+        log::debug!("Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
-        debug!("Incoming HTTP Response: {:?}", res);
+        log::debug!("Incoming HTTP Response: {:?}", res);
         // TODO: Improve error handling
         match res.status() {
             StatusCode::OK => (),
@@ -161,14 +160,14 @@ impl Client {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
             .context("Failed to parse address")?;
-        info!("DELETE at {}", uri);
+        log::info!("DELETE at {}", uri);
         let req = Request::builder()
             .method(Method::DELETE)
             .uri(uri)
             .body(Body::empty())?;
-        debug!("Outgoing HTTP Request: {:?}", req);
+        log::debug!("Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
-        debug!("Incoming HTTP Response: {:?}", res);
+        log::debug!("Incoming HTTP Response: {:?}", res);
         // TODO: Improve error handling
         match res.status() {
             StatusCode::NO_CONTENT => Ok(()),
@@ -215,10 +214,10 @@ impl Client {
                 let res = client.get::<R>(&path).await;
                 match res {
                     Ok(rsrc) => {
-                        info!("Scheduled poll for Resource {} successful.", R::name());
+                        log::info!("Scheduled poll for Resource {} successful.", R::name());
                         callback(rsrc).await;
                     }
-                    Err(_) => error!(
+                    Err(_) => log::warn!(
                         "Scheduled poll for Resource {} at {} failed. Retrying in {} seconds.",
                         R::name(),
                         &path,
@@ -249,7 +248,7 @@ impl Client {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
             .context("Failed to parse address")?;
-        info!("POST {} to {}", R::name(), uri);
+        log::info!("POST {} to {}", R::name(), uri);
         let rsrce = serialize(resource)?;
         let rsrce_size = rsrce.as_bytes().len();
         let req = Request::builder()
@@ -258,9 +257,9 @@ impl Client {
             .header(CONTENT_LENGTH, rsrce_size)
             .uri(uri)
             .body(Body::from(rsrce))?;
-        debug!("Outgoing HTTP Request: {:?}", req);
+        log::debug!("Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
-        debug!("Incoming HTTP Response: {:?}", res);
+        log::debug!("Incoming HTTP Response: {:?}", res);
         // TODO: Improve error handling
         match res.status() {
             StatusCode::CREATED => {
@@ -291,14 +290,14 @@ impl Client {
                 | SepResponse::NotFound
                 | SepResponse::MethodNotAllowed(_)),
             ) => {
-                error!(
+                log::warn!(
                     "DER response POST attempt failed with HTTP status code: {}",
                     e
                 );
             }
-            Err(e) => error!("DER response POST attempt failed with reason: {}", e),
+            Err(e) => log::warn!("DER response POST attempt failed with reason: {}", e),
             Ok(r @ (SepResponse::Created(_) | SepResponse::NoContent)) => {
-                info!("DER response POST attempt succeeded with reason: {}", r)
+                log::info!("DER response POST attempt succeeded with reason: {}", r)
             }
         }
     }
