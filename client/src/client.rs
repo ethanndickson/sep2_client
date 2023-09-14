@@ -112,7 +112,7 @@ impl Client {
         })
     }
 
-    /// Retrieve the resource at the given path.
+    /// Retrieve the [`SEResource`] at the given path.
     ///
     /// Returns an error if the resource could not be retrieved or deserialized.
     pub async fn get<R: SEResource>(&self, path: &str) -> Result<R> {
@@ -139,21 +139,21 @@ impl Client {
         deserialize(&xml)
     }
 
-    /// Update a resource at the given path.
+    /// Update a [`SEResource`] at the given path.
     ///
     /// Returns an error if the server does not respond with 204 No Content or 201 Created.
     pub async fn post<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
         self.put_post(path, resource, Method::POST).await
     }
 
-    /// Create a resource at the given path.
+    /// Create a [`SEResource`] at the given path.
     ///
     /// Returns an error if the server does not respond with 204 No Content or 201 Created.
     pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
         self.put_post(path, resource, Method::PUT).await
     }
 
-    /// Delete the resource at the given path.
+    /// Delete the [`SEResource`] at the given path.
     ///
     /// Returns an error if the server does not respond with 204 No Content.
     pub async fn delete(&self, path: &str) -> Result<()> {
@@ -177,7 +177,7 @@ impl Client {
         }
     }
 
-    /// Begin polling the given route on a regular interval, passing the returned resource to the given callback.
+    /// Begin polling the given route on a regular interval, passing the returned [`SEResource`] to the given callback.
     ///
     /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
     ///
@@ -336,9 +336,7 @@ impl Client {
             )
             .await
         } else {
-            Err(anyhow!(
-                "Attempted to send a response for an event that did not require one."
-            ))
+            bail!("Attempted to send a response for an event that did not require one.")
         }
     }
 }
