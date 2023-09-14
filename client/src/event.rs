@@ -10,7 +10,7 @@ use common::packages::{
     identification::ResponseStatus,
     objects::{DERControl, EndDeviceControl, EventStatusType, TextMessage, TimeTariffInterval},
     traits::SEEvent,
-    types::{Mridtype, OneHourRangeType, PrimacyType},
+    types::{MRIDType, OneHourRangeType, PrimacyType},
     xsd::{EndDevice, FlowReservationResponse},
 };
 use rand::Rng;
@@ -146,7 +146,7 @@ where
     // Send + Sync end device, as the EndDevice resource may be updated
     device: Arc<RwLock<EndDevice>>,
     // Lookup by MRID
-    events: HashMap<Mridtype, Arc<RwLock<EventInstance<E>>>>,
+    events: HashMap<MRIDType, Arc<RwLock<EventInstance<E>>>>,
     // User-defined callback for informing user of event state transitions
     callback: F,
 }
@@ -270,10 +270,10 @@ where
     }
 
     // Internal Event State transitions forbid this function from running multiple times for a single event
-    async fn start_event(&mut self, mrid: &Mridtype) {
+    async fn start_event(&mut self, mrid: &MRIDType) {
         // Guaranteed to exist, avoid double mut borrow
         let target_ei = self.events.remove(mrid).unwrap();
-        let mut superseded: Vec<Mridtype> = vec![];
+        let mut superseded: Vec<MRIDType> = vec![];
         // Mark required events as superseded
         for (mrid, ei) in &mut self.events {
             let ei = &mut *ei.write().await;
@@ -341,7 +341,7 @@ where
     }
 
     // Events may be cancelled before they complete.
-    async fn cancel_event(&mut self, mrid: &Mridtype) {
+    async fn cancel_event(&mut self, mrid: &MRIDType) {
         todo!()
     }
 }
