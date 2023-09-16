@@ -6,9 +6,9 @@ use common::{
         objects::{DERControl, Error},
         primitives::{HexBinary160, Uint32},
         response::DERControlResponse,
-        traits::{SEResource, SERespondableResource},
     },
     serialize,
+    traits::{SEResource, SERespondableResource},
 };
 use hyper::{
     header::{ACCEPT, ALLOW, CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
@@ -278,7 +278,7 @@ impl Client {
         }
     }
 
-    pub async fn send_der_response(
+    pub(crate) async fn send_der_response(
         &self,
         lfdi: Option<HexBinary160>,
         event: &DERControl,
