@@ -22,7 +22,6 @@ use crate::{
 impl EventInstance<DERControl> {
     /// Determine whether one DERControl supersedes another
     pub(crate) fn der_supersedes(&self, other: &Self) -> bool {
-        // TODO: Confirm this is correct
         if self.primacy == other.primacy && self.event.creation_time() > other.event.creation_time()
             || self.primacy < other.primacy
         {
@@ -45,8 +44,8 @@ where
     Res: Future<Output = ResponseStatus> + Send,
 {
     /// Add a [`DERControl`] Event to the schedule.
-    /// Events are to be rescheduled using this function on subsequent retrievals or notifications
-    pub async fn schedule_dercontrol(&mut self, event: DERControl, primacy: PrimacyType) {
+    /// Subsequent retrievals or notifications of any and all [`DERControl`] resources should call this function.
+    pub async fn add_dercontrol(&mut self, event: DERControl, primacy: PrimacyType) {
         let mrid = event.mrid;
         let ev = self.events.get_mut(&mrid);
         let incoming_status = event.event_status.current_status;
@@ -98,8 +97,10 @@ where
             (EIStatus::Active, EventStatusType::Active) => (),
             // Complete -> Any - Do nothing
             (EIStatus::Complete, _) => (),
-            // Scheduled -> Scheduled - Do nothing
-            (EIStatus::Scheduled, EventStatusType::Scheduled) => (),
+            // Scheduled -> Scheduled - Start wait task
+            (EIStatus::Scheduled, EventStatusType::Scheduled) => {
+                self.schedule_dercontrol(&mrid).await
+            }
             // (Cancelled | CancelledRandom | Superseded) -> Any
             (EIStatus::Cancelled | EIStatus::CancelledRandom | EIStatus::Superseded, _) => (),
 
@@ -136,8 +137,13 @@ where
         }
     }
 
-    /// Start an [`EventInstance<DerControl>`] that is not [`EIStatus::Active`]
-    /// `mrid` must point to a previously scheduled [`EventInstance<DerControl>`] in the schedule.
+    /// Start an [`EventInstance<DerControl>`] that is not [`EIStatus::Active`].
+    ///
+    /// Mark all events that this event supersedes as superseded.
+    /// Inform both the server, and the client itself of these state changes.
+    /// Create a task that ends the event when instructed, or when the event is over.
+    ///
+    /// `mrid` must be the key to a previously scheduled [`EventInstance<DerControl>`].
     async fn start_dercontrol(&mut self, mrid: &MRIDType) {
         // Guaranteed to exist, avoid double mut borrow
         let target_ei = self.events.remove(mrid).unwrap();
@@ -167,37 +173,9 @@ where
         }
         // Update event status
         target_ei.write().await.status = EIStatus::Active;
-        // Setup task data
-        let event_duration = (target_ei.read().await.end
-            - (SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs() as i64))
-            .max(0) as u64;
 
-        // Create task that waits until the event is finished, with the ability to end it early
-        let mut callback = self.callback.clone();
-        let target_event_c = target_ei.clone();
-        let client = self.client.clone();
-        let lfdi = self.device.read().await.lfdi;
-        // Unwrap: EIStatus state forbids this function from being called multiple times
-        let rx = target_ei.write().await.oneshot.1.take().unwrap();
-        tokio::spawn(async move {
-            let ei = target_event_c.clone();
-            let resp = tokio::select! {
-                    // Wait until event end, then inform client.
-                    _ = tokio::time::sleep(Duration::from_secs(event_duration)) => callback(ei, EIStatus::Complete),
-                    // Unless we're told to end early, with a given status
-                    status = rx => {
-                        // Unwrap: EIStatus state transitions forbid this function from being called after [`cancel_dercontrol`]
-                        callback(ei, status.unwrap())
-                    }
-                }.await;
-            // Return the user-defined response
-            client
-                .send_der_response(lfdi, &target_event_c.read().await.event, resp)
-                .await;
-        });
+        // Start waiting for end of event
+        self.start_wait_end(target_ei.clone()).await;
 
         // Inform client of event start
         (self.callback)(target_ei.clone(), EIStatus::Active);
@@ -205,29 +183,41 @@ where
         self.events.insert(*mrid, target_ei);
     }
 
-    /// Cancel an [`EventInstance<DerControl>`] that has been previously scheduled
+    /// Schedule an [`EventInstance<DerControl>`] that has been previously added to the schedule, such that it begins at it's scheduled start time
+    async fn schedule_dercontrol(&mut self, mrid: &MRIDType) {
+        todo!()
+    }
+
+    /// Cancel an [`EventInstance<DerControl>`] that has been previously added to the schedule
     ///
     /// If the event is active, end the waiting task.
     /// Inform the server the event was cancelled with the given reason.
-    /// Update the internal[`EventInstance<DerControl>`]
+    /// Update the internal [`EventInstance<DerControl>`]
     ///
     /// `cancel_reason` must be one of [`EIStatus::Cancelled`] | [`EIStatus::CancelledRandom`] | [`EIStatus::Superseded`]
     async fn cancel_dercontrol(&mut self, mrid: &MRIDType, cancel_reason: EIStatus) {
         let target_ei = self.events.get(mrid).unwrap().clone();
 
-        if let EIStatus::Active = target_ei.read().await.status {
-            let mut target_ei = target_ei.write().await;
-            // Unwrap: EIStatus state transitions forbid this function from being called before [`start_dercontrol`]
-            match target_ei.oneshot.0.take().unwrap().send(cancel_reason) {
-                Ok(_) => log::info!(
-                    "DERControlSchedule: Cancelled in-progress DERControl event with mRID: {mrid}"
-                ),
-                Err(_) => {
-                    log::error!(
-                        "DERControLSchedule: Failed to cancel an in-progress DERControl event with mRID: {mrid}"
-                    )
+        match target_ei.read().await.status {
+            // Cancel waiting for end task
+            EIStatus::Active => {
+                let mut target_ei = target_ei.write().await;
+                // Unwrap: EIStatus state transitions forbid this function from being called before [`start_dercontrol`]
+                match target_ei.oneshot.0.take().unwrap().send(cancel_reason) {
+                    Ok(_) => log::info!(
+                        "DERControlSchedule: Cancelled in-progress DERControl event with mRID: {mrid}"
+                    ),
+                    Err(_) => {
+                        log::error!(
+                            "DERControlSchedule: Failed to cancel an in-progress DERControl event with mRID: {mrid}"
+                        )
+                    }
                 }
             }
+            // Cancel waiting for start task
+            EIStatus::Scheduled => todo!(),
+            // Else, we don't need to update any internal state
+            _ => (),
         }
 
         // Inform server event was cancelled
@@ -240,5 +230,47 @@ where
             .await;
 
         target_ei.write().await.status = cancel_reason;
+    }
+
+    /// Create an async task that waits until the given event is finished, or until told to end the event early.
+    ///
+    /// When either condition is met, inform the server, and the client via the callback.
+    async fn start_wait_end(&mut self, ei: Arc<RwLock<EventInstance<DERControl>>>) {
+        // Setup task data
+        let event_duration = (ei.read().await.end
+            - (SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs() as i64))
+            .max(0) as u64;
+
+        let mut callback = self.callback.clone();
+        let target_event_c = ei.clone();
+        let client = self.client.clone();
+        let lfdi = self.device.read().await.lfdi;
+        // Unwrap: EIStatus state forbids this function from being called multiple times
+        let rx = ei.write().await.oneshot.1.take().unwrap();
+        tokio::spawn(async move {
+            let ei = target_event_c.clone();
+            let resp = tokio::select! {
+                // Wait until event end, then inform client.
+                _ = tokio::time::sleep(Duration::from_secs(event_duration)) => {
+                    ei.write().await.status = EIStatus::Complete;
+                    callback(ei, EIStatus::Complete)
+                },
+                // Unless we're told to end early, with a given status
+                status = rx => {
+                    // Unwrap: EIStatus state transitions forbid this function from being called after [`cancel_dercontrol`]
+                    let status = status.unwrap();
+                    ei.write().await.status = status;
+                    callback(ei, status)
+                }
+            }
+            .await;
+            // Return the user-defined response
+            client
+                .send_der_response(lfdi, &target_event_c.read().await.event, resp)
+                .await;
+        });
     }
 }
