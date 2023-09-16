@@ -1,6 +1,7 @@
-use std::{collections::HashMap, future::Future, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::client::Client;
+use async_trait::async_trait;
 use common::packages::{
     identification::ResponseStatus,
     objects::{EndDeviceControl, EventStatusType, TextMessage, TimeTariffInterval},
@@ -115,82 +116,56 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
     })
 }
 
-pub struct Schedule<E, F, Res>
+#[async_trait]
+pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
+    async fn event_update(
+        &self,
+        event: Arc<RwLock<EventInstance<E>>>,
+        status: EIStatus,
+    ) -> ResponseStatus;
+}
+
+type EventsMap<E> = Arc<RwLock<HashMap<MRIDType, Arc<RwLock<EventInstance<E>>>>>>;
+
+#[derive(Clone)]
+pub struct Schedule<E, H>
 where
     E: SEEvent,
-    F: FnMut(Arc<RwLock<EventInstance<E>>>, EIStatus) -> Res + Send + Sync + Clone + 'static,
-    Res: Future<Output = ResponseStatus> + Send,
+    H: EventHandler<E>,
 {
     pub(crate) client: Client,
     // Send + Sync end device, as the EndDevice resource may be updated
     pub(crate) device: Arc<RwLock<EndDevice>>,
-    // Lookup by MRID
-    pub(crate) events: HashMap<MRIDType, Arc<RwLock<EventInstance<E>>>>,
+    // All Events added to this schedule, indexed by mRID
+    pub(crate) events: EventsMap<E>,
     // User-defined callback for informing user of event state transitions
-    pub(crate) callback: F,
+    pub(crate) handler: Arc<H>,
 }
 
-impl<E, F, Res> Schedule<E, F, Res>
+impl<E, H> Schedule<E, H>
 where
     E: SEEvent,
-    F: FnMut(Arc<RwLock<EventInstance<E>>>, EIStatus) -> Res + Send + Sync + Clone + 'static,
-    Res: Future<Output = ResponseStatus> + Send,
+    H: EventHandler<E>,
 {
     /// Create a schedule for the given client & it's EndDevice representation
-    pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, callback: F) -> Self {
+    pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, handler: H) -> Self {
         Schedule {
             client,
             device,
-            events: HashMap::new(),
-            callback,
+            events: Arc::new(RwLock::new(HashMap::new())),
+            handler: Arc::new(handler),
         }
     }
 }
 
 // Demand Response Load Control Function Set
-impl<F, Res> Schedule<EndDeviceControl, F, Res>
-where
-    F: FnMut(Arc<RwLock<EventInstance<EndDeviceControl>>>, EIStatus) -> Res
-        + Send
-        + Sync
-        + Clone
-        + 'static,
-    Res: Future<Output = ResponseStatus> + Send,
-{
-}
+impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {}
 
 // Messaging Function Set
-impl<F, Res> Schedule<TextMessage, F, Res>
-where
-    F: FnMut(Arc<RwLock<EventInstance<TextMessage>>>, EIStatus) -> Res
-        + Send
-        + Sync
-        + Clone
-        + 'static,
-    Res: Future<Output = ResponseStatus> + Send,
-{
-}
+impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {}
 
 // Flow Reservation Function Set
-impl<F, Res> Schedule<FlowReservationResponse, F, Res>
-where
-    F: FnMut(Arc<RwLock<EventInstance<FlowReservationResponse>>>, EIStatus) -> Res
-        + Send
-        + Sync
-        + Clone
-        + 'static,
-    Res: Future<Output = ResponseStatus> + Send,
-{
-}
+impl<H: EventHandler<FlowReservationResponse>> Schedule<FlowReservationResponse, H> {}
 
 // Pricing Function Set
-impl<F, Res> Schedule<TimeTariffInterval, F, Res>
-where
-    F: FnMut(Arc<RwLock<EventInstance<TimeTariffInterval>>>, EIStatus) -> Res
-        + Send
-        + Sync
-        + Clone
-        + 'static,
-    Res: Future<Output = ResponseStatus> + Send,
-{
-}
+impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {}
