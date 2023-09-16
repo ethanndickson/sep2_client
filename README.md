@@ -2,6 +2,8 @@
 
 `client` - Implementation
 
-`server` - IEEE 2030.5 Server for testing
+`server` - Dumb IEEE 2030.5 Server for testing
+
+`docs` - Project Reports & Seminars
 
 `IEEE-2030.5-Common` - Git submodule for the IEEE 2030.5 Rust server-client common library

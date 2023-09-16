@@ -8,7 +8,7 @@ use client::{
 use common::packages::{identification::ResponseStatus, objects::DERControl, xsd::EndDevice};
 use tokio::sync::RwLock;
 
-fn test_setup() -> (Schedule<DERControl, DERControlHandler>) {
+fn test_setup() -> Schedule<DERControl, DERControlHandler> {
     let client = Client::new(
         "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
