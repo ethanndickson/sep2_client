@@ -9,7 +9,6 @@ use common::packages::{
 };
 use common::traits::SEEvent;
 use rand::Rng;
-use tokio::sync::oneshot::{self, Receiver, Sender};
 use tokio::sync::RwLock;
 
 /// A wrapper around an [`SEEvent`] resource.
@@ -20,7 +19,6 @@ pub struct EventInstance<E: SEEvent> {
     /// The current status of the Event,
     pub(crate) status: EIStatus,
     pub(crate) event: E,
-    pub(crate) oneshot: (Option<Sender<EIStatus>>, Option<Receiver<EIStatus>>),
 }
 
 /// The current state of an [`EventInstance`] in the schedule.
@@ -68,14 +66,12 @@ impl<E: SEEvent> EventInstance<E> {
     pub(crate) fn new(event: E, primacy: PrimacyType) -> Self {
         let start: i64 = event.interval().start.get();
         let end: i64 = start + i64::from(event.interval().duration.get());
-        let (send, recv) = oneshot::channel();
         EventInstance {
             status: event.event_status().current_status.into(),
             event,
             primacy,
             start,
             end,
-            oneshot: (Some(send), Some(recv)),
         }
     }
 
@@ -87,14 +83,12 @@ impl<E: SEEvent> EventInstance<E> {
     ) -> Self {
         let start: i64 = event.interval().start.get() + randomize(rand_duration);
         let end: i64 = start + i64::from(event.interval().duration.get()) + randomize(rand_start);
-        let (send, recv) = oneshot::channel();
         EventInstance {
             status: event.event_status().current_status.into(),
             event,
             primacy,
             start,
             end,
-            oneshot: (Some(send), Some(recv)),
         }
     }
 
