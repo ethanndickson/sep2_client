@@ -31,7 +31,7 @@ impl EventHandler<DERControl> for DERControlHandler {
         status: EIStatus,
     ) -> ResponseStatus {
         match status {
-            EIStatus::Scheduled => todo!(),
+            EIStatus::Scheduled => ResponseStatus::EventAcknowledge,
             EIStatus::Active => todo!(),
             EIStatus::Cancelled => todo!(),
             EIStatus::Complete => todo!(),
