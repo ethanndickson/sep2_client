@@ -131,7 +131,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         // Guaranteed to exist, avoid double mut borrow
         let target_ei = self.events.write().await.remove(mrid).unwrap();
         let mut superseded: Vec<MRIDType> = vec![];
-        // Mark required events as superseded\
+        // Mark required events as superseded
         // TODO: Make this prompt the client for the correct response
         for (mrid, ei) in &mut *self.events.write().await {
             let ei_w = &mut *ei.write().await;
@@ -161,8 +161,8 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         // Update event status
         target_ei.write().await.status = EIStatus::Active;
 
-        // Setup wait task
-        let wait_duration = (target_ei.read().await.end
+        // Setup task
+        let event_duration = (target_ei.read().await.end
             - (SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or(Duration::ZERO)
@@ -175,7 +175,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
         // Start waiting for end of event
         tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(wait_duration)).await;
+            tokio::time::sleep(Duration::from_secs(event_duration)).await;
             // If it's Active, then it hasn't been cancelled
             if ei.read().await.status == EIStatus::Active {
                 ei.write().await.status = EIStatus::Complete;
@@ -196,9 +196,26 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         self.events.write().await.insert(*mrid, target_ei);
     }
 
-    /// Schedule an [`EventInstance<DerControl>`] such that it begins at it's scheduled start time
+    /// Schedule an [`EventInstance<DerControl>`] such that it begins at it's scheduled start time.
     async fn schedule_dercontrol(&mut self, mrid: &MRIDType) {
         let ei = self.events.read().await.get(mrid).unwrap().clone();
+        let mut this = self.clone();
+        let mrid = mrid.clone();
+
+        let until_event = (ei.read().await.start
+            - (SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or(Duration::ZERO)
+                .as_secs() as i64))
+            .max(0) as u64;
+
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(until_event)).await;
+            // If the event is still scheduled
+            if ei.read().await.status == EIStatus::Scheduled {
+                this.start_dercontrol(&mrid).await;
+            }
+        });
     }
 
     /// Cancel an [`EventInstance<DerControl>`] that has been previously added to the schedule

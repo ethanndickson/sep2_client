@@ -26,7 +26,7 @@ pub struct EventInstance<E: SEEvent> {
 /// Can be created from a [`EventStatusType`] for the purpose of reading [`SEEvent`] resources.
 /// Can be converted to a [`ResponseStatus`] for the purpose of creating [`SEResponse`] resources.
 ///
-/// [`SEResponse`]: common::packages::traits::SEResponse
+/// [`SEResponse`]: common::traits::SEResponse
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum EIStatus {
@@ -36,6 +36,7 @@ pub enum EIStatus {
     Complete,
     CancelledRandom,
     Superseded,
+    // TODO: ScheduledSuperseded & Unsuperseding unstarted events
 }
 
 impl From<EIStatus> for ResponseStatus {
@@ -105,6 +106,18 @@ impl<E: SEEvent> EventInstance<E> {
     pub fn event(&self) -> &E {
         &self.event
     }
+
+    pub fn primacy(&self) -> &PrimacyType {
+        &self.primacy
+    }
+
+    pub fn start_time(&self) -> i64 {
+        self.start
+    }
+
+    pub fn end_time(&self) -> i64 {
+        self.start
+    }
 }
 
 fn randomize(bound: Option<OneHourRangeType>) -> i64 {
@@ -118,6 +131,12 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
 
 #[async_trait]
 pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
+    /// Called whenever the state of an event is updated such that a response to the server is required.
+    /// Type is bound by an [`SEEvent`] pertaining to a specific function set.
+    ///
+    /// Allows the client to apply the event at the device-level, and determine the correct response code.
+    ///
+    /// When determining the ResponseStatus to return, refer to Table 27 of IEEE 2030.5-2018
     async fn event_update(
         &self,
         event: Arc<RwLock<EventInstance<E>>>,
@@ -127,7 +146,13 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
 
 type EventsMap<E> = Arc<RwLock<HashMap<MRIDType, Arc<RwLock<EventInstance<E>>>>>>;
 
-#[derive(Clone)]
+/// Schedule for a given function set, and a specific server.
+///
+/// Schedules are bound by the [`SEEvent`] pertaining to a specific function set,
+/// and an [`EventHandler`] that is passed event updates, such that clients can make device changes,
+/// and dictate the response sent to the server.
+///
+/// Multi-server interactions are handled gracefully as the `replyTo` field on Events contains the hostname of the server.
 pub struct Schedule<E, H>
 where
     E: SEEvent,
@@ -138,8 +163,24 @@ where
     pub(crate) device: Arc<RwLock<EndDevice>>,
     // All Events added to this schedule, indexed by mRID
     pub(crate) events: EventsMap<E>,
-    // User-defined callback for informing user of event state transitions
+    // Callback provider for informing client of event state transitions
     pub(crate) handler: Arc<H>,
+}
+
+// Manual clone implementation since H doesn't need to be clone
+impl<E, H> Clone for Schedule<E, H>
+where
+    E: SEEvent,
+    H: EventHandler<E>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            device: self.device.clone(),
+            events: self.events.clone(),
+            handler: self.handler.clone(),
+        }
+    }
 }
 
 impl<E, H> Schedule<E, H>
@@ -147,7 +188,9 @@ where
     E: SEEvent,
     H: EventHandler<E>,
 {
-    /// Create a schedule for the given client & it's EndDevice representation
+    /// Create a schedule for the given [`Client`] & it's [`EndDevice`] representation.
+    ///
+    /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
     pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, handler: H) -> Self {
         Schedule {
             client,
