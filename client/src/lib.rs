@@ -1,5 +1,5 @@
 pub mod client;
-pub mod der;
+mod der;
 pub mod event;
 pub mod pubsub;
 pub mod security;
