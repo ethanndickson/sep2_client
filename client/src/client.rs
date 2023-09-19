@@ -86,7 +86,9 @@ enum PollTask {
     ForceRun,
     Cancel,
 }
-/// Represents an IEEE 2030.5 Client.
+/// Represents an IEEE 2030.5 Client connection to a single server
+///
+/// Can be cloned cheaply, poll tasks and the underyling `hyper` connection pool are shared between cloned clients.
 #[derive(Clone)]
 pub struct Client {
     addr: String,
@@ -129,6 +131,7 @@ impl Client {
         let res = self.http.request(req).await?;
         log::debug!("Incoming HTTP Response: {:?}", res);
         // TODO: Improve error handling
+        // TODO: Handle moved resources
         match res.status() {
             StatusCode::OK => (),
             StatusCode::NOT_FOUND => bail!("404 Not Found"),
