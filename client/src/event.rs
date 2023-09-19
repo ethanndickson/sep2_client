@@ -153,6 +153,8 @@ type EventsMap<E> = Arc<RwLock<HashMap<MRIDType, Arc<RwLock<EventInstance<E>>>>>
 /// and dictate the response sent to the server.
 ///
 /// Multi-server interactions are handled gracefully as the `replyTo` field on Events contains the hostname of the server.
+///
+/// Can be cloned for the purpose of sharing across threads / using asynchronously
 pub struct Schedule<E, H>
 where
     E: SEEvent,
