@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use common::{
+use sep2_common::{
     packages::{
         identification::ResponseStatus,
         objects::{DERControl, EventStatusType as EventStatus},
@@ -76,6 +76,8 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             // Add it to our schedule
             let ei = Arc::new(RwLock::new(ei));
             self.events.write().await.insert(mrid, ei.clone());
+            // TODO: Refactor this function
+            self.clone().schedule_dercontrol(&mrid).await;
             ei
         };
 

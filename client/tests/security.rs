@@ -1,5 +1,5 @@
-use client::security::{security_init, sfdi_gen};
-use common::packages::primitives::HexBinary160;
+use sep2_client::security::{security_init, sfdi_gen};
+use sep2_common::packages::primitives::HexBinary160;
 
 #[test]
 fn security_generates() {

@@ -7,12 +7,12 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use client::{
+use sep2_client::{
     client::{Client, SepResponse},
     event::{EIStatus, EventHandler, EventInstance, Schedule},
     pubsub::{ClientNotifServer, NotifHandler},
 };
-use common::{
+use sep2_common::{
     deserialize,
     packages::{
         identification::ResponseStatus,

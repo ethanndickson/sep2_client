@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use client::{
+use sep2_client::{
     client::Client,
     event::{EIStatus, EventHandler, EventInstance, Schedule},
 };
-use common::packages::{identification::ResponseStatus, objects::DERControl, xsd::EndDevice};
+use sep2_common::packages::{identification::ResponseStatus, objects::DERControl, xsd::EndDevice};
 use tokio::sync::RwLock;
 
 fn test_setup() -> Schedule<DERControl, DERControlHandler> {

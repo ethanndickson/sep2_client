@@ -2,14 +2,14 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::client::Client;
 use async_trait::async_trait;
-use common::packages::{
+use rand::Rng;
+use sep2_common::packages::{
     identification::ResponseStatus,
     objects::{EndDeviceControl, EventStatusType, TextMessage, TimeTariffInterval},
     types::{MRIDType, OneHourRangeType, PrimacyType},
     xsd::{EndDevice, FlowReservationResponse},
 };
-use common::traits::SEEvent;
-use rand::Rng;
+use sep2_common::traits::SEEvent;
 use tokio::sync::RwLock;
 
 /// A wrapper around an [`SEEvent`] resource.
@@ -26,7 +26,7 @@ pub struct EventInstance<E: SEEvent> {
 /// Can be created from a [`EventStatusType`] for the purpose of reading [`SEEvent`] resources.
 /// Can be converted to a [`ResponseStatus`] for the purpose of creating [`SEResponse`] resources.
 ///
-/// [`SEResponse`]: common::traits::SEResponse
+/// [`SEResponse`]: sep2_common::traits::SEResponse
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum EIStatus {

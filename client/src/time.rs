@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use common::packages::primitives::Int64;
+use sep2_common::packages::primitives::Int64;
 
 // TODO: Server time sync?
 

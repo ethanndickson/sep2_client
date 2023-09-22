@@ -1,6 +1,6 @@
-use client::client::Client;
-use client::client::SepResponse;
-use common::{
+use sep2_client::client::Client;
+use sep2_client::client::SepResponse;
+use sep2_common::{
     deserialize,
     examples::{ED_16_01_08, REG_16_01_10},
     packages::{
