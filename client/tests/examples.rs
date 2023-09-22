@@ -4,11 +4,11 @@ use sep2_common::{
     deserialize,
     examples::{ED_16_01_08, REG_16_01_10},
     packages::{
-        primitives::Int64,
-        types::{PINType, SFDIType},
-        xsd::{
+        links::{
             DeviceCapability, EndDevice, EndDeviceList, FunctionSetAssignmentsList, Registration,
         },
+        primitives::Int64,
+        types::{PINType, SFDIType},
     },
 };
 
