@@ -33,9 +33,9 @@ pub(crate) fn create_client(
     Client::builder().build::<Connector, hyper::Body>(https)
 }
 
-pub type TlsServerConfig = SslAcceptorBuilder;
+pub(crate) type TlsServerConfig = SslAcceptorBuilder;
 
-pub fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerConfig> {
+pub(crate) fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerConfig> {
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
