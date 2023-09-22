@@ -5,9 +5,9 @@ use async_trait::async_trait;
 use rand::Rng;
 use sep2_common::packages::{
     identification::ResponseStatus,
+    links::{EndDevice, FlowReservationResponse},
     objects::{EndDeviceControl, EventStatusType, TextMessage, TimeTariffInterval},
     types::{MRIDType, OneHourRangeType, PrimacyType},
-    xsd::{EndDevice, FlowReservationResponse},
 };
 use sep2_common::traits::SEEvent;
 use tokio::sync::RwLock;

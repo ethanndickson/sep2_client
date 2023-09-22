@@ -22,6 +22,7 @@ pub fn sfdi_gen(lfdi: &HexBinary160) -> SFDIType {
     SFDIType::new(sfdi * 10 + check_digit(sfdi)).unwrap()
 }
 
+/// Given the path to a client certificate, generate a LFDI Hash value, and the corresponding SFDI value.
 pub fn security_init(cert_path: &str) -> Result<(HexBinary160, SFDIType)> {
     let lfdi = lfdi_gen(cert_path)?;
     let sfdi = sfdi_gen(&lfdi);

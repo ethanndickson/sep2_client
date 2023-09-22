@@ -17,14 +17,15 @@ use sep2_common::{
     deserialize,
     packages::{
         identification::ResponseStatus,
+        links::{
+            DERControlList, DERProgramList, DefaultDERControl, EndDevice,
+            FunctionSetAssignmentsList,
+        },
+        metering::Reading,
         objects::DERControl,
         primitives::{Int64, Uint32},
         pubsub::Notification,
         types::SFDIType,
-        xsd::{
-            DERControlList, DERProgramList, DefaultDERControl, EndDevice,
-            FunctionSetAssignmentsList, Reading,
-        },
     },
 };
 use tokio::sync::{

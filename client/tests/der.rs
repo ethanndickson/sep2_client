@@ -5,7 +5,9 @@ use sep2_client::{
     client::Client,
     event::{EIStatus, EventHandler, EventInstance, Schedule},
 };
-use sep2_common::packages::{identification::ResponseStatus, objects::DERControl, xsd::EndDevice};
+use sep2_common::packages::{
+    identification::ResponseStatus, links::EndDevice, objects::DERControl,
+};
 use tokio::sync::RwLock;
 
 fn test_setup() -> Schedule<DERControl, DERControlHandler> {

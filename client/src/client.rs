@@ -184,7 +184,7 @@ impl Client {
     ///
     /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
     ///
-    /// All poll events created can be forcibly run using [`sep2_client::force_poll`], such as is required when reconnecting to the server after a period of connectivity loss.
+    /// All poll events created can be forcibly run using [`Client::force_poll`], such as is required when reconnecting to the server after a period of connectivity loss.
     pub async fn start_poll<R: SEResource, F, Res>(
         &self,
         path: String,
@@ -231,12 +231,12 @@ impl Client {
         });
     }
 
-    /// Forcibly poll & run the callbacks of all routes polled using [`sep2_client::start_poll`]
+    /// Forcibly poll & run the callbacks of all routes polled using [`Client::start_poll`]
     pub async fn force_poll(&self) {
         let _ = self.broadcaster.send(PollTask::ForceRun);
     }
 
-    /// Cancel all poll tasks created using [`sep2_client::start_poll`]
+    /// Cancel all poll tasks created using [`Client::start_poll`]
     pub async fn cancel_polls(&self) {
         let _ = self.broadcaster.send(PollTask::Cancel);
     }
