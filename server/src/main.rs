@@ -1,13 +1,13 @@
 use anyhow::{Ok, Result};
 use async_trait::async_trait;
 use clap::Parser;
-use client::pubsub::{ClientNotifServer, NotifHandler};
-use common::examples::{
-    DC_16_04_11, EDL_16_02_08, ED_16_01_08, ED_16_03_06, ER_16_04_06, FSAL_16_03_11, REG_16_01_10,
-};
 use hyper::header::LOCATION;
 use hyper::{Body, Method, StatusCode};
 use hyper::{Request, Response};
+use sep2_client::pubsub::{ClientNotifServer, NotifHandler};
+use sep2_common::examples::{
+    DC_16_04_11, EDL_16_02_08, ED_16_01_08, ED_16_03_06, ER_16_04_06, FSAL_16_03_11, REG_16_01_10,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

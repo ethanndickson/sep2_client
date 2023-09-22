@@ -1,6 +1,6 @@
 use anyhow::Result;
-use common::packages::{primitives::HexBinary160, types::SFDIType};
 use openssl::sha::Sha256;
+use sep2_common::packages::{primitives::HexBinary160, types::SFDIType};
 
 /// Generate a LFDI hash value from a certificate file
 pub fn lfdi_gen(cert_path: &str) -> Result<HexBinary160> {
