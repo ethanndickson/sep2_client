@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use sep2_client::{
     client::{Client, SepResponse},
+    der::der_ei_status_response,
     event::{EIStatus, EventHandler, EventInstance, Schedule},
     pubsub::{ClientNotifServer, NotifHandler},
 };
@@ -100,9 +101,7 @@ impl EventHandler<DERControl> for Handler {
                 println!("DERControl Started: {:?}", event.read().await.event());
             }
         };
-        // TODO: This needs to call FS specific conversions
-        // The returned ResponseStatus may differ depending on the client's requirements.
-        status.into()
+        der_ei_status_response(status)
     }
 }
 
@@ -180,7 +179,7 @@ async fn setup_schedule(
         let derpll = fsa.der_program_list_link.as_ref().unwrap();
         // Set a poll task on these DER Programs
         let mut rx = poll_derprograms(
-            &client,
+            client,
             &format!("{}?l={}", derpll.href, derpll.all.unwrap()),
         )
         .await
