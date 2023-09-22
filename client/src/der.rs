@@ -111,7 +111,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                     .send_der_response(
                         self.device.read().await.lfdi,
                         &ei.read().await.event,
-                        incoming_status.into(),
+                        der_status_response(incoming_status),
                     )
                     .await;
             }
@@ -202,7 +202,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     async fn schedule_dercontrol(&mut self, mrid: &MRIDType) {
         let ei = self.events.read().await.get(mrid).unwrap().clone();
         let mut this = self.clone();
-        let mrid = mrid.clone();
+        let mrid = *mrid;
 
         let until_event = (ei.read().await.start
             - (SystemTime::now()
@@ -232,5 +232,28 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         self.client
             .send_der_response(self.device.read().await.lfdi, &ei.read().await.event, resp)
             .await;
+    }
+}
+
+/// Given the status of an Event, convert it to a ResponseStatus, as per the DER FS
+pub fn der_status_response(e: EventStatus) -> ResponseStatus {
+    match e {
+        EventStatus::Scheduled => ResponseStatus::EventReceived,
+        EventStatus::Active => ResponseStatus::EventStarted,
+        EventStatus::Cancelled => ResponseStatus::EventCancelled,
+        EventStatus::CancelledRandom => ResponseStatus::EventCancelled,
+        EventStatus::Superseded => ResponseStatus::EventSuperseded,
+    }
+}
+
+/// Given the status of an EventInstance, convert it to a ResponseStatus, as per the DER FS
+pub fn der_ei_status_response(e: EIStatus) -> ResponseStatus {
+    match e {
+        EIStatus::Scheduled => ResponseStatus::EventReceived,
+        EIStatus::Active => ResponseStatus::EventStarted,
+        EIStatus::Cancelled => ResponseStatus::EventCancelled,
+        EIStatus::Complete => ResponseStatus::EventCompleted,
+        EIStatus::CancelledRandom => ResponseStatus::EventCancelled,
+        EIStatus::Superseded => ResponseStatus::EventSuperseded,
     }
 }

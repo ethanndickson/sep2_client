@@ -39,19 +39,6 @@ pub enum EIStatus {
     // TODO: ScheduledSuperseded & Unsuperseding unstarted events
 }
 
-impl From<EIStatus> for ResponseStatus {
-    fn from(value: EIStatus) -> Self {
-        match value {
-            EIStatus::Scheduled => Self::EventReceived, // TODO:  Maybe
-            EIStatus::Active => Self::EventStarted,
-            EIStatus::Cancelled => Self::EventCancelled,
-            EIStatus::CancelledRandom => Self::EventCancelled,
-            EIStatus::Superseded => Self::EventSuperseded,
-            EIStatus::Complete => Self::EventCompleted,
-        }
-    }
-}
-
 impl From<EventStatusType> for EIStatus {
     fn from(value: EventStatusType) -> Self {
         match value {
