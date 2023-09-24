@@ -6,21 +6,26 @@ use hyper::{
 };
 use sep2_common::{
     deserialize,
-    packages::{
-        identification::{ResponseRequired, ResponseStatus},
-        objects::{DERControl, Error},
-        primitives::{HexBinary160, Uint32},
-        response::DERControlResponse,
-    },
+    packages::{objects::Error, primitives::Uint32},
     serialize,
-    traits::{SEResource, SERespondableResource},
+    traits::SEResource,
 };
 use std::{fmt::Display, future::Future, time::Duration};
 use tokio::sync::broadcast::{self, Sender};
 
-use crate::{
-    time::current_time,
-    tls::{create_client, create_client_tls_cfg, HTTPSClient},
+use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
+
+#[cfg(feature = "der")]
+use crate::time::current_time;
+#[cfg(feature = "der")]
+use sep2_common::{
+    packages::{
+        der::DERControl,
+        identification::{ResponseRequired, ResponseStatus},
+        primitives::HexBinary160,
+        response::DERControlResponse,
+    },
+    traits::SERespondableResource,
 };
 
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
@@ -281,6 +286,7 @@ impl Client {
         }
     }
 
+    #[cfg(feature = "der")]
     pub(crate) async fn send_der_response(
         &self,
         lfdi: Option<HexBinary160>,
@@ -304,7 +310,7 @@ impl Client {
             }
         }
     }
-
+    #[cfg(feature = "der")]
     #[inline(always)]
     async fn do_der_response(
         &self,

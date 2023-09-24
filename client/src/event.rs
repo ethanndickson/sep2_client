@@ -4,9 +4,9 @@ use crate::client::Client;
 use async_trait::async_trait;
 use rand::Rng;
 use sep2_common::packages::{
+    edev::EndDevice,
     identification::ResponseStatus,
-    links::{EndDevice, FlowReservationResponse},
-    objects::{EndDeviceControl, EventStatusType, TextMessage, TimeTariffInterval},
+    objects::EventStatusType,
     types::{MRIDType, OneHourRangeType, PrimacyType},
 };
 use sep2_common::traits::SEEvent;
@@ -189,15 +189,3 @@ where
         }
     }
 }
-
-// Demand Response Load Control Function Set
-impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {}
-
-// Messaging Function Set
-impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {}
-
-// Flow Reservation Function Set
-impl<H: EventHandler<FlowReservationResponse>> Schedule<FlowReservationResponse, H> {}
-
-// Pricing Function Set
-impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {}

@@ -5,8 +5,9 @@ use std::{
 
 use sep2_common::{
     packages::{
+        der::DERControl,
         identification::ResponseStatus,
-        objects::{DERControl, EventStatusType as EventStatus},
+        objects::EventStatusType as EventStatus,
         types::{MRIDType, PrimacyType},
     },
     traits::SEEvent,

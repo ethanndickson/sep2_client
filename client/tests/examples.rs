@@ -1,12 +1,14 @@
 use sep2_client::client::Client;
 use sep2_client::client::SepResponse;
+use sep2_common::packages::dcap::DeviceCapability;
+use sep2_common::packages::edev::EndDevice;
+use sep2_common::packages::edev::EndDeviceList;
+use sep2_common::packages::edev::Registration;
+use sep2_common::packages::fsa::FunctionSetAssignmentsList;
 use sep2_common::{
     deserialize,
     examples::{ED_16_01_08, REG_16_01_10},
     packages::{
-        links::{
-            DeviceCapability, EndDevice, EndDeviceList, FunctionSetAssignmentsList, Registration,
-        },
         primitives::Int64,
         types::{PINType, SFDIType},
     },
