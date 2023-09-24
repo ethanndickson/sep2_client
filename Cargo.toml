@@ -3,5 +3,6 @@ resolver = "2"
 members = [
     "IEEE-2030.5-Common/common",
     "client",
-    "server"
+    "test_server",
+    "test_client"
 ]
