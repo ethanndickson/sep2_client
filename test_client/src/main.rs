@@ -137,7 +137,7 @@ async fn process_derpl_task(
                 }
             }
             (_, Some(ddercl)) => {
-                let ddercl: DefaultDERControl = client.get(&ddercl.href).await?;
+                let _: DefaultDERControl = client.get(&ddercl.href).await?;
                 todo!("Handle DefaultDERControl Case, the user needs to be able to access this somehow.")
             }
             _ => log::warn!("Found a DERP with no DERControls or default"),
