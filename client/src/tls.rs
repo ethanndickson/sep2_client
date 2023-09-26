@@ -4,9 +4,11 @@ use anyhow::Result;
 use hyper::client::HttpConnector;
 use hyper::{Body, Client};
 use hyper_openssl::HttpsConnector;
-use openssl::ssl::{
-    SslAcceptor, SslAcceptorBuilder, SslConnector, SslConnectorBuilder, SslFiletype, SslMethod,
-};
+use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod};
+
+#[cfg(feature = "pubsub")]
+use openssl::ssl::{SslAcceptor, SslAcceptorBuilder};
+
 pub(crate) type Connector = HttpsConnector<HttpConnector>;
 pub(crate) type HTTPSClient = Client<Connector, Body>;
 pub(crate) type TlsClientConfig = SslConnectorBuilder;
@@ -33,8 +35,10 @@ pub(crate) fn create_client(
     Client::builder().build::<Connector, hyper::Body>(https)
 }
 
+#[cfg(feature = "pubsub")]
 pub(crate) type TlsServerConfig = SslAcceptorBuilder;
 
+#[cfg(feature = "pubsub")]
 pub(crate) fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerConfig> {
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
     log::debug!("Setting CipherSuite");
