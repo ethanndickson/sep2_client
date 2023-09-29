@@ -1,7 +1,4 @@
 //! Sample DER Client Binary for the IEEE 2030.5 Client Library
-//!
-//! This file serves as additional documentation for how the library can be used,
-//! including examples for retrievals, notifications, polling and DER Event Scheduling
 
 use std::sync::Arc;
 
@@ -40,7 +37,7 @@ impl TypeMapKey for ReadingResource {
 #[derive(Default, Clone)]
 struct Handler {
     // Store any form of interior-mutable state, or a channel inlet here and
-    // have it accessible when handling notifs or events.
+    // have it accessible when handling notifs and/or events.
     state: Arc<RwLock<TypeMap>>,
 }
 

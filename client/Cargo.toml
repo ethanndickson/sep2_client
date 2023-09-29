@@ -18,7 +18,8 @@ tokio = {version = "1.28.1", features = ["full"] }
 tokio-openssl = "0.6.3"
 
 [dev-dependencies]
-sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["examples"]  }
+sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["examples","der","edev","fsa","metering","pubsub"]  }
+typemap_rev = "0.3.0"
 
 [features]
 default = ["sep2_common/default"]
@@ -30,3 +31,10 @@ drlc = ["sep2_common/drlc","event"]
 flow_reservation = ["sep2_common/flow_reservation","event"]
 pubsub = ["sep2_common/pubsub"]
 all = ["event","der","pricing","messaging","drlc", "flow_reservation", "pubsub","sep2_common/all"]
+
+[[example]]
+name = "der_client"
+path = "examples/der_client.rs"
+required-features = ["pubsub","der","event"]
+
+
