@@ -6,13 +6,13 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
 
 # Contents
 
-`client` - Implementation of an IEEE 2030.5 Client Library
+`client` - Implementation of an IEEE 2030.5 Client Library, including documentation & examples
 
-`server` - Dumb IEEE 2030.5 Server for testing
+`test_server` - Dumb IEEE 2030.5 Server for testing
 
 `docs` - Thesis Project Reports & Seminars
 
-`IEEE-2030.5-Common` - Git submodule for the IEEE 2030.5 Rust server-client common library
+`IEEE-2030.5-Common` - Git submodule for the IEEE 2030.5 Rust server & client common library
 
 # Progress
 ### Core
@@ -35,6 +35,7 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
   - [x] DER Non-Aggregate Client Sample Impl.
 ### Stretch Goals
 - [ ] DNS-SD
+- [ ] Client EXI Support (Requires a Rust EXI Library)
+### Future
 - [ ] Australian CSIP Extensions
-- [ ] Rust EXI Library
 - [ ] [rustls ECDHE-ECDSA-AES128-CCM8 Support](https://github.com/rustls/rustls/issues/1034)

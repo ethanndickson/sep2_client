@@ -4,5 +4,4 @@ members = [
     "IEEE-2030.5-Common/common",
     "client",
     "test_server",
-    "test_client"
 ]
