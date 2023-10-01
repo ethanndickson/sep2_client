@@ -27,7 +27,7 @@ struct DERControlHandler {}
 impl EventHandler<DERControl> for DERControlHandler {
     async fn event_update(
         &self,
-        event: Arc<RwLock<EventInstance<DERControl>>>,
+        event: &EventInstance<DERControl>,
         status: EIStatus,
     ) -> ResponseStatus {
         match status {
