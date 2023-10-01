@@ -74,27 +74,27 @@ impl NotifHandler for Handler {
 impl EventHandler<DERControl> for Handler {
     async fn event_update(
         &self,
-        event: Arc<RwLock<EventInstance<DERControl>>>,
+        event: &EventInstance<DERControl>,
         status: EIStatus,
     ) -> ResponseStatus {
         match status {
             EIStatus::Scheduled => {
-                println!("Received DERControl: {:?}", event.read().await.event());
+                println!("Received DERControl: {:?}", event.event());
             }
             EIStatus::Active => {
-                println!("DERControl Started: {:?}", event.read().await.event());
+                println!("DERControl Started: {:?}", event.event());
             }
             EIStatus::Cancelled => {
-                println!("DERControl Cancelled: {:?}", event.read().await.event());
+                println!("DERControl Cancelled: {:?}", event.event());
             }
             EIStatus::Complete => {
-                println!("DERControl Complete: {:?}", event.read().await.event());
+                println!("DERControl Complete: {:?}", event.event());
             }
             EIStatus::CancelledRandom => {
-                println!("DERControl Cancelled: {:?}", event.read().await.event());
+                println!("DERControl Cancelled: {:?}", event.event());
             }
             EIStatus::Superseded => {
-                println!("DERControl Started: {:?}", event.read().await.event());
+                println!("DERControl Started: {:?}", event.event());
             }
         };
         der_ei_status_response(status)

@@ -1,4 +1,5 @@
 use std::{
+    ops::Deref,
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -142,7 +143,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                 if ei_w.status == EIStatus::Active {
                     // Since the event is active, the client needs to be told the event is over
                     (self.handler)
-                        .event_update(ei.clone(), EIStatus::Superseded)
+                        .event_update(ei.clone().read().await.deref(), EIStatus::Superseded)
                         .await;
                 }
                 ei_w.status = EIStatus::Superseded;
@@ -183,7 +184,9 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             if ei.read().await.status == EIStatus::Active {
                 ei.write().await.status = EIStatus::Complete;
                 // Defer to client callback for ResponseStatus
-                let resp = handler.event_update(ei.clone(), EIStatus::Complete).await;
+                let resp = handler
+                    .event_update(ei.clone().read().await.deref(), EIStatus::Complete)
+                    .await;
                 // Inform server
                 client
                     .send_der_response(lfdi, &ei.read().await.event, resp)
@@ -193,7 +196,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
         // Inform client of event start
         (self.handler)
-            .event_update(target_ei.clone(), EIStatus::Active)
+            .event_update(target_ei.clone().read().await.deref(), EIStatus::Active)
             .await;
         // Store event
         self.events.write().await.insert(*mrid, target_ei);
@@ -229,7 +232,9 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     async fn cancel_dercontrol(&mut self, mrid: &MRIDType, cancel_reason: EIStatus) {
         let ei = self.events.read().await.get(mrid).unwrap().clone();
         ei.write().await.status = cancel_reason;
-        let resp = (self.handler).event_update(ei.clone(), cancel_reason).await;
+        let resp = (self.handler)
+            .event_update(ei.clone().read().await.deref(), cancel_reason)
+            .await;
         self.client
             .send_der_response(self.device.read().await.lfdi, &ei.read().await.event, resp)
             .await;
