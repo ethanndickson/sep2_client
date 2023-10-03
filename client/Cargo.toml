@@ -18,11 +18,11 @@ tokio = {version = "1.28.1", features = ["full"] }
 tokio-openssl = "0.6.3"
 
 [dev-dependencies]
-sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["examples","der","edev","fsa","metering","pubsub"]  }
+sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["examples","der","edev","fsa","metering","pubsub","dcap"]  }
 typemap_rev = "0.3.0"
 
 [features]
-default = ["sep2_common/default"]
+default = []
 event = ["sep2_common/edev", "sep2_common/response"]
 der = ["sep2_common/der", "event"]
 pricing = ["sep2_common/pricing","event"]
