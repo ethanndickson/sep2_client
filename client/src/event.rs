@@ -1,4 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use crate::client::Client;
 use async_trait::async_trait;
@@ -17,9 +21,11 @@ pub struct EventInstance<E: SEEvent> {
     pub(crate) start: i64,
     pub(crate) end: i64,
     pub(crate) primacy: PrimacyType,
-    /// The current status of the Event,
-    pub(crate) status: EIStatus,
     pub(crate) event: E,
+    // The current status of the Event,
+    status: EIStatus,
+    // When the event status was last updated
+    last_updated: SystemTime,
 }
 
 /// The current state of an [`EventInstance`] in the schedule.
@@ -61,6 +67,7 @@ impl<E: SEEvent> EventInstance<E> {
             primacy,
             start,
             end,
+            last_updated: SystemTime::now(),
         }
     }
 
@@ -78,12 +85,23 @@ impl<E: SEEvent> EventInstance<E> {
             primacy,
             start,
             end,
+            last_updated: SystemTime::now(),
         }
     }
 
     pub(crate) fn supersedes(&self, other: &Self) -> bool {
         self.primacy == other.primacy && self.event.creation_time() > other.event.creation_time()
             || self.primacy < other.primacy
+    }
+
+    pub(crate) fn update_status(&mut self, status: EIStatus) {
+        self.status = status;
+        self.last_updated = SystemTime::now();
+    }
+
+    pub(crate) fn clean_events(self) {
+        // TODO: Add a way to end this task when the scheduler is shutdown
+        // TODO: Implement this without using a `sleep` variant, so it counts while the system is sleeping
     }
 
     pub fn status(&self) -> EIStatus {
@@ -137,7 +155,8 @@ type EventsMap<E> = Arc<RwLock<HashMap<MRIDType, Arc<RwLock<EventInstance<E>>>>>
 ///
 /// Multi-server interactions are handled gracefully as the `replyTo` field on Events contains the hostname of the server.
 ///
-/// Can be cloned for the purpose of sharing across threads / using asynchronously
+/// A [`Schedule`] instance is a handle to a handful of shared state.
+/// Cloning this struct is relatively cheap, and will involve incrementing all internal atomic reference counts.
 pub struct Schedule<E, H>
 where
     E: SEEvent,

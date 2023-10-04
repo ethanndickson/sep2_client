@@ -83,7 +83,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             ei
         };
 
-        let current_status = ei.read().await.status;
+        let current_status = ei.read().await.status();
         // Handle status transitions
         // TODO: Determine when the currently superseded events need to be reevaluated
         match (current_status, incoming_status) {
@@ -140,13 +140,13 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         for (mrid, ei) in &mut *self.events.write().await {
             let ei_w = &mut *ei.write().await;
             if (target_ei.read().await).der_supersedes(ei_w) {
-                if ei_w.status == EIStatus::Active {
+                if ei_w.status() == EIStatus::Active {
                     // Since the event is active, the client needs to be told the event is over
                     (self.handler)
                         .event_update(ei.clone().read().await.deref(), EIStatus::Superseded)
                         .await;
                 }
-                ei_w.status = EIStatus::Superseded;
+                ei_w.update_status(EIStatus::Superseded);
                 superseded.push(*mrid);
             }
         }
@@ -163,7 +163,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                 .await;
         }
         // Update event status
-        target_ei.write().await.status = EIStatus::Active;
+        target_ei.write().await.update_status(EIStatus::Active);
 
         // Setup task
         let event_duration = (target_ei.read().await.end
@@ -181,8 +181,8 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_secs(event_duration)).await;
             // If it's Active, then it hasn't been cancelled
-            if ei.read().await.status == EIStatus::Active {
-                ei.write().await.status = EIStatus::Complete;
+            if ei.read().await.status() == EIStatus::Active {
+                ei.write().await.update_status(EIStatus::Complete);
                 // Defer to client callback for ResponseStatus
                 let resp = handler
                     .event_update(ei.clone().read().await.deref(), EIStatus::Complete)
@@ -218,7 +218,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_secs(until_event)).await;
             // If the event is still scheduled
-            if ei.read().await.status == EIStatus::Scheduled {
+            if ei.read().await.status() == EIStatus::Scheduled {
                 this.start_dercontrol(&mrid).await;
             }
         });
@@ -231,7 +231,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     /// `cancel_reason` must/will be one of [`EIStatus::Cancelled`] | [`EIStatus::CancelledRandom`] | [`EIStatus::Superseded`]
     async fn cancel_dercontrol(&mut self, mrid: &MRIDType, cancel_reason: EIStatus) {
         let ei = self.events.read().await.get(mrid).unwrap().clone();
-        ei.write().await.status = cancel_reason;
+        ei.write().await.update_status(cancel_reason);
         let resp = (self.handler)
             .event_update(ei.clone().read().await.deref(), cancel_reason)
             .await;

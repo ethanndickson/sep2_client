@@ -10,7 +10,7 @@ use sep2_common::{
     serialize,
     traits::SEResource,
 };
-use std::{fmt::Display, future::Future, time::Duration};
+use std::{fmt::Display, future::Future, sync::Arc, time::Duration};
 use tokio::sync::broadcast::{self, Sender};
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
@@ -96,7 +96,7 @@ enum PollTask {
 /// Can be cloned cheaply, poll tasks and the underyling `hyper` connection pool are shared between cloned clients.
 #[derive(Clone)]
 pub struct Client {
-    addr: String,
+    addr: Arc<String>,
     http: HTTPSClient,
     broadcaster: Sender<PollTask>,
 }
@@ -113,7 +113,7 @@ impl Client {
         let cfg = create_client_tls_cfg(cert_path, pk_path)?;
         let (tx, _) = broadcast::channel::<PollTask>(1);
         Ok(Client {
-            addr: server_addr.to_owned(),
+            addr: server_addr.to_owned().into(),
             http: create_client(cfg, tcp_keepalive),
             broadcaster: tx,
         })
