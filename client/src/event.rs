@@ -140,7 +140,7 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     async fn event_update(&self, event: &EventInstance<E>, status: EIStatus) -> ResponseStatus;
 }
 
-type EventsMap<E> = Arc<RwLock<HashMap<MRIDType, Arc<RwLock<EventInstance<E>>>>>>;
+type EventsMap<E> = Arc<RwLock<HashMap<MRIDType, EventInstance<E>>>>;
 
 /// Schedule for a given function set, and a specific server.
 ///
@@ -210,11 +210,10 @@ where
             // Wake every 10 minutes to check, to handle a sleeping device
             tokio::time::sleep(ten_min).await;
             if SystemTime::now() > next {
-                // TODO: Handle EI behind rwlock
-                // self.events
-                //     .write()
-                //     .await
-                //     .retain(|_, ei| ei.read().await.last_updated < next - day);
+                self.events
+                    .write()
+                    .await
+                    .retain(|_, ei| ei.last_updated < next - day);
                 next = SystemTime::now() + day;
             }
         }
