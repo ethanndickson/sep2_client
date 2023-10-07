@@ -99,11 +99,6 @@ impl<E: SEEvent> EventInstance<E> {
         self.last_updated = SystemTime::now();
     }
 
-    pub(crate) fn clean_events(self) {
-        // TODO: Add a way to end this task when the scheduler is shutdown
-        // TODO: Implement this without using a `sleep` variant, so it counts while the system is sleeping
-    }
-
     pub fn status(&self) -> EIStatus {
         self.status
     }
@@ -196,11 +191,32 @@ where
     ///
     /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
     pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, handler: H) -> Self {
-        Schedule {
+        let out = Schedule {
             client,
             device,
             events: Arc::new(RwLock::new(HashMap::new())),
             handler: Arc::new(handler),
+        };
+        tokio::spawn(out.clone().clean_events());
+        out
+    }
+
+    pub(crate) async fn clean_events(self) {
+        let day = Duration::from_secs(60 * 60 * 24);
+        let ten_min = Duration::from_secs(60 * 10);
+        let mut next = SystemTime::now() + day;
+        // TODO: Add a way to terminate task
+        loop {
+            // Wake every 10 minutes to check, to handle a sleeping device
+            tokio::time::sleep(ten_min).await;
+            if SystemTime::now() > next {
+                // TODO: Handle EI behind rwlock
+                // self.events
+                //     .write()
+                //     .await
+                //     .retain(|_, ei| ei.read().await.last_updated < next - day);
+                next = SystemTime::now() + day;
+            }
         }
     }
 }
