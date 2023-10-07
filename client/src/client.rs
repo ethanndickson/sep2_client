@@ -10,7 +10,12 @@ use sep2_common::{
     serialize,
     traits::SEResource,
 };
-use std::{fmt::Display, future::Future, sync::Arc, time::Duration};
+use std::{
+    fmt::Display,
+    future::Future,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::sync::broadcast::{self, Sender};
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
@@ -203,22 +208,32 @@ impl Client {
         let client = self.clone();
         let mut rx = self.broadcaster.subscribe();
         tokio::task::spawn(async move {
+            let mut next = SystemTime::now()
+                + Duration::from_secs(poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as u64);
             loop {
                 tokio::select! {
-                    _ = tokio::time::sleep(Duration::from_secs(
-                        poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as u64,
-                    )) => (),
+                    // Sleep in 30 second increments to account for sleepy devices
+                    _ = tokio::time::sleep(Duration::from_secs(30)) => {
+                        if !(SystemTime::now() > next) {
+                            continue;
+                        }
+                    },
                     flag = rx.recv() => {
-                        if let Ok(v) = flag {
-                            match v {
-                                PollTask::ForceRun => (),
-                                PollTask::Cancel => break,
+                        match flag {
+                            Ok(PollTask::ForceRun) => (),
+                            Ok(PollTask::Cancel) => {
+                                log::warn!("Cancelling poll task for {} at {}", R::name(), path);
+                                break;
                             }
-                        } else {
-                            break;
+                            _ => {
+                                log::warn!("Poll task for {} at {} could not listen on it's broadcast receiver", R::name(), path);
+                                break;
+                            }
+
                         }
                     }
                 }
+
                 let res = client.get::<R>(&path).await;
                 match res {
                     Ok(rsrc) => {
@@ -232,6 +247,10 @@ impl Client {
                         &poll_rate.unwrap_or(Self::DEFAULT_POLLRATE)
                     ),
                 }
+
+                // Set next poll time
+                next = SystemTime::now()
+                    + Duration::from_secs(poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as u64);
             }
         });
     }
