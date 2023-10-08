@@ -130,39 +130,47 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     ///
     /// `mrid` must be the key to a previously scheduled [`EventInstance<DerControl>`].
     async fn start_dercontrol(&mut self, mrid: &MRIDType) {
-        // Guaranteed to exist, avoid double mut borrow
-        let mut target_ei = self.events.write().await.remove(mrid).unwrap();
-        let mut superseded: Vec<MRIDType> = vec![];
-        // Mark required events as superseded
-        // TODO: Make this prompt the client for the correct response
-        for (mrid, ei) in &mut *self.events.write().await {
-            // let ei_w = &mut *ei.write().await;
-            if target_ei.der_supersedes(ei) {
-                if ei.status() == EIStatus::Active {
-                    // Since the event is active, the client needs to be told the event is over
-                    (self.handler).event_update(&ei, EIStatus::Superseded).await;
+        // For each event that would be superseded by this event starting:
+        // - inform the client
+        // - inform the server
+        // - mark as superseded
+        {
+            // We purposefully hold the RwLock for this entire block
+            let mut events = self.events.write().await;
+            let target_ei = events.get(mrid).unwrap();
+            let mut superseded = vec![];
+
+            // Mark required events as superseded
+            for (mrid, ei) in events.iter() {
+                if target_ei.der_supersedes(ei) {
+                    if ei.status() == EIStatus::Active {
+                        // Since the event is active, the client needs to be told the event is over
+                        (self.handler).event_update(&ei, EIStatus::Superseded).await;
+                    }
+                    superseded.push(*mrid);
+                    self.client
+                        .send_der_response(
+                            self.device.read().await.lfdi,
+                            &ei.event,
+                            ResponseStatus::EventSuperseded,
+                        )
+                        .await;
                 }
-                ei.update_status(EIStatus::Superseded);
-                superseded.push(*mrid);
             }
+
+            // Update internal status
+            for mrid in superseded {
+                let ei = events.get_mut(&mrid).unwrap();
+                ei.update_status(EIStatus::Superseded)
+            }
+
+            // Update event status
+            let target_ei = events.get_mut(&mrid).unwrap();
+            target_ei.update_status(EIStatus::Active);
         }
-        // Notify server
-        for mrid in superseded {
-            let events = self.events.read().await;
-            let event = &events.get(&mrid).unwrap().event;
-            self.client
-                .send_der_response(
-                    self.device.read().await.lfdi,
-                    event,
-                    ResponseStatus::EventSuperseded,
-                )
-                .await;
-        }
-        // Update event status
-        target_ei.update_status(EIStatus::Active);
 
         // Setup task
-        let event_duration = (&target_ei.end
+        let event_duration = (&self.events.read().await.get(mrid).unwrap().end
             - (SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or(Duration::ZERO)
@@ -173,9 +181,6 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         let lfdi = self.device.read().await.lfdi;
         let events = self.events.clone();
         let mrid = mrid.clone();
-
-        // Store event
-        self.events.write().await.insert(mrid, target_ei);
 
         // Start waiting for end of event
         tokio::spawn(async move {
