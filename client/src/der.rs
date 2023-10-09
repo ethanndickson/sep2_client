@@ -91,32 +91,21 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             (EIStatus::Scheduled, EventStatus::Scheduled) => (),
             // Scheduled -> Active
             (EIStatus::Scheduled, EventStatus::Active) => {
-                log::debug!("DERControlSchedule: DERControl ({mrid}) has entered it's earliest effective start time.")
+                log::info!("DERControlSchedule: DERControl ({mrid}) has entered it's earliest effective start time.")
             }
-            // Active -> Superseded
-            (EIStatus::Active, EventStatus::Superseded) => {
-                self.cancel_dercontrol(&mrid, incoming_status.into()).await
-            }
-            // Active -> (Cancelled || CancelledRandom)
-            (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom) => {
-                self.cancel_dercontrol(&mrid, incoming_status.into()).await
-            }
-            // Scheduled -> (Cancelled || CancelledRandom) - Respond EventCancelled
+            // Active -> (Cancelled || CancelledRandom || Superseded)
+            (
+                EIStatus::Active,
+                EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded,
+            ) => self.cancel_dercontrol(&mrid, incoming_status.into()).await,
+            // Scheduled -> (Cancelled || CancelledRandom)
             (EIStatus::Scheduled, EventStatus::Cancelled | EventStatus::CancelledRandom) => {
-                let events = self.events.read().await;
-                let ei = events.get(&mrid).unwrap();
-                self.client
-                    .send_der_response(
-                        self.device.read().await.lfdi,
-                        &ei.event,
-                        der_status_response(incoming_status),
-                    )
-                    .await;
+                self.cancel_dercontrol(&mrid, incoming_status.into()).await;
             }
             // Scheduled -> Superseded
-            (EIStatus::Scheduled, EventStatus::Superseded) => todo!(),
+            (EIStatus::Scheduled, EventStatus::Superseded) => log::warn!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is not locally."),
             // Active -> Scheduled
-            (EIStatus::Active, EventStatus::Scheduled) => todo!("Is this transition possible?"),
+            (EIStatus::Active, EventStatus::Scheduled) => log::warn!("DERControlSchedule: DERControl ({mrid}) is active locally, and scheduled on the server. Is the client clock ahead?  "),
         }
     }
 
@@ -127,7 +116,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     /// Create a task that ends the event at the correct time, can be overriden.
     ///
     /// `mrid` must be the key to a previously scheduled [`EventInstance<DerControl>`].
-    async fn start_dercontrol(&mut self, mrid: &MRIDType) {
+    async fn start_dercontrol(&mut self, target_mrid: &MRIDType) {
         // For each event that would be superseded by this event starting:
         // - inform the client
         // - inform the server
@@ -135,21 +124,23 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         {
             // We purposefully hold the RwLock for this entire block
             let mut events = self.events.write().await;
-            let target_ei = events.get(mrid).unwrap();
+            let target = events.get(target_mrid).unwrap();
             let mut superseded = vec![];
 
             // Mark required events as superseded
-            for (mrid, ei) in events.iter() {
-                if target_ei.der_supersedes(ei) {
-                    if ei.status() == EIStatus::Active {
+            for (o_mrid, other) in events.iter() {
+                if target.der_supersedes(other) {
+                    if other.status() == EIStatus::Active {
                         // Since the event is active, the client needs to be told the event is over
-                        (self.handler).event_update(&ei, EIStatus::Superseded).await;
+                        (self.handler)
+                            .event_update(&other, EIStatus::Superseded)
+                            .await;
                     }
-                    superseded.push(*mrid);
+                    superseded.push(*o_mrid);
                     self.client
                         .send_der_response(
                             self.device.read().await.lfdi,
-                            &ei.event,
+                            &other.event,
                             ResponseStatus::EventSuperseded,
                         )
                         .await;
@@ -157,23 +148,23 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             }
 
             // Update internal status
-            for mrid in superseded {
-                let ei = events.get_mut(&mrid).unwrap();
-                ei.update_status(EIStatus::Superseded)
+            for o_mrid in superseded {
+                let ei = events.get_mut(&o_mrid).unwrap();
+                ei.update_status(EIStatus::Superseded);
             }
 
             // Update event status
-            let target_ei = events.get_mut(&mrid).unwrap();
-            target_ei.update_status(EIStatus::Active);
+            let target = events.get_mut(&target_mrid).unwrap();
+            target.update_status(EIStatus::Active);
         }
 
         // Setup task
-        let end = self.events.read().await.get(mrid).unwrap().end;
+        let end = self.events.read().await.get(target_mrid).unwrap().end;
         let handler = self.handler.clone();
         let client = self.client.clone();
         let lfdi = self.device.read().await.lfdi;
         let events = self.events.clone();
-        let mrid = mrid.clone();
+        let mrid = target_mrid.clone();
 
         // Start waiting for end of event
         tokio::spawn(async move {
@@ -200,10 +191,10 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     }
 
     /// Schedule an [`EventInstance<DerControl>`] such that it begins at it's scheduled start time.
-    async fn schedule_dercontrol(&mut self, mrid: MRIDType) {
+    async fn schedule_dercontrol(&mut self, target_mrid: MRIDType) {
         let start = {
             let events = self.events.read().await;
-            let ei = events.get(&mrid).unwrap().clone();
+            let ei = events.get(&target_mrid).unwrap().clone();
             ei.start
         };
         let this = self.clone();
@@ -212,9 +203,9 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             crate::time::sleep_until(start, SLEEP_TICKRATE).await;
             // If the event is still scheduled
             let mut events = this.events.write().await;
-            let ei = events.get_mut(&mrid).unwrap();
+            let ei = events.get_mut(&target_mrid).unwrap();
             if ei.status() == EIStatus::Scheduled {
-                this.clone().start_dercontrol(&mrid).await;
+                this.clone().start_dercontrol(&target_mrid).await;
             }
         });
     }
@@ -224,9 +215,9 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     /// Update the internal [`EventInstance<DerControl>`]
     ///
     /// `cancel_reason` must/will be one of [`EIStatus::Cancelled`] | [`EIStatus::CancelledRandom`] | [`EIStatus::Superseded`]
-    async fn cancel_dercontrol(&mut self, mrid: &MRIDType, cancel_reason: EIStatus) {
+    async fn cancel_dercontrol(&mut self, target_mrid: &MRIDType, cancel_reason: EIStatus) {
         let mut events = self.events.write().await;
-        let ei = events.get_mut(mrid).unwrap();
+        let ei = events.get_mut(target_mrid).unwrap();
         ei.update_status(cancel_reason);
         let resp = (self.handler).event_update(&ei, cancel_reason).await;
         self.client
