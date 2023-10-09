@@ -1,10 +1,9 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::{collections::HashMap, sync::Arc};
 
-use crate::client::Client;
+use crate::{
+    client::Client,
+    time::{current_time, SLEEP_TICKRATE},
+};
 use async_trait::async_trait;
 use rand::Rng;
 use sep2_common::packages::{
@@ -25,7 +24,7 @@ pub struct EventInstance<E: SEEvent> {
     // The current status of the Event,
     status: EIStatus,
     // When the event status was last updated
-    last_updated: SystemTime,
+    last_updated: i64,
 }
 
 /// The current state of an [`EventInstance`] in the schedule.
@@ -67,7 +66,7 @@ impl<E: SEEvent> EventInstance<E> {
             primacy,
             start,
             end,
-            last_updated: SystemTime::now(),
+            last_updated: current_time().get(),
         }
     }
 
@@ -85,7 +84,7 @@ impl<E: SEEvent> EventInstance<E> {
             primacy,
             start,
             end,
-            last_updated: SystemTime::now(),
+            last_updated: current_time().get(),
         }
     }
 
@@ -96,7 +95,7 @@ impl<E: SEEvent> EventInstance<E> {
 
     pub(crate) fn update_status(&mut self, status: EIStatus) {
         self.status = status;
-        self.last_updated = SystemTime::now();
+        self.last_updated = current_time().get();
     }
 
     pub fn status(&self) -> EIStatus {
@@ -202,20 +201,16 @@ where
     }
 
     pub(crate) async fn clean_events(self) {
-        let day = Duration::from_secs(60 * 60 * 24);
-        let ten_min = Duration::from_secs(60 * 10);
-        let mut next = SystemTime::now() + day;
+        let day = 60 * 60 * 24;
+        let mut next = current_time().get() + day;
         // TODO: Add a way to terminate task
         loop {
-            // Wake every 10 minutes to check, to handle a sleeping device
-            tokio::time::sleep(ten_min).await;
-            if SystemTime::now() > next {
-                self.events
-                    .write()
-                    .await
-                    .retain(|_, ei| ei.last_updated < next - day);
-                next = SystemTime::now() + day;
-            }
+            crate::time::sleep_until(next, SLEEP_TICKRATE).await;
+            self.events
+                .write()
+                .await
+                .retain(|_, ei| ei.last_updated < next - day);
+            next = current_time().get() + day;
         }
     }
 }
