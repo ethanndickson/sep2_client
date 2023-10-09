@@ -17,8 +17,11 @@ use tokio::sync::RwLock;
 
 /// A wrapper around an [`SEEvent`] resource.
 pub struct EventInstance<E: SEEvent> {
+    // Event start time, after randomisation
     pub(crate) start: i64,
+    // Event end time, after randomisation
     pub(crate) end: i64,
+    // Event primacy
     pub(crate) primacy: PrimacyType,
     pub(crate) event: E,
     // The current status of the Event,
