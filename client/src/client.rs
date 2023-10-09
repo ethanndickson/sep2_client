@@ -10,12 +10,7 @@ use sep2_common::{
     serialize,
     traits::SEResource,
 };
-use std::{
-    fmt::Display,
-    future::Future,
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::{fmt::Display, future::Future, sync::Arc, time::Duration};
 use tokio::sync::broadcast::{self, Sender};
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
@@ -208,16 +203,12 @@ impl Client {
         let client = self.clone();
         let mut rx = self.broadcaster.subscribe();
         tokio::task::spawn(async move {
-            let mut next = SystemTime::now()
-                + Duration::from_secs(poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as u64);
+            let mut next =
+                current_time().get() + poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as i64;
             loop {
                 tokio::select! {
                     // Sleep in 30 second increments to account for sleepy devices
-                    _ = tokio::time::sleep(Duration::from_secs(30)) => {
-                        if !(SystemTime::now() > next) {
-                            continue;
-                        }
-                    },
+                    _ = crate::time::sleep_until(next, Duration::from_secs(30)) => (),
                     flag = rx.recv() => {
                         match flag {
                             Ok(PollTask::ForceRun) => (),
@@ -249,8 +240,8 @@ impl Client {
                 }
 
                 // Set next poll time
-                next = SystemTime::now()
-                    + Duration::from_secs(poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as u64);
+                next =
+                    current_time().get() + poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as i64;
             }
         });
     }

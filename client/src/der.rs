@@ -1,5 +1,3 @@
-use std::time::{Duration, SystemTime};
-
 use sep2_common::{
     packages::{
         der::DERControl,
@@ -12,7 +10,7 @@ use sep2_common::{
 
 use crate::{
     event::{EIStatus, EventHandler, EventInstance, Schedule},
-    time::current_time,
+    time::{current_time, SLEEP_TICKRATE},
 };
 
 impl EventInstance<DERControl> {
@@ -170,12 +168,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         }
 
         // Setup task
-        let event_duration = (&self.events.read().await.get(mrid).unwrap().end
-            - (SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap_or(Duration::ZERO)
-                .as_secs() as i64))
-            .max(0) as u64;
+        let end = self.events.read().await.get(mrid).unwrap().end;
         let handler = self.handler.clone();
         let client = self.client.clone();
         let lfdi = self.device.read().await.lfdi;
@@ -184,7 +177,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
         // Start waiting for end of event
         tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(event_duration)).await;
+            crate::time::sleep_until(end, SLEEP_TICKRATE).await;
             let mut events = events.write().await;
             let ei = events.get_mut(&mrid).unwrap();
             // If it's Active, then it hasn't been cancelled
@@ -208,21 +201,15 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
     /// Schedule an [`EventInstance<DerControl>`] such that it begins at it's scheduled start time.
     async fn schedule_dercontrol(&mut self, mrid: MRIDType) {
-        let until_event = {
+        let start = {
             let events = self.events.read().await;
             let ei = events.get(&mrid).unwrap().clone();
-
-            (ei.start
-                - (SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap_or(Duration::ZERO)
-                    .as_secs() as i64))
-                .max(0) as u64
+            ei.start
         };
         let this = self.clone();
 
         tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(until_event)).await;
+            crate::time::sleep_until(start, SLEEP_TICKRATE).await;
             // If the event is still scheduled
             let mut events = this.events.write().await;
             let ei = events.get_mut(&mrid).unwrap();
