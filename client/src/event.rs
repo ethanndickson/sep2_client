@@ -16,7 +16,10 @@ use sep2_common::packages::{
     types::{MRIDType, OneHourRangeType, PrimacyType},
 };
 use sep2_common::traits::SEEvent;
-use tokio::sync::RwLock;
+use tokio::sync::{
+    broadcast::{Receiver, Sender},
+    RwLock,
+};
 
 /// A wrapper around an [`SEEvent`] resource.
 pub struct EventInstance<E: SEEvent> {
@@ -192,16 +195,14 @@ where
     pub(crate) fn insert(&mut self, mrid: &MRIDType, ei: EventInstance<E>) {
         if ei.status() == EIStatus::Scheduled {
             match self.next_start {
-                Some(next_start) if ei.end < next_start.0 => {
-                    self.next_start = Some((ei.start, *mrid))
-                }
+                Some((start, _)) if ei.start < start => self.next_start = Some((ei.start, *mrid)),
                 None => self.next_start = Some((ei.start, *mrid)),
                 _ => (),
             }
         }
         if ei.status() == EIStatus::Active {
             match self.next_end {
-                Some(next_end) if ei.end < next_end.0 => self.next_end = Some((ei.end, *mrid)),
+                Some((end, _)) if ei.end < end => self.next_end = Some((ei.end, *mrid)),
                 None => self.next_end = Some((ei.end, *mrid)),
                 _ => (),
             }
@@ -249,6 +250,7 @@ where
             .map(|(mrid, ei)| (ei.end, *mrid));
     }
 }
+
 /// Schedule for a given function set, and a specific server.
 ///
 /// Schedules are bound by the [`SEEvent`] pertaining to a specific function set,
@@ -271,6 +273,8 @@ where
     pub(crate) events: Arc<RwLock<Events<E>>>,
     // Callback provider for informing client of event state transitions
     pub(crate) handler: Arc<H>,
+    // Broadcast to tasks to shut them down
+    pub(crate) bc_sd: Sender<()>,
 }
 
 // Manual clone implementation since H doesn't need to be clone
@@ -285,6 +289,7 @@ where
             device: self.device.clone(),
             events: self.events.clone(),
             handler: self.handler.clone(),
+            bc_sd: self.bc_sd.clone(),
         }
     }
 }
@@ -294,12 +299,18 @@ where
     E: SEEvent,
     H: EventHandler<E>,
 {
-    pub(crate) async fn clean_events(self) {
+    pub(crate) async fn clean_events(self, mut rx: Receiver<()>) {
         let week = 60 * 60 * 24 * 30;
         let mut last = current_time().get();
         let mut next = current_time().get() + week;
         loop {
-            crate::time::sleep_until(next, SLEEP_TICKRATE).await;
+            tokio::select! {
+                _ = crate::time::sleep_until(next,SLEEP_TICKRATE) => (),
+                _ = rx.recv() => {
+                    log::info!("DERControlSchedule: Shutting down clean event task...");
+                    break
+                },
+            }
             self.events.write().await.map.retain(|_, ei| {
                 // Retain if:
                 // Event is active or scheduled
@@ -311,5 +322,9 @@ where
             last = current_time().get();
             next = last + week;
         }
+    }
+
+    pub fn shutdown(&mut self) {
+        let _ = self.bc_sd.send(());
     }
 }
