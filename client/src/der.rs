@@ -21,9 +21,8 @@ impl EventInstance<DERControl> {
     pub(crate) fn der_supersedes(&self, other: &Self) -> bool {
         // If there is any overlap
         if self.start_time() <= other.end_time() && self.end_time() >= other.start_time() {
-            if self.primacy() == other.primacy()
+            if self.primacy() < other.primacy() || self.primacy() == other.primacy()
                 && self.event().creation_time() > other.event().creation_time()
-                || self.primacy() < other.primacy()
             {
                 return self.event()
                     .der_control_base
