@@ -219,8 +219,7 @@ where
     pub(crate) fn update_event(&mut self, event: &MRIDType, status: EIStatus) {
         let event = self.map.get_mut(event).unwrap();
         event.update_status(status);
-        self.update_next_end();
-        self.update_next_start();
+        self.update_nexts();
     }
 
     pub(crate) fn update_events(&mut self, events: &[MRIDType], status: EIStatus) {
@@ -228,23 +227,17 @@ where
             let other = self.map.get_mut(o_mrid).unwrap();
             other.update_status(status);
         }
-        self.update_next_end();
-        self.update_next_start();
+        self.update_nexts();
     }
 
-    /// Reevaluates `start_next`
-    pub(crate) fn update_next_start(&mut self) {
+    /// Reevaluates `next_start` and `next_end`
+    pub(crate) fn update_nexts(&mut self) {
         self.next_start = self
             .map
             .iter()
             .filter(|(_, ei)| ei.status() == EIStatus::Scheduled)
             .min_by_key(|(_, ei)| ei.start)
             .map(|(mrid, ei)| (ei.start, *mrid));
-    }
-
-    /// Reevaluates`next_end`
-    pub(crate) fn update_next_end(&mut self) {
-        // Choose a new `next_end``
         self.next_end = self
             .map
             .iter()
@@ -299,7 +292,6 @@ where
     H: EventHandler<E>,
 {
     pub(crate) async fn clean_events(self) {
-        // TODO: Add a way to terminate task
         let week = 60 * 60 * 24 * 30;
         let mut last = current_time().get();
         let mut next = current_time().get() + week;
