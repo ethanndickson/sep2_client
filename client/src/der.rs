@@ -19,17 +19,18 @@ use crate::{
 impl EventInstance<DERControl> {
     /// Determine whether one DERControl supersedes another
     pub(crate) fn der_supersedes(&self, other: &Self) -> bool {
-        // TODO: Add in start and end time checks
-        if self.primacy() == other.primacy()
-            && self.event().creation_time() > other.event().creation_time()
-            || self.primacy() < other.primacy()
-        {
-            self.event()
-                .der_control_base
-                .same_target(&other.event().der_control_base)
-        } else {
-            false
+        // If there is any overlap
+        if self.start_time() <= other.end_time() && self.end_time() >= other.start_time() {
+            if self.primacy() == other.primacy()
+                && self.event().creation_time() > other.event().creation_time()
+                || self.primacy() < other.primacy()
+            {
+                return self.event()
+                    .der_control_base
+                    .same_target(&other.event().der_control_base);
+            }
         }
+        false
     }
 }
 
@@ -44,6 +45,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             events: Arc::new(RwLock::new(Events::new())),
             handler: Arc::new(handler),
         };
+        // TODO: Add a way to kill tasks
         tokio::spawn(out.clone().clean_events());
         tokio::spawn(out.clone().der_start_task());
         tokio::spawn(out.clone().der_end_task());
@@ -188,7 +190,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                 _ => continue,
             };
 
-            // Mark event as complete, reevaluate `next_start``
+            // Mark event as complete
             events.update_event(&mrid, EIStatus::Active);
 
             // Notify client and server
@@ -209,7 +211,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                 _ => continue,
             };
 
-            // Mark event as complete, reevaluate `next_end``
+            // Mark event as complete
             events.update_event(&mrid,EIStatus::Complete);
 
             // Notify client and server
