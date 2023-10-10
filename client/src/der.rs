@@ -9,7 +9,7 @@ use sep2_common::{
     },
     traits::SEEvent,
 };
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, broadcast::Receiver};
 
 use crate::{
     event::{EIStatus, EventHandler, EventInstance, Schedule, Events},
@@ -38,16 +38,17 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     ///
     /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
     pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, handler: H) -> Self {
+        let (tx,rx) = tokio::sync::broadcast::channel::<()>(1);
         let out = Schedule {
             client,
             device,
             events: Arc::new(RwLock::new(Events::new())),
             handler: Arc::new(handler),
+            bc_sd: tx.clone(),
         };
-        // TODO: Add a way to kill tasks
-        tokio::spawn(out.clone().clean_events());
-        tokio::spawn(out.clone().der_start_task());
-        tokio::spawn(out.clone().der_end_task());
+        tokio::spawn(out.clone().clean_events(rx));
+        tokio::spawn(out.clone().der_start_task(tx.subscribe()));
+        tokio::spawn(out.clone().der_end_task(tx.subscribe()));
         out
     }
 
@@ -178,10 +179,16 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         };
     }
 
-    async fn der_start_task(self) {
+    async fn der_start_task(self, mut rx: Receiver<()>) {
         loop {
             // Intermittently sleep until next event start time
-            tokio::time::sleep(SLEEP_TICKRATE).await;
+            tokio::select! {
+                _ = tokio::time::sleep(SLEEP_TICKRATE) => (),
+                _ = rx.recv() => {
+                    log::info!("DERControlSchedule: Shutting down event start task..."); 
+                    break
+                },
+            }
             let mut events = self.events.write().await;
             let mrid = match events.next_start() {
                 Some((time, mrid)) if time < current_time().get() => mrid,
@@ -199,10 +206,16 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         }
     }
 
-    async fn der_end_task(self) {
+    async fn der_end_task(self, mut rx: Receiver<()>) {
         loop {
             // Intermittently sleep until next event end time
-            tokio::time::sleep(SLEEP_TICKRATE).await;
+            tokio::select! {
+                _ = tokio::time::sleep(SLEEP_TICKRATE) => (),
+                _ = rx.recv() => {
+                    log::info!("DERControlSchedule: Shutting down event end task..."); 
+                    break
+                },
+            }
             let mut events = self.events.write().await;
             let mrid = match events.next_end() {
                 Some((time, mrid)) if time < current_time().get() => mrid,
