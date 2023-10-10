@@ -96,8 +96,11 @@ impl<E: SEEvent> EventInstance<E> {
     }
 
     pub(crate) fn supersedes(&self, other: &Self) -> bool {
-        self.primacy == other.primacy && self.event.creation_time() > other.event.creation_time()
-            || self.primacy < other.primacy
+        self.start_time() <= other.end_time()
+            && self.end_time() >= other.start_time()
+            && (self.primacy < other.primacy
+                || self.primacy == other.primacy
+                    && self.event.creation_time() > other.event.creation_time())
     }
 
     pub(crate) fn update_status(&mut self, status: EIStatus) {
