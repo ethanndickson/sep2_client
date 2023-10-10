@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{hash_map, HashMap},
+    sync::Arc,
+};
 
 use crate::{
     client::Client,
@@ -18,12 +21,13 @@ use tokio::sync::RwLock;
 /// A wrapper around an [`SEEvent`] resource.
 pub struct EventInstance<E: SEEvent> {
     // Event start time, after randomisation
-    pub(crate) start: i64,
+    start: i64,
     // Event end time, after randomisation
-    pub(crate) end: i64,
+    end: i64,
     // Event primacy
-    pub(crate) primacy: PrimacyType,
-    pub(crate) event: E,
+    primacy: PrimacyType,
+    // The SEEvent instance
+    event: E,
     // The current status of the Event,
     status: EIStatus,
     // When the event status was last updated
@@ -142,8 +146,113 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     async fn event_update(&self, event: &EventInstance<E>, status: EIStatus) -> ResponseStatus;
 }
 
-type EventsMap<E> = Arc<RwLock<HashMap<MRIDType, EventInstance<E>>>>;
+type EventsMap<E> = HashMap<MRIDType, EventInstance<E>>;
 
+/// Wrapper around a map of MRIDs to EventInstances, to maintain `next_start` and `next_end` validity
+/// All functions
+pub(crate) struct Events<E>
+where
+    E: SEEvent,
+{
+    map: EventsMap<E>,
+    next_start: Option<(i64, MRIDType)>,
+    next_end: Option<(i64, MRIDType)>,
+}
+
+impl<E> Events<E>
+where
+    E: SEEvent,
+{
+    pub(crate) fn new() -> Self {
+        Events {
+            map: HashMap::new(),
+            next_start: None,
+            next_end: None,
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn next_start(&self) -> Option<(i64, MRIDType)> {
+        self.next_start
+    }
+
+    #[inline(always)]
+    pub(crate) fn next_end(&self) -> Option<(i64, MRIDType)> {
+        self.next_end
+    }
+
+    #[inline(always)]
+    pub(crate) fn iter(&self) -> hash_map::Iter<'_, MRIDType, EventInstance<E>> {
+        self.map.iter()
+    }
+
+    pub(crate) fn insert(&mut self, mrid: &MRIDType, ei: EventInstance<E>) {
+        if ei.status() == EIStatus::Scheduled {
+            match self.next_start {
+                Some(next_start) if ei.end < next_start.0 => {
+                    self.next_start = Some((ei.start, *mrid))
+                }
+                None => self.next_start = Some((ei.start, *mrid)),
+                _ => (),
+            }
+        }
+        if ei.status() == EIStatus::Active {
+            match self.next_end {
+                Some(next_end) if ei.end < next_end.0 => self.next_end = Some((ei.end, *mrid)),
+                None => self.next_end = Some((ei.end, *mrid)),
+                _ => (),
+            }
+        }
+        let _ = self.map.insert(*mrid, ei);
+    }
+
+    #[inline(always)]
+    pub(crate) fn get(&self, mrid: &MRIDType) -> Option<&EventInstance<E>> {
+        self.map.get(mrid)
+    }
+
+    #[inline(always)]
+    pub(crate) fn contains(&self, mrid: &MRIDType) -> bool {
+        self.map.contains_key(mrid)
+    }
+
+    pub(crate) fn update_event(&mut self, event: &MRIDType, status: EIStatus) {
+        let event = self.map.get_mut(event).unwrap();
+        event.update_status(status);
+        self.update_next_end();
+        self.update_next_start();
+    }
+
+    pub(crate) fn update_events(&mut self, events: &[MRIDType], status: EIStatus) {
+        for o_mrid in events {
+            let other = self.map.get_mut(o_mrid).unwrap();
+            other.update_status(status);
+        }
+        self.update_next_end();
+        self.update_next_start();
+    }
+
+    /// Reevaluates `start_next`
+    pub(crate) fn update_next_start(&mut self) {
+        self.next_start = self
+            .map
+            .iter()
+            .filter(|(_, ei)| ei.status() == EIStatus::Scheduled)
+            .min_by_key(|(_, ei)| ei.start)
+            .map(|(mrid, ei)| (ei.start, *mrid));
+    }
+
+    /// Reevaluates`next_end`
+    pub(crate) fn update_next_end(&mut self) {
+        // Choose a new `next_end``
+        self.next_end = self
+            .map
+            .iter()
+            .filter(|(_, ei)| ei.status() == EIStatus::Active)
+            .min_by_key(|(_, ei)| ei.end)
+            .map(|(mrid, ei)| (ei.end, *mrid));
+    }
+}
 /// Schedule for a given function set, and a specific server.
 ///
 /// Schedules are bound by the [`SEEvent`] pertaining to a specific function set,
@@ -163,7 +272,7 @@ where
     // Send + Sync end device, as the EndDevice resource may be updated
     pub(crate) device: Arc<RwLock<EndDevice>>,
     // All Events added to this schedule, indexed by mRID
-    pub(crate) events: EventsMap<E>,
+    pub(crate) events: Arc<RwLock<Events<E>>>,
     // Callback provider for informing client of event state transitions
     pub(crate) handler: Arc<H>,
 }
@@ -189,31 +298,23 @@ where
     E: SEEvent,
     H: EventHandler<E>,
 {
-    /// Create a schedule for the given [`Client`] & it's [`EndDevice`] representation.
-    ///
-    /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
-    pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, handler: H) -> Self {
-        let out = Schedule {
-            client,
-            device,
-            events: Arc::new(RwLock::new(HashMap::new())),
-            handler: Arc::new(handler),
-        };
-        tokio::spawn(out.clone().clean_events());
-        out
-    }
-
     pub(crate) async fn clean_events(self) {
-        let day = 60 * 60 * 24;
-        let mut next = current_time().get() + day;
         // TODO: Add a way to terminate task
+        let week = 60 * 60 * 24 * 30;
+        let mut last = current_time().get();
+        let mut next = current_time().get() + week;
         loop {
             crate::time::sleep_until(next, SLEEP_TICKRATE).await;
-            self.events
-                .write()
-                .await
-                .retain(|_, ei| ei.last_updated < next - day);
-            next = current_time().get() + day;
+            self.events.write().await.map.retain(|_, ei| {
+                // Retain if:
+                // Event is active or scheduled
+                // or
+                // Event has been updated since last prune
+                matches!(ei.status, EIStatus::Active | EIStatus::Scheduled)
+                    || ei.last_updated > last
+            });
+            last = current_time().get();
+            next = last + week;
         }
     }
 }

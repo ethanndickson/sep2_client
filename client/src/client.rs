@@ -13,10 +13,9 @@ use sep2_common::{
 use std::{fmt::Display, future::Future, sync::Arc, time::Duration};
 use tokio::sync::broadcast::{self, Sender};
 
+use crate::time::current_time;
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
-#[cfg(feature = "der")]
-use crate::time::current_time;
 #[cfg(feature = "der")]
 use sep2_common::{
     packages::{
