@@ -1,35 +1,39 @@
 use std::sync::Arc;
 
-use sep2_common::{
-    packages::{
-        der::DERControl,
-        identification::ResponseStatus,
-        objects::EventStatusType as EventStatus,
-        types::{MRIDType, PrimacyType}, edev::EndDevice,
-    },
-    traits::SEEvent,
+use sep2_common::packages::{
+    der::DERControl,
+    edev::EndDevice,
+    identification::ResponseStatus,
+    objects::EventStatusType as EventStatus,
+    types::{MRIDType, PrimacyType},
 };
-use tokio::sync::{RwLock, broadcast::Receiver};
+use tokio::sync::{broadcast::Receiver, RwLock};
 
 use crate::{
-    event::{EIStatus, EventHandler, EventInstance, Schedule, Events},
-    time::{current_time, SLEEP_TICKRATE}, client::Client,
+    client::Client,
+    event::{EIStatus, EventHandler, EventInstance, Events, Schedule},
+    time::{current_time, SLEEP_TICKRATE},
 };
 
 impl EventInstance<DERControl> {
-    /// Determine whether one DERControl supersedes another
-    pub(crate) fn der_supersedes(&self, other: &Self) -> bool {
-        // If there is any overlap
-        if self.start_time() <= other.end_time() && self.end_time() >= other.start_time() {
-            if self.primacy() < other.primacy() || self.primacy() == other.primacy()
-                && self.event().creation_time() > other.event().creation_time()
-            {
-                return self.event()
-                    .der_control_base
-                    .same_target(&other.event().der_control_base);
-            }
+    // Check if two DERControls have the same base
+    fn has_same_target(&self, other: &Self) -> bool {
+        self.event()
+            .der_control_base
+            .same_target(&other.event().der_control_base)
+    }
+
+    /// Return which of the given DERControl events would be superseded, if any
+    pub(crate) fn der_superseded<'a>(&'a mut self, other: &'a mut Self) -> Option<&'a mut Self> {
+        if self.does_supersede(other) && self.has_same_target(other) {
+            return Some(other);
         }
-        false
+
+        if other.does_supersede(self) && other.has_same_target(self) {
+            return Some(self);
+        }
+
+        None
     }
 }
 
@@ -38,7 +42,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     ///
     /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
     pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, handler: H) -> Self {
-        let (tx,rx) = tokio::sync::broadcast::channel::<()>(1);
+        let (tx, rx) = tokio::sync::broadcast::channel::<()>(1);
         let out = Schedule {
             client,
             device,
@@ -82,10 +86,10 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                     log::info!("DERControlSchedule: DERControl ({mrid}) has entered it's earliest effective start time.")
                 }
                 // Scheduled -> Superseded
-                (EIStatus::Scheduled, EventStatus::Superseded) => 
+                (EIStatus::Scheduled, EventStatus::Superseded) =>
                     log::warn!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is not locally."),
                 // Active -> Scheduled
-                (EIStatus::Active, EventStatus::Scheduled) => 
+                (EIStatus::Active, EventStatus::Scheduled) =>
                     log::warn!("DERControlSchedule: DERControl ({mrid}) is active locally, and scheduled on the server. Is the client clock ahead?"),
                 // Active -> Active
                 (EIStatus::Active, EventStatus::Active) => (),
@@ -109,9 +113,12 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                 .await;
 
             // Event arrives cancelled or superseded
-            if matches!(incoming_status, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) {
+            if matches!(
+                incoming_status,
+                EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
+            ) {
                 log::warn!("DERControlSchedule: Told to schedule DERControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
-                    self.client
+                self.client
                     .send_der_response(
                         self.device.read().await.lfdi,
                         &event,
@@ -149,30 +156,30 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             // - mark as superseded
 
             // Determine what events this supersedes
-            let target = ei;
-            let mut superseded = vec![];
-            for (o_mrid, other) in events.iter() {
-                if target.der_supersedes(other) {
-                    if other.status() == EIStatus::Active {
+            let mut target = ei;
+            for (_, other) in events.iter_mut() {
+                // If an event is superseded
+                if let Some(superseded) = target.der_superseded(other) {
+                    if superseded.status() == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler)
-                            .event_update(&other, EIStatus::Superseded)
+                            .event_update(&superseded, EIStatus::Superseded)
                             .await;
                     }
-                    superseded.push(*o_mrid);
+                    superseded.update_status(EIStatus::Superseded);
                     // Tell the server we've been informed this event is superseded
                     self.client
                         .send_der_response(
                             self.device.read().await.lfdi,
-                            other.event(),
+                            superseded.event(),
                             ResponseStatus::EventSuperseded,
                         )
                         .await;
                 }
             }
 
-            // Update internal status
-            events.update_events(&superseded, EIStatus::Superseded);
+            // Update `next_start` and `next_end`
+            events.update_nexts();
 
             // Add it to our schedule
             events.insert(&mrid, target);
@@ -185,7 +192,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             tokio::select! {
                 _ = tokio::time::sleep(SLEEP_TICKRATE) => (),
                 _ = rx.recv() => {
-                    log::info!("DERControlSchedule: Shutting down event start task..."); 
+                    log::info!("DERControlSchedule: Shutting down event start task...");
                     break
                 },
             }
@@ -202,7 +209,9 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             // Notify client and server
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target, EIStatus::Active).await;
-            self.client.send_der_response(self.device.read().await.lfdi, target.event(), resp).await;
+            self.client
+                .send_der_response(self.device.read().await.lfdi, target.event(), resp)
+                .await;
         }
     }
 
@@ -212,7 +221,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             tokio::select! {
                 _ = tokio::time::sleep(SLEEP_TICKRATE) => (),
                 _ = rx.recv() => {
-                    log::info!("DERControlSchedule: Shutting down event end task..."); 
+                    log::info!("DERControlSchedule: Shutting down event end task...");
                     break
                 },
             }
@@ -224,15 +233,16 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             };
 
             // Mark event as complete
-            events.update_event(&mrid,EIStatus::Complete);
+            events.update_event(&mrid, EIStatus::Complete);
 
             // Notify client and server
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target, EIStatus::Complete).await;
-            self.client.send_der_response(self.device.read().await.lfdi, target.event(), resp).await;
+            self.client
+                .send_der_response(self.device.read().await.lfdi, target.event(), resp)
+                .await;
         }
     }
-
 
     /// Cancel an [`EventInstance<DerControl>`] that has been previously added to the schedule
     ///

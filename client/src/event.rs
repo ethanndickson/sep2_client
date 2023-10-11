@@ -98,12 +98,29 @@ impl<E: SEEvent> EventInstance<E> {
         }
     }
 
-    pub(crate) fn supersedes(&self, other: &Self) -> bool {
+    // Determine if the this event supersedes the other
+    pub(crate) fn does_supersede(&self, other: &Self) -> bool {
+        // If there is an overlap
         self.start_time() <= other.end_time()
             && self.end_time() >= other.start_time()
+            // If other has lesser primacy
             && (self.primacy < other.primacy
+                // Or same primacy, and this one is newer
                 || self.primacy == other.primacy
                     && self.event.creation_time() > other.event.creation_time())
+    }
+
+    // Determine which event would be superseded
+    pub(crate) fn which_superseded<'a>(&'a self, other: &'a Self) -> Option<&'a Self> {
+        if self.does_supersede(other) {
+            return Some(&other);
+        }
+
+        if other.does_supersede(self) {
+            return Some(&self);
+        }
+
+        None
     }
 
     pub(crate) fn update_status(&mut self, status: EIStatus) {
@@ -188,8 +205,8 @@ where
     }
 
     #[inline(always)]
-    pub(crate) fn iter(&self) -> hash_map::Iter<'_, MRIDType, EventInstance<E>> {
-        self.map.iter()
+    pub(crate) fn iter_mut(&mut self) -> hash_map::IterMut<'_, MRIDType, EventInstance<E>> {
+        self.map.iter_mut()
     }
 
     pub(crate) fn insert(&mut self, mrid: &MRIDType, ei: EventInstance<E>) {
@@ -223,14 +240,6 @@ where
     pub(crate) fn update_event(&mut self, event: &MRIDType, status: EIStatus) {
         let event = self.map.get_mut(event).unwrap();
         event.update_status(status);
-        self.update_nexts();
-    }
-
-    pub(crate) fn update_events(&mut self, events: &[MRIDType], status: EIStatus) {
-        for o_mrid in events {
-            let other = self.map.get_mut(o_mrid).unwrap();
-            other.update_status(status);
-        }
         self.update_nexts();
     }
 
