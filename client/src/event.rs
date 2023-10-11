@@ -111,13 +111,13 @@ impl<E: SEEvent> EventInstance<E> {
     }
 
     // Determine which event would be superseded
-    pub(crate) fn which_superseded<'a>(&'a self, other: &'a Self) -> Option<&'a Self> {
+    pub(crate) fn which_superseded<'a>(&'a mut self, other: &'a mut Self) -> Option<&'a mut Self> {
         if self.does_supersede(other) {
-            return Some(&other);
+            return Some(other);
         }
 
         if other.does_supersede(self) {
-            return Some(&self);
+            return Some(self);
         }
 
         None

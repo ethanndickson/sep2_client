@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sep2_common::packages::primitives::Int64;
 
 // TODO: Server time sync?
+#[cfg(feature = "event")]
 pub(crate) const SLEEP_TICKRATE: Duration = Duration::from_secs(60 * 5);
 
 /// Return the current time, as an Int64

@@ -163,7 +163,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                     if superseded.status() == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler)
-                            .event_update(&superseded, EIStatus::Superseded)
+                            .event_update(superseded, EIStatus::Superseded)
                             .await;
                     }
                     superseded.update_status(EIStatus::Superseded);
@@ -253,8 +253,8 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         let mut events = self.events.write().await;
         events.update_event(target_mrid, cancel_reason);
 
-        let ei = events.get(&target_mrid).unwrap();
-        let resp = (self.handler).event_update(&ei, cancel_reason).await;
+        let ei = events.get(target_mrid).unwrap();
+        let resp = (self.handler).event_update(ei, cancel_reason).await;
         self.client
             .send_der_response(self.device.read().await.lfdi, ei.event(), resp)
             .await;
