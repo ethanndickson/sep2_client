@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -18,7 +19,6 @@ pub struct ClientNotifServer<H: NotifHandler> {
     addr: SocketAddr,
     cfg: TlsServerConfig,
     handler: H,
-    // TODO: Shutdown inlet & Panic outlet
 }
 
 impl<H: NotifHandler> ClientNotifServer<H> {
@@ -31,15 +31,26 @@ impl<H: NotifHandler> ClientNotifServer<H> {
         })
     }
 
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(self, shutdown: impl Future) -> Result<()> {
+        tokio::pin!(shutdown);
         let acceptor = self.cfg.build();
         let handler = Arc::new(self.handler);
         let listener = TcpListener::bind(self.addr).await?;
-        log::info!("NotifServer listening on {}", self.addr);
+        let mut set = tokio::task::JoinSet::new();
+        log::info!("NotifServer: Listening on {}", self.addr);
         loop {
             // Accept TCP Connection
-            let (stream, addr) = listener.accept().await?;
-            log::info!("Remote connecting from {}", addr);
+            let (stream, addr) = tokio::select! {
+                _ = &mut shutdown => break,
+                res = listener.accept() => match res {
+                    Ok((s,a)) => (s,a),
+                    Err(err) => {
+                        log::error!("NotifServer: Failed to accept connection: {err}");
+                        continue;
+                    }
+                }
+            };
+            log::debug!("NotifServer: Remote connecting from {}", addr);
 
             // Perform TLS handshake
             let ssl = Ssl::new(acceptor.context())?;
@@ -53,10 +64,17 @@ impl<H: NotifHandler> ClientNotifServer<H> {
                 let handler = handler.clone();
                 async move { handler.router(req).await }
             });
-            tokio::task::spawn(async move {
-                let _ = Http::new().serve_connection(stream, service).await;
+            set.spawn(async move {
+                if let Err(err) = Http::new().serve_connection(stream, service).await {
+                    log::error!("NotifServer: Failed to handle connection: {err}");
+                }
             });
         }
+        // Wait for all connection handlers to finish
+        log::debug!("NotifServer: Attempting graceful shutdown");
+        set.shutdown().await;
+        log::info!("NotifServer: Server has been shutdown.");
+        Ok(())
     }
 }
 

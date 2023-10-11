@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
     let handler = TestHandler {};
     let server = ClientNotifServer::new(&addr, &args.cert, &args.key, handler).unwrap();
     log::info!("Server listening on {addr}");
-    server.run().await
+    server.run(tokio::signal::ctrl_c()).await
 }
 
 pub struct TestHandler {}
