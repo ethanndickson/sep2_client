@@ -6,7 +6,6 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use sep2_client::{
     client::{Client, SepResponse},
-    der::der_ei_status_response,
     event::{EIStatus, EventHandler, EventInstance, Schedule},
     pubsub::{ClientNotifServer, NotifHandler},
 };
@@ -97,7 +96,7 @@ impl EventHandler<DERControl> for Handler {
                 println!("DERControl Started: {:?}", event.event());
             }
         };
-        der_ei_status_response(status)
+        status.into_der_response()
     }
 }
 
