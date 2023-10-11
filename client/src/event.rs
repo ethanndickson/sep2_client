@@ -1,12 +1,10 @@
 use std::{
     collections::{hash_map, HashMap},
     sync::Arc,
+    time::Duration,
 };
 
-use crate::{
-    client::Client,
-    time::{current_time, SLEEP_TICKRATE},
-};
+use crate::{client::Client, time::current_time};
 use async_trait::async_trait;
 use rand::Rng;
 use sep2_common::packages::{
@@ -128,17 +126,24 @@ impl<E: SEEvent> EventInstance<E> {
                     && self.event.creation_time() > other.event.creation_time())
     }
 
-    // Determine which event would be superseded
-    pub(crate) fn which_superseded<'a>(&'a mut self, other: &'a mut Self) -> Option<&'a mut Self> {
-        if self.does_supersede(other) {
-            return Some(other);
-        }
+    /// Given two events, determine which is superseded, update internal states, and return the superseded event
+    pub(crate) fn mark_supersede<'a>(
+        a: (&'a mut EventInstance<E>, &'a MRIDType),
+        b: (&'a mut EventInstance<E>, &'a MRIDType),
+    ) -> Option<&'a mut EventInstance<E>> {
+        let out = if a.0.does_supersede(b.0) {
+            Some((a, b))
+        } else if b.0.does_supersede(a.0) {
+            Some((b, a))
+        } else {
+            None
+        };
 
-        if other.does_supersede(self) {
-            return Some(self);
-        }
-
-        None
+        out.map(|(superseding, superseded)| {
+            superseded.0.superseded_by(superseding.1);
+            superseded.0.update_status(EIStatus::Superseded);
+            superseding.0
+        })
     }
 
     pub(crate) fn update_status(&mut self, status: EIStatus) {
@@ -167,7 +172,7 @@ impl<E: SEEvent> EventInstance<E> {
     }
 
     pub fn end_time(&self) -> i64 {
-        self.start
+        self.end
     }
 }
 
@@ -325,6 +330,7 @@ where
     pub(crate) handler: Arc<H>,
     // Broadcast to tasks to shut them down
     pub(crate) bc_sd: Sender<()>,
+    pub(crate) tickrate: Duration,
 }
 
 // Manual clone implementation since H doesn't need to be clone
@@ -340,6 +346,7 @@ where
             events: self.events.clone(),
             handler: self.handler.clone(),
             bc_sd: self.bc_sd.clone(),
+            tickrate: self.tickrate.clone(),
         }
     }
 }
@@ -355,7 +362,7 @@ where
         let mut next = current_time().get() + week;
         loop {
             tokio::select! {
-                _ = crate::time::sleep_until(next,SLEEP_TICKRATE) => (),
+                _ = crate::time::sleep_until(next,self.tickrate) => (),
                 _ = rx.recv() => {
                     log::info!("DERControlSchedule: Shutting down clean event task...");
                     break

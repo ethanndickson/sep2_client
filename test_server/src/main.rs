@@ -65,6 +65,11 @@ impl NotifHandler for TestHandler {
             (&Method::GET, "/edev/3/reg") => {
                 *response.body_mut() = Body::from(REG_16_01_10);
             }
+            (&Method::POST, "/rsp") => {
+                *response.status_mut() = StatusCode::CREATED;
+                // Location header is unset in examples, but is technically always required by spec?
+                // Client will handle missing location header regardless.
+            }
             _ => {
                 *response.status_mut() = StatusCode::NOT_FOUND;
             }

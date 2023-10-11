@@ -1,6 +1,6 @@
 //! Sample DER Client Binary for the IEEE 2030.5 Client Library
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -221,8 +221,13 @@ async fn main() -> Result<()> {
     )?;
 
     // Create a DER FS Schedule (DERControl)
-    let schedule: Schedule<DERControl, Handler> =
-        Schedule::new(client.clone(), edr.clone(), handler);
+    let schedule: Schedule<DERControl, Handler> = Schedule::new(
+        client.clone(),
+        edr.clone(),
+        Arc::new(handler),
+        // 10 minute intermittent sleeps
+        Duration::from_secs(60 * 60 * 10),
+    );
 
     // Setup DERControl event polling retrieval
     let _ = setup_schedule(&client, edr, schedule)
