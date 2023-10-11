@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use sep2_common::packages::{
     der::DERControl,
@@ -12,7 +12,7 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 use crate::{
     client::Client,
     event::{EIStatus, EventHandler, EventInstance, Events, Schedule},
-    time::{current_time, SLEEP_TICKRATE},
+    time::current_time,
 };
 
 impl EventInstance<DERControl> {
@@ -49,14 +49,20 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     /// Create a schedule for the given [`Client`] & it's [`EndDevice`] representation.
     ///
     /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
-    pub fn new(client: Client, device: Arc<RwLock<EndDevice>>, handler: H) -> Self {
+    pub fn new(
+        client: Client,
+        device: Arc<RwLock<EndDevice>>,
+        handler: Arc<H>,
+        tickrate: Duration,
+    ) -> Self {
         let (tx, rx) = tokio::sync::broadcast::channel::<()>(1);
         let out = Schedule {
             client,
             device,
             events: Arc::new(RwLock::new(Events::new())),
-            handler: Arc::new(handler),
+            handler,
             bc_sd: tx.clone(),
+            tickrate,
         };
         tokio::spawn(out.clone().clean_events(rx));
         tokio::spawn(out.clone().der_start_task(tx.subscribe()));
@@ -198,7 +204,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         loop {
             // Intermittently sleep until next event start time
             tokio::select! {
-                _ = tokio::time::sleep(SLEEP_TICKRATE) => (),
+                _ = tokio::time::sleep(self.tickrate) => (),
                 _ = rx.recv() => {
                     log::info!("DERControlSchedule: Shutting down event start task...");
                     break
@@ -227,7 +233,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         loop {
             // Intermittently sleep until next event end time
             tokio::select! {
-                _ = tokio::time::sleep(SLEEP_TICKRATE) => (),
+                _ = tokio::time::sleep(self.tickrate) => (),
                 _ = rx.recv() => {
                     log::info!("DERControlSchedule: Shutting down event end task...");
                     break
