@@ -35,6 +35,8 @@ pub struct EventInstance<E: SEEvent> {
     status: EIStatus,
     // When the event status was last updated
     last_updated: i64,
+    // The event(s) this supersedes, if any
+    superseded_by: Vec<MRIDType>,
 }
 
 /// The current state of an [`EventInstance`] in the schedule.
@@ -77,6 +79,7 @@ impl<E: SEEvent> EventInstance<E> {
             start,
             end,
             last_updated: current_time().get(),
+            superseded_by: vec![],
         }
     }
 
@@ -95,6 +98,7 @@ impl<E: SEEvent> EventInstance<E> {
             start,
             end,
             last_updated: current_time().get(),
+            superseded_by: vec![],
         }
     }
 
@@ -126,6 +130,10 @@ impl<E: SEEvent> EventInstance<E> {
     pub(crate) fn update_status(&mut self, status: EIStatus) {
         self.status = status;
         self.last_updated = current_time().get();
+    }
+
+    pub(crate) fn superseded_by(&mut self, other: &MRIDType) {
+        self.superseded_by.push(*other);
     }
 
     pub fn status(&self) -> EIStatus {
@@ -241,6 +249,25 @@ where
         let event = self.map.get_mut(event).unwrap();
         event.update_status(status);
         self.update_nexts();
+    }
+
+    /// Given an event, and a reason for it's cancellation:
+    /// - unsupersede (reschedule) unstarted events that are no longer superseded by any other events
+    /// - mark the given event as cancelled, and re-evaulate the upcoming events
+    pub(crate) fn cancel_event(&mut self, event: &MRIDType, reason: EIStatus) {
+        self.map
+            .iter_mut()
+            .filter(|(_, ei)| ei.status() == EIStatus::Superseded)
+            .for_each(|(_, ei)| {
+                // Current event is no longer superseded by the given event
+                ei.superseded_by.retain(|f| f != event);
+                // If the event is no longer superseded by anything, and hasn't started yet, reschedule it
+                if ei.superseded_by.len() == 0 && ei.start > current_time().get() {
+                    ei.update_status(EIStatus::Scheduled)
+                }
+            });
+        // Mark the event as cancelled internally, re-evaluate the next event to start
+        self.update_event(event, reason);
     }
 
     /// Reevaluates `next_start` and `next_end`

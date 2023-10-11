@@ -22,19 +22,27 @@ impl EventInstance<DERControl> {
             .der_control_base
             .same_target(&other.event().der_control_base)
     }
+}
 
-    /// Return which of the given DERControl events would be superseded, if any
-    pub(crate) fn der_superseded<'a>(&'a mut self, other: &'a mut Self) -> Option<&'a mut Self> {
-        if self.does_supersede(other) && self.has_same_target(other) {
-            return Some(other);
-        }
-
-        if other.does_supersede(self) && other.has_same_target(self) {
-            return Some(self);
-        }
-
+/// Given two DERControls, determine which is superseded, update internal states, and return the superseded event
+pub(crate) fn der_mark_supersede<'a>(
+    a: (&'a mut EventInstance<DERControl>, &'a MRIDType),
+    b: (&'a mut EventInstance<DERControl>, &'a MRIDType),
+) -> Option<&'a mut EventInstance<DERControl>> {
+    let same_target = a.0.has_same_target(b.0);
+    let out = if a.0.does_supersede(b.0) && same_target {
+        Some((a, b))
+    } else if b.0.does_supersede(a.0) && same_target {
+        Some((b, a))
+    } else {
         None
-    }
+    };
+
+    out.map(|(superseding, superseded)| {
+        superseded.0.superseded_by(superseding.1);
+        superseded.0.update_status(EIStatus::Superseded);
+        superseding.0
+    })
 }
 
 impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
@@ -157,16 +165,16 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
             // Determine what events this supersedes
             let mut target = ei;
-            for (_, other) in events.iter_mut() {
-                // If an event is superseded
-                if let Some(superseded) = target.der_superseded(other) {
+            for (o_mrid, other) in events.iter_mut() {
+                // Determine the superseded event, update internal state accordingly
+                if let Some(superseded) = der_mark_supersede((&mut target, &mrid), (other, o_mrid))
+                {
                     if superseded.status() == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler)
                             .event_update(superseded, EIStatus::Superseded)
                             .await;
                     }
-                    superseded.update_status(EIStatus::Superseded);
                     // Tell the server we've been informed this event is superseded
                     self.client
                         .send_der_response(
@@ -246,12 +254,14 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
     /// Cancel an [`EventInstance<DerControl>`] that has been previously added to the schedule
     ///
-    /// Update the internal [`EventInstance<DerControl>`]
+    /// Update the internal [`EventInstance<DerControl>`] state.
+    /// If the event is responsible for superseding other events,
+    /// and those events have not started, they will be marked as scheduled internally - the client will not be informed.
     ///
     /// `cancel_reason` must/will be one of [`EIStatus::Cancelled`] | [`EIStatus::CancelledRandom`] | [`EIStatus::Superseded`]
     async fn cancel_dercontrol(&mut self, target_mrid: &MRIDType, cancel_reason: EIStatus) {
         let mut events = self.events.write().await;
-        events.update_event(target_mrid, cancel_reason);
+        events.cancel_event(target_mrid, cancel_reason);
 
         let ei = events.get(target_mrid).unwrap();
         let resp = (self.handler).event_update(ei, cancel_reason).await;
