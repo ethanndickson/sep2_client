@@ -50,7 +50,7 @@ impl Handler {
                     .write()
                     .await
                     .insert::<ReadingResource>(r.resource.unwrap());
-                SepResponse::Created("/reading".to_owned())
+                SepResponse::Created(Some("/reading".to_owned()))
             }
             // "Undesired subscription ... SHALL return an HTTP 400 error"
             Err(_) => SepResponse::BadRequest(None),
@@ -153,6 +153,7 @@ async fn setup_schedule(
     // Add our device to the server
     let res = client.post("/edev", &*edr.read().await).await.unwrap();
     if let SepResponse::Created(loc) = res {
+        let loc = loc.ok_or(anyhow!("No location header provided."))?;
         // EndDevice resource is now populated,
         // use the returned location header to determine where it is
         let edr: EndDevice = client

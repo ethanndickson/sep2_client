@@ -64,7 +64,7 @@ async fn registration_local() {
     }
     let res = client.post("/edev", &own_edr).await.unwrap();
     // Header should return location of newly posted resource
-    if let SepResponse::Created(loc) = res {
+    if let SepResponse::Created(Some(loc)) = res {
         assert_eq!(loc, "/edev/4");
     } else {
         panic!("Expected 201 Created from server, not 204 No Content");

@@ -29,8 +29,8 @@ use sep2_common::{
 
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
 pub enum SepResponse {
-    // HTTP 201 w/ Location header value - 2030.5-2018 - 5.5.2.4
-    Created(String), // TODO: This might need to handle non-existent location header for Responses??
+    // HTTP 201 w/ Location header value, if it exists - 2030.5-2018 - 5.5.2.4
+    Created(Option<String>),
     // HTTP 204 - 2030.5-2018 - 5.5.2.5
     NoContent,
     // HTTP 400 - 2030.5-2018 - 5.5.2.9
@@ -44,7 +44,16 @@ pub enum SepResponse {
 impl Display for SepResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SepResponse::Created(loc) => write!(f, "201 Created - Location Header {}", loc),
+            SepResponse::Created(loc) => {
+                write!(
+                    f,
+                    "201 Created - Location Header {}",
+                    match loc {
+                        Some(loc) => loc,
+                        None => "None",
+                    }
+                )
+            }
             SepResponse::NoContent => write!(f, "204 No Content"),
             SepResponse::BadRequest(e) => match e {
                 Some(e) => write!(f, "400 Bad Request - Error: {}", e),
@@ -64,7 +73,9 @@ impl From<SepResponse> for hyper::Response<Body> {
         match value {
             SepResponse::Created(loc) => {
                 *res.status_mut() = StatusCode::CREATED;
-                res.headers_mut().insert(LOCATION, loc.parse().unwrap());
+                if let Some(loc) = loc {
+                    res.headers_mut().insert(LOCATION, loc.parse().unwrap());
+                }
             }
             SepResponse::NoContent => {
                 *res.status_mut() = StatusCode::NO_CONTENT;
@@ -92,7 +103,7 @@ enum PollTask {
 }
 /// Represents an IEEE 2030.5 Client connection to a single server
 ///
-/// Can be cloned cheaply, poll tasks and the underyling `hyper` connection pool are shared between cloned clients.
+/// Can be cloned cheaply as poll tasks, and the underlying `hyper` connection pool are shared between cloned clients.
 #[derive(Clone)]
 pub struct Client {
     addr: Arc<String>,
@@ -286,7 +297,7 @@ impl Client {
                     .ok_or(anyhow!("201 Created - Missing Location Header"))?
                     .to_str()?
                     .to_string();
-                Ok(SepResponse::Created(loc))
+                Ok(SepResponse::Created(Some(loc)))
             }
             StatusCode::NO_CONTENT => Ok(SepResponse::NoContent),
             StatusCode::BAD_REQUEST => bail!("400 Bad Request"),

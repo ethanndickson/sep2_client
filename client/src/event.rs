@@ -262,7 +262,7 @@ where
                 // Current event is no longer superseded by the given event
                 ei.superseded_by.retain(|f| f != event);
                 // If the event is no longer superseded by anything, and hasn't started yet, reschedule it
-                if ei.superseded_by.len() == 0 && ei.start > current_time().get() {
+                if ei.superseded_by.is_empty() && ei.start > current_time().get() {
                     ei.update_status(EIStatus::Scheduled)
                 }
             });
