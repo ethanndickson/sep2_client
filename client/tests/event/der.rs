@@ -30,14 +30,7 @@ impl EventHandler<DERControl> for DERControlHandler {
         event: &EventInstance<DERControl>,
         status: EIStatus,
     ) -> ResponseStatus {
-        match status {
-            EIStatus::Scheduled => ResponseStatus::EventAcknowledge,
-            EIStatus::Active => todo!(),
-            EIStatus::Cancelled => todo!(),
-            EIStatus::Complete => todo!(),
-            EIStatus::CancelledRandom => todo!(),
-            EIStatus::Superseded => todo!(),
-        }
+        status.into_der_response()
     }
 }
 

@@ -56,6 +56,20 @@ pub enum EIStatus {
     // TODO: ScheduledSuperseded & Unsuperseding unstarted events
 }
 
+impl EIStatus {
+    /// Given the status of an EventInstance, convert it to a ResponseStatus, as per the DER FS
+    pub fn into_der_response(self) -> ResponseStatus {
+        match self {
+            EIStatus::Scheduled => ResponseStatus::EventReceived,
+            EIStatus::Active => ResponseStatus::EventStarted,
+            EIStatus::Cancelled => ResponseStatus::EventCancelled,
+            EIStatus::Complete => ResponseStatus::EventCompleted,
+            EIStatus::CancelledRandom => ResponseStatus::EventCancelled,
+            EIStatus::Superseded => ResponseStatus::EventSuperseded,
+        }
+    }
+}
+
 impl From<EventStatusType> for EIStatus {
     fn from(value: EventStatusType) -> Self {
         match value {
