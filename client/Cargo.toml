@@ -16,6 +16,7 @@ openssl = "0.10.52"
 rand = "0.8.5"
 tokio = {version = "1.28.1", features = ["full"] }
 tokio-openssl = "0.6.3"
+dashmap = "5.5.3"
 
 [dev-dependencies]
 sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["examples","der","edev","fsa","metering","pubsub","dcap"]  }

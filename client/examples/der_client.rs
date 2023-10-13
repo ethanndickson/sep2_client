@@ -5,22 +5,19 @@ use std::{sync::Arc, time::Duration};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use sep2_client::{
-    client::{Client, SepResponse},
+    client::{Client, SEPResponse},
     event::{EIStatus, EventHandler, EventInstance, Schedule},
-    pubsub::{ClientNotifServer, NotifHandler},
+    pubsub::ClientNotifServer,
 };
-use sep2_common::{
-    deserialize,
-    packages::{
-        der::{DERControl, DERControlList, DERProgramList, DefaultDERControl},
-        edev::EndDevice,
-        fsa::FunctionSetAssignmentsList,
-        identification::ResponseStatus,
-        metering::Reading,
-        primitives::{Int64, Uint32},
-        pubsub::Notification,
-        types::SFDIType,
-    },
+use sep2_common::packages::{
+    der::{DERControl, DERControlList, DERProgramList, DefaultDERControl},
+    edev::EndDevice,
+    fsa::FunctionSetAssignmentsList,
+    identification::ResponseStatus,
+    metering::Reading,
+    primitives::{Int64, Uint32},
+    pubsub::Notification,
+    types::SFDIType,
 };
 use tokio::sync::{
     mpsc::{self, Receiver},
@@ -34,39 +31,7 @@ impl TypeMapKey for ReadingResource {
 }
 
 #[derive(Default, Clone)]
-struct Handler {
-    // Store any form of interior-mutable state, or a channel inlet here and
-    // have it accessible when handling notifs and/or events.
-    state: Arc<RwLock<TypeMap>>,
-}
-
-impl Handler {
-    async fn add_reading(&self, resource: &str) -> SepResponse {
-        let res = deserialize::<Notification<Reading>>(resource);
-        match res {
-            Ok(r) => {
-                self.state
-                    .write()
-                    .await
-                    .insert::<ReadingResource>(r.resource.unwrap());
-                SepResponse::Created(Some("/reading".to_owned()))
-            }
-            // "Undesired subscription ... SHALL return an HTTP 400 error"
-            Err(_) => SepResponse::BadRequest(None),
-        }
-    }
-}
-
-// Example defintion for how incoming notifications should be routed.
-#[async_trait]
-impl NotifHandler for Handler {
-    async fn notif_handler(&self, path: &str, resource: &str) -> SepResponse {
-        match path {
-            "/reading" => self.add_reading(resource).await,
-            _ => SepResponse::NotFound,
-        }
-    }
-}
+struct Handler {}
 
 // Example definition of how DER event status updates should be handled.
 #[async_trait]
@@ -151,7 +116,7 @@ async fn setup_schedule(
 ) -> Result<()> {
     // Add our device to the server
     let res = client.post("/edev", &*edr.read().await).await.unwrap();
-    if let SepResponse::Created(loc) = res {
+    if let SEPResponse::Created(loc) = res {
         let loc = loc.ok_or(anyhow!("No location header provided."))?;
         // EndDevice resource is now populated,
         // use the returned location header to determine where it is
@@ -195,21 +160,37 @@ async fn setup_schedule(
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Initialise a typemap for storing Resources
+    let state: Arc<RwLock<TypeMap>> = Arc::new(RwLock::new(TypeMap::new()));
+
     // Initialise an EndDevice resource representing this device
     // (or acquire multiple out of band EndDevices if aggregate client)
     let mut edr = EndDevice::default();
     edr.changed_time = Int64(1379905200);
     edr.sfdi = SFDIType::new(987654321005).unwrap();
     let edr = Arc::new(RwLock::new(edr));
-    // Create an event & notif handler with it's own state
-    let handler = Handler::default();
+
     // Create a Notificaton server listening on 1338
+    // Make it listen for reading resources on "/reading"
+    let notif_state = state.clone();
     let notifs = ClientNotifServer::new(
         "127.0.0.1:1338",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
-        handler.clone(),
-    )?;
+    )?
+    .add("/reading", move |notif: Notification<Reading>| {
+        let notif_state = notif_state.clone();
+        async move {
+            match notif.resource {
+                Some(r) => {
+                    notif_state.write().await.insert::<ReadingResource>(r);
+                    SEPResponse::Created(None)
+                }
+                None => SEPResponse::BadRequest(None),
+            }
+        }
+    });
+
     // Spawn an async task to run our notif server
     let notif_handle = tokio::task::spawn(notifs.run(tokio::signal::ctrl_c()));
     // Create a HTTPS client for a specfific server
@@ -220,6 +201,8 @@ async fn main() -> Result<()> {
         None,
     )?;
 
+    // Create an event handler with it's own state
+    let handler = Handler::default();
     // Create a DER FS Schedule (DERControl)
     let schedule: Schedule<DERControl, Handler> = Schedule::new(
         client.clone(),
