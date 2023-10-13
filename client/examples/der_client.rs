@@ -20,6 +20,7 @@ use sep2_common::packages::{
     pubsub::Notification,
     types::SFDIType,
 };
+use simple_logger::SimpleLogger;
 use tokio::sync::{
     mpsc::{self, Receiver},
     RwLock,
@@ -166,6 +167,7 @@ async fn incoming_dcap(notif: Notification<DeviceCapability>) -> SEPResponse {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    SimpleLogger::new().init().unwrap();
     // Initialise a typemap for storing Resources
     let state: Arc<RwLock<TypeMap>> = Arc::new(RwLock::new(TypeMap::new()));
 
@@ -181,8 +183,8 @@ async fn main() -> Result<()> {
     let notif_state = state.clone();
     let notifs = ClientNotifServer::new(
         "127.0.0.1:1338",
-        "../certs/client_cert.pem",
-        "../certs/client_private_key.pem",
+        "../../certs/client_cert.pem",
+        "../../certs/client_private_key.pem",
     )?
     // Example route that adds to some thread-safe state
     .add("/reading", move |notif: Notification<Reading>| {
@@ -205,11 +207,10 @@ async fn main() -> Result<()> {
     // Create a HTTPS client for a specfific server
     let client = Client::new(
         "https://127.0.0.1:1337",
-        "../certs/client_cert.pem",
-        "../certs/client_private_key.pem",
+        "../../certs/client_cert.pem",
+        "../../certs/client_private_key.pem",
         None,
     )?;
-
     // Create an event handler with it's own state
     let handler = Handler::default();
     // Create a DER FS Schedule (DERControl)

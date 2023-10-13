@@ -293,8 +293,8 @@ impl Client {
             Box::pin(async move {
                 match client.get::<T>(&path).await {
                     Ok(rsrc) => {
-                        log::warn!("Cancelling poll task for {} at {}", T::name(), path);
-                        callback(rsrc)
+                        log::info!("Scheduled poll for Resource {} successful.", T::name());
+                        callback(rsrc).await
                     }
                     Err(err) => {
                         log::warn!(

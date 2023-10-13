@@ -21,6 +21,7 @@ dashmap = "5.5.3"
 [dev-dependencies]
 sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["examples","der","edev","fsa","metering","pubsub","dcap"]  }
 typemap_rev = "0.3.0"
+simple_logger = "4.2.0"
 
 [features]
 default = []
