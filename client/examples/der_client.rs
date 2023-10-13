@@ -10,6 +10,7 @@ use sep2_client::{
     pubsub::ClientNotifServer,
 };
 use sep2_common::packages::{
+    dcap::DeviceCapability,
     der::{DERControl, DERControlList, DERProgramList, DefaultDERControl},
     edev::EndDevice,
     fsa::FunctionSetAssignmentsList,
@@ -158,6 +159,11 @@ async fn setup_schedule(
     Ok(())
 }
 
+async fn incoming_dcap(notif: Notification<DeviceCapability>) -> SEPResponse {
+    println!("Notif Received: {:?}", notif);
+    SEPResponse::Created(None)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialise a typemap for storing Resources
@@ -178,6 +184,7 @@ async fn main() -> Result<()> {
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
     )?
+    // Example route that adds to some thread-safe state
     .add("/reading", move |notif: Notification<Reading>| {
         let notif_state = notif_state.clone();
         async move {
@@ -189,7 +196,9 @@ async fn main() -> Result<()> {
                 None => SEPResponse::BadRequest(None),
             }
         }
-    });
+    })
+    // Example route that uses a function pointer
+    .add("/dcap", incoming_dcap);
 
     // Spawn an async task to run our notif server
     let notif_handle = tokio::task::spawn(notifs.run(tokio::signal::ctrl_c()));
