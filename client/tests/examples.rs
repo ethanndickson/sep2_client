@@ -1,5 +1,5 @@
 use sep2_client::client::Client;
-use sep2_client::client::SepResponse;
+use sep2_client::client::SEPResponse;
 use sep2_common::packages::dcap::DeviceCapability;
 use sep2_common::packages::edev::EndDevice;
 use sep2_common::packages::edev::EndDeviceList;
@@ -64,7 +64,7 @@ async fn registration_local() {
     }
     let res = client.post("/edev", &own_edr).await.unwrap();
     // Header should return location of newly posted resource
-    if let SepResponse::Created(Some(loc)) = res {
+    if let SEPResponse::Created(Some(loc)) = res {
         assert_eq!(loc, "/edev/4");
     } else {
         panic!("Expected 201 Created from server, not 204 No Content");

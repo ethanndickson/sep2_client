@@ -28,7 +28,7 @@ use sep2_common::{
 };
 
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
-pub enum SepResponse {
+pub enum SEPResponse {
     // HTTP 201 w/ Location header value, if it exists - 2030.5-2018 - 5.5.2.4
     Created(Option<String>),
     // HTTP 204 - 2030.5-2018 - 5.5.2.5
@@ -41,10 +41,10 @@ pub enum SepResponse {
     MethodNotAllowed(&'static str),
 }
 
-impl Display for SepResponse {
+impl Display for SEPResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SepResponse::Created(loc) => {
+            SEPResponse::Created(loc) => {
                 write!(
                     f,
                     "201 Created - Location Header {}",
@@ -54,39 +54,39 @@ impl Display for SepResponse {
                     }
                 )
             }
-            SepResponse::NoContent => write!(f, "204 No Content"),
-            SepResponse::BadRequest(e) => match e {
+            SEPResponse::NoContent => write!(f, "204 No Content"),
+            SEPResponse::BadRequest(e) => match e {
                 Some(e) => write!(f, "400 Bad Request - Error: {}", e),
                 None => write!(f, "400 Bad Request"),
             },
-            SepResponse::NotFound => write!(f, "404 Not Found"),
-            SepResponse::MethodNotAllowed(allow) => {
+            SEPResponse::NotFound => write!(f, "404 Not Found"),
+            SEPResponse::MethodNotAllowed(allow) => {
                 write!(f, "405 Method Not Allowed - Allow Header {}", allow)
             }
         }
     }
 }
 
-impl From<SepResponse> for hyper::Response<Body> {
-    fn from(value: SepResponse) -> Self {
+impl From<SEPResponse> for hyper::Response<Body> {
+    fn from(value: SEPResponse) -> Self {
         let mut res = hyper::Response::new(Body::empty());
         match value {
-            SepResponse::Created(loc) => {
+            SEPResponse::Created(loc) => {
                 *res.status_mut() = StatusCode::CREATED;
                 if let Some(loc) = loc {
                     res.headers_mut().insert(LOCATION, loc.parse().unwrap());
                 }
             }
-            SepResponse::NoContent => {
+            SEPResponse::NoContent => {
                 *res.status_mut() = StatusCode::NO_CONTENT;
             }
-            SepResponse::BadRequest(_) => {
+            SEPResponse::BadRequest(_) => {
                 *res.status_mut() = StatusCode::BAD_REQUEST;
             }
-            SepResponse::NotFound => {
+            SEPResponse::NotFound => {
                 *res.status_mut() = StatusCode::NOT_FOUND;
             }
-            SepResponse::MethodNotAllowed(methods) => {
+            SEPResponse::MethodNotAllowed(methods) => {
                 *res.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
                 res.headers_mut()
                     .insert(ALLOW, HeaderValue::from_static(methods));
@@ -160,14 +160,14 @@ impl Client {
     /// Update a [`SEResource`] at the given path.
     ///
     /// Returns an error if the server does not respond with 204 No Content or 201 Created.
-    pub async fn post<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
+    pub async fn post<R: SEResource>(&self, path: &str, resource: &R) -> Result<SEPResponse> {
         self.put_post(path, resource, Method::POST).await
     }
 
     /// Create a [`SEResource`] at the given path.
     ///
     /// Returns an error if the server does not respond with 204 No Content or 201 Created.
-    pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<SepResponse> {
+    pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<SEPResponse> {
         self.put_post(path, resource, Method::PUT).await
     }
 
@@ -272,7 +272,7 @@ impl Client {
         path: &str,
         resource: &R,
         method: Method,
-    ) -> Result<SepResponse> {
+    ) -> Result<SEPResponse> {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
             .context("Failed to parse address")?;
@@ -297,9 +297,9 @@ impl Client {
                     .ok_or(anyhow!("201 Created - Missing Location Header"))?
                     .to_str()?
                     .to_string();
-                Ok(SepResponse::Created(Some(loc)))
+                Ok(SEPResponse::Created(Some(loc)))
             }
-            StatusCode::NO_CONTENT => Ok(SepResponse::NoContent),
+            StatusCode::NO_CONTENT => Ok(SEPResponse::NoContent),
             StatusCode::BAD_REQUEST => bail!("400 Bad Request"),
             StatusCode::NOT_FOUND => bail!("404 Not Found"),
             _ => bail!("Unexpected HTTP response from server"),
@@ -315,9 +315,9 @@ impl Client {
     ) {
         match self.do_der_response(lfdi, event, status).await {
             Ok(
-                e @ (SepResponse::BadRequest(_)
-                | SepResponse::NotFound
-                | SepResponse::MethodNotAllowed(_)),
+                e @ (SEPResponse::BadRequest(_)
+                | SEPResponse::NotFound
+                | SEPResponse::MethodNotAllowed(_)),
             ) => {
                 log::warn!(
                     "DER response POST attempt failed with HTTP status code: {}",
@@ -325,7 +325,7 @@ impl Client {
                 );
             }
             Err(e) => log::warn!("DER response POST attempt failed with reason: {}", e),
-            Ok(r @ (SepResponse::Created(_) | SepResponse::NoContent)) => {
+            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
                 log::info!("DER response POST attempt succeeded with reason: {}", r)
             }
         }
@@ -337,7 +337,7 @@ impl Client {
         lfdi: Option<HexBinary160>,
         event: &DERControl,
         status: ResponseStatus,
-    ) -> Result<SepResponse> {
+    ) -> Result<SEPResponse> {
         if matches!(status, ResponseStatus::EventReceived)
             && event
                 .response_required
