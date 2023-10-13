@@ -281,7 +281,7 @@ impl Client {
         callback: F,
     ) where
         T: SEResource,
-        F: FnMut(T) -> R + Send + Sync + Clone + 'static,
+        F: Fn(T) -> R + Send + Sync + Clone + 'static,
         R: Future<Output = ()> + Send + Sync + 'static,
     {
         let client = self.clone();
@@ -289,7 +289,7 @@ impl Client {
         let new: PollCallback = Box::new(move || {
             let path = path.clone();
             let client = client.clone();
-            let mut callback = callback.clone();
+            let callback = callback.clone();
             Box::pin(async move {
                 match client.get::<T>(&path).await {
                     Ok(rsrc) => {
