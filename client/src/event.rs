@@ -1,3 +1,10 @@
+//! Common Application Functionality: Events
+//!
+//!
+//! Since we are required to compare real-world timestamps
+//! to determine when events start and end, we cannot use the [`Instant`] type.
+//! Instead, we compare an `i64` of the number of seconds since the Unix Epoch.
+
 use std::{
     collections::{hash_map, HashMap},
     sync::Arc,
