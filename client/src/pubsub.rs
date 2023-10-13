@@ -70,7 +70,7 @@ impl ClientNotifServer {
     /// Add a route to the server.
     /// Given:
     /// - A relative URI of the form "/foo"
-    /// - A `FnMut1` callback accepting a [`Notification<T>`]`, where T is the expected [`SEResource`] on the route  
+    /// - A `Fn` callback accepting a [`Notification<T>`]`, where T is the expected [`SEResource`] on the route  
     ///
     /// [`SEResource`]: sep2_common::traits::SEResource
     pub fn add<F, T, R>(self, path: impl Into<String>, callback: F) -> Self
@@ -86,7 +86,8 @@ impl ClientNotifServer {
             match e {
                 Ok(resource) => {
                     log::debug!("NotifServer: Successfully deserialized a resource on {log_path}");
-                    Box::pin(callback(resource))
+                    let out = callback(resource);
+                    Box::pin(out)
                 }
                 Err(err) => {
                     log::error!("NotifServer: Failed to deserialize resource on {log_path}: {err}");
