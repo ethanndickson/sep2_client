@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dashmap::DashMap;
 use hyper::{server::conn::Http, service::service_fn, Body, Method, Request, Response};
-use openssl::ssl::Ssl;
+use openssl::ssl::{Ssl, SslAcceptor};
 use sep2_common::{deserialize, packages::pubsub::Notification, traits::SEResource};
 use std::{future::Future, net::SocketAddr, pin::Pin, sync::Arc};
 use tokio::net::TcpListener;
@@ -53,18 +53,26 @@ impl Router {
 /// For use in the system test server binary, and in the Client as the receiver for the subscription/notification mechanism
 pub struct ClientNotifServer {
     addr: SocketAddr,
-    cfg: TlsServerConfig,
+    cfg: Option<TlsServerConfig>,
     router: Router,
 }
 
 impl ClientNotifServer {
-    pub fn new(addr: &str, cert_path: &str, pk_path: &str) -> Result<Self> {
-        let cfg = create_server_tls_config(cert_path, pk_path)?;
+    pub fn new(addr: &str) -> Result<Self> {
         Ok(ClientNotifServer {
             addr: addr.parse()?,
-            cfg,
+            cfg: None,
             router: Router::new(),
         })
+    }
+
+    /// We assume IEEE 2030.5 Clients operating as aggregates will run the Client Notification Server
+    /// behind an external reverse proxy. Thus, terminating TLS at the application is optional,
+    /// and can be enabled by supplying certificates to this method.
+    pub fn https(mut self, cert_path: &str, pk_path: &str) -> Result<Self> {
+        let cfg = create_server_tls_config(cert_path, pk_path)?;
+        self.cfg = Some(cfg);
+        Ok(self)
     }
 
     /// Add a route to the server.
@@ -100,7 +108,13 @@ impl ClientNotifServer {
 
     pub async fn run(self, shutdown: impl Future) -> Result<()> {
         tokio::pin!(shutdown);
-        let acceptor = self.cfg.build();
+        let ssl_cfg: Option<SslAcceptor> = match self.cfg {
+            Some(a) => Some(a.build()),
+            None => {
+                log::debug!("NotifServer: No SSL Configuration found, will serve using HTTP.");
+                None
+            }
+        };
         let router = Arc::new(self.router);
         let listener = TcpListener::bind(self.addr).await?;
         let mut set = tokio::task::JoinSet::new();
@@ -119,23 +133,31 @@ impl ClientNotifServer {
             };
             log::debug!("NotifServer: Remote connecting from {}", addr);
 
-            // Perform TLS handshake
-            let ssl = Ssl::new(acceptor.context())?;
-            let stream = SslStream::new(ssl, stream)?;
-            let mut stream = Box::pin(stream);
-            stream.as_mut().accept().await?;
-
             // Bind connection to service
             let router = router.clone();
             let service = service_fn(move |req| {
                 let handler = router.clone();
                 async move { handler.router(req).await }
             });
-            set.spawn(async move {
-                if let Err(err) = Http::new().serve_connection(stream, service).await {
-                    log::error!("NotifServer: Failed to handle connection: {err}");
-                }
-            });
+
+            // Perform TLS handshake
+            if let Some(acceptor) = &ssl_cfg {
+                let ssl = Ssl::new(acceptor.context())?;
+                let stream = SslStream::new(ssl, stream)?;
+                let mut stream = Box::pin(stream);
+                stream.as_mut().accept().await?;
+                set.spawn(async move {
+                    if let Err(err) = Http::new().serve_connection(stream, service).await {
+                        log::error!("NotifServer: Failed to handle connection: {err}");
+                    }
+                });
+            } else {
+                set.spawn(async move {
+                    if let Err(err) = Http::new().serve_connection(stream, service).await {
+                        log::error!("NotifServer: Failed to handle connection: {err}");
+                    }
+                });
+            }
         }
         // Wait for all connection handlers to finish
         log::debug!("NotifServer: Attempting graceful shutdown");
