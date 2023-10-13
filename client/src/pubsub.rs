@@ -11,7 +11,7 @@ use crate::client::SEPResponse;
 use crate::tls::{create_server_tls_config, TlsServerConfig};
 
 type RouteCallback = Box<
-    dyn FnMut(&str) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + Sync + 'static>>
+    dyn Fn(&str) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + Sync + 'static>>
         + Send
         + Sync
         + 'static,
@@ -73,10 +73,10 @@ impl ClientNotifServer {
     /// - A `FnMut1` callback accepting a [`Notification<T>`]`, where T is the expected [`SEResource`] on the route  
     ///
     /// [`SEResource`]: sep2_common::traits::SEResource
-    pub fn add<F, T, R>(self, path: impl Into<String>, mut callback: F) -> Self
+    pub fn add<F, T, R>(self, path: impl Into<String>, callback: F) -> Self
     where
         T: SEResource,
-        F: FnMut(Notification<T>) -> R + Send + Sync + 'static,
+        F: Fn(Notification<T>) -> R + Send + Sync + 'static,
         R: Future<Output = SEPResponse> + Send + Sync + 'static,
     {
         let path = path.into();

@@ -113,10 +113,7 @@ enum PollTaskOld {
 }
 
 type PollCallback = Box<
-    dyn FnMut() -> Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>
-        + Send
-        + Sync
-        + 'static,
+    dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>> + Send + Sync + 'static,
 >;
 
 struct PollTask {
@@ -180,12 +177,30 @@ impl Client {
     ) -> Result<Self> {
         let cfg = create_client_tls_cfg(cert_path, pk_path)?;
         let (tx, _) = broadcast::channel::<PollTaskOld>(1);
-        Ok(Client {
+        let out = Client {
             addr: server_addr.to_owned().into(),
             http: create_client(cfg, tcp_keepalive),
             broadcaster: tx,
             polls: Arc::new(RwLock::new(BinaryHeap::new())),
-        })
+        };
+        tokio::spawn(out.clone().poll_task());
+        Ok(out)
+    }
+
+    async fn poll_task(self) {
+        loop {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            let mut polls = self.polls.write().await;
+            while let Some(task) = polls.peek() {
+                if task.next < Instant::now() {
+                    let mut cur = polls.pop().unwrap();
+                    cur.execute().await;
+                    polls.push(cur);
+                } else {
+                    break;
+                }
+            }
+        }
     }
 
     /// Retrieve the [`SEResource`] at the given path.
@@ -259,68 +274,49 @@ impl Client {
     /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
     ///
     /// All poll events created can be forcibly run using [`Client::force_poll`], such as is required when reconnecting to the server after a period of connectivity loss.
-    pub async fn start_poll<R: SEResource, F, Res>(
+    pub async fn start_poll<F, T, R>(
         &self,
         path: impl Into<String>,
         poll_rate: Option<Uint32>,
-        mut callback: F,
+        callback: F,
     ) where
-        R: SEResource,
-        F: FnMut(R) -> Res + Send + Sync + 'static,
-        Res: Future<Output = ()> + Send + Sync + 'static,
+        T: SEResource,
+        F: FnMut(T) -> R + Send + Sync + Clone + 'static,
+        R: Future<Output = ()> + Send + Sync + 'static,
     {
         let client = self.clone();
         let path: String = path.into();
         let new: PollCallback = Box::new(move || {
             let path = path.clone();
             let client = client.clone();
-            // TODO: Finish
-            Box::pin(async { () })
+            let mut callback = callback.clone();
+            Box::pin(async move {
+                match client.get::<T>(&path).await {
+                    Ok(rsrc) => {
+                        log::warn!("Cancelling poll task for {} at {}", T::name(), path);
+                        callback(rsrc)
+                    }
+                    Err(err) => {
+                        log::warn!(
+                            "Scheduled poll for Resource {} at {} failed with reason {}. Retrying in {} seconds.",
+                            T::name(),
+                            &path,
+                            err,
+                            &poll_rate.unwrap_or(Self::DEFAULT_POLLRATE)
+                        );
+                        return;
+                    }
+                };
+            })
         });
-        // let client = self.clone();
-        // let mut rx = self.broadcaster.subscribe();
-        // tokio::task::spawn(async move {
-        //     let mut next =
-        //         current_time().get() + poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as i64;
-        //     loop {
-        //         tokio::select! {
-        //             // Sleep in 30 second increments to account for sleepy devices
-        //             _ = crate::time::sleep_until(next, Duration::from_secs(30)) => (),
-        //             flag = rx.recv() => {
-        //                 match flag {
-        //                     Ok(PollTaskOld::ForceRun) => (),
-        //                     Ok(PollTaskOld::Cancel) => {
-        //                         log::warn!("Cancelling poll task for {} at {}", R::name(), path);
-        //                         break;
-        //                     }
-        //                     _ => {
-        //                         log::warn!("Poll task for {} at {} could not listen on it's broadcast receiver", R::name(), path);
-        //                         break;
-        //                     }
-
-        //                 }
-        //             }
-        //         }
-
-        //         let res = client.get::<R>(&path).await;
-        //         match res {
-        //             Ok(rsrc) => {
-        //                 log::info!("Scheduled poll for Resource {} successful.", R::name());
-        //                 callback(rsrc).await;
-        //             }
-        //             Err(_) => log::warn!(
-        //                 "Scheduled poll for Resource {} at {} failed. Retrying in {} seconds.",
-        //                 R::name(),
-        //                 &path,
-        //                 &poll_rate.unwrap_or(Self::DEFAULT_POLLRATE)
-        //             ),
-        //         }
-
-        //         // Set next poll time
-        //         next =
-        //             current_time().get() + poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as i64;
-        //     }
-        // });
+        let interval =
+            Duration::from_secs(poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as u64);
+        let poll = PollTask {
+            callback: new,
+            interval: interval,
+            next: Instant::now() + interval,
+        };
+        self.polls.write().await.push(poll);
     }
 
     /// Forcibly poll & run the callbacks of all routes polled using [`Client::start_poll`]
