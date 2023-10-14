@@ -86,8 +86,7 @@ impl ClientNotifServer {
             match e {
                 Ok(resource) => {
                     log::debug!("NotifServer: Successfully deserialized a resource on {log_path}");
-                    let out = callback(resource);
-                    Box::pin(out)
+                    Box::pin(callback(resource))
                 }
                 Err(err) => {
                     log::error!("NotifServer: Failed to deserialize resource on {log_path}: {err}");
@@ -99,6 +98,10 @@ impl ClientNotifServer {
         self
     }
 
+    /// Start the Notification Server.
+    ///
+    /// When the provided `shutdown` future completes, the server will shutdown gracefully.
+    /// Will return an error if the server crashes.
     pub async fn run(self, shutdown: impl Future) -> Result<()> {
         tokio::pin!(shutdown);
         let acceptor = self.cfg.build();

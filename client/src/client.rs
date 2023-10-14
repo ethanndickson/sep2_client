@@ -286,9 +286,12 @@ impl Client {
     {
         let client = self.clone();
         let path: String = path.into();
+        let rate = poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get();
         let new: PollCallback = Box::new(move || {
             let path = path.clone();
             let client = client.clone();
+            // Each time this closure is called, we need to produce a single future to return,
+            // that future includes our callback, so we need to clone it every invocation of the poll callback.
             let callback = callback.clone();
             Box::pin(async move {
                 match client.get::<T>(&path).await {
@@ -302,15 +305,14 @@ impl Client {
                             T::name(),
                             &path,
                             err,
-                            &poll_rate.unwrap_or(Self::DEFAULT_POLLRATE)
+                            &rate
                         );
                         return;
                     }
                 };
             })
         });
-        let interval =
-            Duration::from_secs(poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get() as u64);
+        let interval = Duration::from_secs(rate as u64);
         let poll = PollTask {
             callback: new,
             interval: interval,
