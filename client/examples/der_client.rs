@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use sep2_client::{
     client::{Client, SEPResponse},
+    edev::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Schedule},
     pubsub::ClientNotifServer,
 };
@@ -16,9 +17,8 @@ use sep2_common::packages::{
     fsa::FunctionSetAssignmentsList,
     identification::ResponseStatus,
     metering::Reading,
-    primitives::{Int64, Uint32},
+    primitives::Uint32,
     pubsub::Notification,
-    types::SFDIType,
 };
 use simple_logger::SimpleLogger;
 use tokio::sync::{
@@ -113,11 +113,11 @@ async fn process_derpl_task(
 // TODO: Do `.all` unwraps need to be replaced with the request minus query string?
 async fn setup_schedule(
     client: &Client,
-    edr: Arc<RwLock<EndDevice>>,
+    edr: Arc<RwLock<SEDevice>>,
     schedule: Schedule<DERControl, Handler>,
 ) -> Result<()> {
     // Add our device to the server
-    let res = client.post("/edev", &*edr.read().await).await.unwrap();
+    let res = client.post("/edev", &edr.read().await.edev).await.unwrap();
     if let SEPResponse::Created(loc) = res {
         let loc = loc.ok_or(anyhow!("No location header provided."))?;
         // EndDevice resource is now populated,
@@ -173,9 +173,7 @@ async fn main() -> Result<()> {
 
     // Initialise an EndDevice resource representing this device
     // (or acquire multiple out of band EndDevices if aggregate client)
-    let mut edr = EndDevice::default();
-    edr.changed_time = Int64(1379905200);
-    edr.sfdi = SFDIType::new(987654321005).unwrap();
+    let edr = SEDevice::new_from_cert("../../certs/client_cert.pem").unwrap();
     let edr = Arc::new(RwLock::new(edr));
 
     // Create a Notificaton server listening on 1338

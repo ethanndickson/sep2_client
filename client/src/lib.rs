@@ -1,4 +1,9 @@
 pub mod client;
+pub mod edev;
+pub mod security;
+pub mod time;
+pub mod tls;
+
 #[cfg(feature = "der")]
 pub mod der;
 #[cfg(feature = "drlc")]
@@ -13,6 +18,3 @@ pub mod messaging;
 pub mod pricing;
 #[cfg(feature = "pubsub")]
 pub mod pubsub;
-pub mod security;
-pub mod time;
-pub mod tls;
