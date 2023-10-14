@@ -3,13 +3,13 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use sep2_client::{
     client::Client,
+    edev::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Schedule},
     time::current_time,
 };
 use sep2_common::{
     packages::{
         der::DERControl,
-        edev::EndDevice,
         identification::ResponseStatus,
         objects::EventStatusType,
         primitives::{HexBinary128, Int64, Uint32},
@@ -30,7 +30,7 @@ fn test_setup() -> (
         None,
     )
     .unwrap();
-    let device = EndDevice::default();
+    let device = SEDevice::new_from_cert("../certs/client_cert.pem").unwrap();
     let handler = Arc::new(DERControlHandler {
         logs: RwLock::new(vec![]),
     });

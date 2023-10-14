@@ -210,15 +210,15 @@ impl Client {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
             .context("Failed to parse address")?;
-        log::info!("GET {} from {}", R::name(), uri);
+        log::info!("Client: GET {} from {}", R::name(), uri);
         let req = Request::builder()
             .method(Method::GET)
             .header(ACCEPT, "application/sep+xml")
             .uri(uri)
             .body(Body::default())?;
-        log::debug!("Outgoing HTTP Request: {:?}", req);
+        log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
-        log::debug!("Incoming HTTP Response: {:?}", res);
+        log::debug!("Client: Incoming HTTP Response: {:?}", res);
         // TODO: Improve error handling
         // TODO: Handle moved resources
         match res.status() {
@@ -252,14 +252,14 @@ impl Client {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
             .context("Failed to parse address")?;
-        log::info!("DELETE at {}", uri);
+        log::info!("Client: DELETE at {}", uri);
         let req = Request::builder()
             .method(Method::DELETE)
             .uri(uri)
             .body(Body::empty())?;
-        log::debug!("Outgoing HTTP Request: {:?}", req);
+        log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
-        log::debug!("Incoming HTTP Response: {:?}", res);
+        log::debug!("Client: Incoming HTTP Response: {:?}", res);
         // TODO: Improve error handling
         match res.status() {
             StatusCode::NO_CONTENT => Ok(()),
@@ -296,12 +296,15 @@ impl Client {
             Box::pin(async move {
                 match client.get::<T>(&path).await {
                     Ok(rsrc) => {
-                        log::info!("Scheduled poll for Resource {} successful.", T::name());
+                        log::info!(
+                            "Client: Scheduled poll for Resource {} successful.",
+                            T::name()
+                        );
                         callback(rsrc).await
                     }
                     Err(err) => {
                         log::warn!(
-                            "Scheduled poll for Resource {} at {} failed with reason {}. Retrying in {} seconds.",
+                            "Client: Scheduled poll for Resource {} at {} failed with reason {}. Retrying in {} seconds.",
                             T::name(),
                             &path,
                             err,
@@ -350,9 +353,9 @@ impl Client {
             .header(CONTENT_LENGTH, rsrce_size)
             .uri(uri)
             .body(Body::from(rsrce))?;
-        log::debug!("Outgoing HTTP Request: {:?}", req);
+        log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
-        log::debug!("Incoming HTTP Response: {:?}", res);
+        log::debug!("Client: Incoming HTTP Response: {:?}", res);
         // TODO: Improve error handling
         match res.status() {
             StatusCode::CREATED => {
@@ -374,7 +377,7 @@ impl Client {
     #[cfg(feature = "der")]
     pub(crate) async fn send_der_response(
         &self,
-        lfdi: Option<HexBinary160>,
+        lfdi: HexBinary160,
         event: &DERControl,
         status: ResponseStatus,
     ) {
@@ -385,13 +388,19 @@ impl Client {
                 | SEPResponse::MethodNotAllowed(_)),
             ) => {
                 log::warn!(
-                    "DER response POST attempt failed with HTTP status code: {}",
+                    "Client: DER response POST attempt failed with HTTP status code: {}",
                     e
                 );
             }
-            Err(e) => log::warn!("DER response POST attempt failed with reason: {}", e),
+            Err(e) => log::warn!(
+                "Client: DER response POST attempt failed with reason: {}",
+                e
+            ),
             Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
-                log::info!("DER response POST attempt succeeded with reason: {}", r)
+                log::info!(
+                    "Client: DER response POST attempt succeeded with reason: {}",
+                    r
+                )
             }
         }
     }
@@ -399,7 +408,7 @@ impl Client {
     #[inline(always)]
     async fn do_der_response(
         &self,
-        lfdi: Option<HexBinary160>,
+        lfdi: HexBinary160,
         event: &DERControl,
         status: ResponseStatus,
     ) -> Result<SEPResponse> {
@@ -408,16 +417,16 @@ impl Client {
                 .response_required
                 .map(|rr| {
                     rr.contains(
-                        ResponseRequired::MessageReceived | ResponseRequired::SpecificResponse,
+                        ResponseRequired::MessageReceived
+                            | ResponseRequired::SpecificResponse
+                            | ResponseRequired::ResponseRequired,
                     )
                 })
                 .ok_or(anyhow!("Event does not contain a ResponseRequired field"))?
         {
             let resp = DERControlResponse {
                 created_date_time: Some(current_time()),
-                end_device_lfdi: lfdi.ok_or(anyhow!(
-                    "Attempted to send DER response for EndDevice that does not have an LFDI"
-                ))?,
+                end_device_lfdi: lfdi,
                 status: Some(status),
                 subject: event.mrid,
                 href: None,

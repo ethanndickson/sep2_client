@@ -2,7 +2,6 @@ use std::{sync::Arc, time::Duration};
 
 use sep2_common::packages::{
     der::DERControl,
-    edev::EndDevice,
     identification::ResponseStatus,
     objects::EventStatusType as EventStatus,
     types::{MRIDType, PrimacyType},
@@ -11,6 +10,7 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 
 use crate::{
     client::Client,
+    edev::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Events, Schedule},
     time::current_time,
 };
@@ -51,7 +51,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
     pub fn new(
         client: Client,
-        device: Arc<RwLock<EndDevice>>,
+        device: Arc<RwLock<SEDevice>>,
         handler: Arc<H>,
         tickrate: Duration,
     ) -> Self {

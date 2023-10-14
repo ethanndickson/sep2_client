@@ -11,11 +11,10 @@ use std::{
     time::Duration,
 };
 
-use crate::{client::Client, time::current_time};
+use crate::{client::Client, edev::SEDevice, time::current_time};
 use async_trait::async_trait;
 use rand::Rng;
 use sep2_common::packages::{
-    edev::EndDevice,
     identification::ResponseStatus,
     objects::EventStatusType,
     types::{MRIDType, OneHourRangeType, PrimacyType},
@@ -330,7 +329,7 @@ where
 {
     pub(crate) client: Client,
     // Send + Sync end device, as the EndDevice resource may be updated
-    pub(crate) device: Arc<RwLock<EndDevice>>,
+    pub(crate) device: Arc<RwLock<SEDevice>>,
     // All Events added to this schedule, indexed by mRID
     pub(crate) events: Arc<RwLock<Events<E>>>,
     // Callback provider for informing client of event state transitions
