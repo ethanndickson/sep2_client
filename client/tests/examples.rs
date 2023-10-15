@@ -30,6 +30,7 @@ fn test_setup() -> (EndDevice, Registration, Client) {
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
         None,
+        None,
     )
     .unwrap();
     (edr, reg, client)

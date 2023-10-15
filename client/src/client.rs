@@ -23,9 +23,10 @@ use tokio::sync::{
     RwLock,
 };
 
-use crate::time::current_time;
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
+#[cfg(feature = "der")]
+use crate::time::current_time;
 #[cfg(feature = "der")]
 use sep2_common::{
     packages::{
@@ -160,7 +161,6 @@ type PollQueue = Arc<RwLock<BinaryHeap<PollTask>>>;
 #[derive(Clone)]
 pub struct Client {
     addr: Arc<String>,
-    // TODO: Move this into a cloneable inner
     http: HTTPSClient,
     broadcaster: Sender<PollTaskOld>,
     polls: PollQueue,
@@ -168,12 +168,25 @@ pub struct Client {
 
 impl Client {
     const DEFAULT_POLLRATE: Uint32 = Uint32(900);
+    const DEFAULT_TICKRATE: Duration = Duration::from_secs(600);
 
+    /// **TCP KeepAlive**:
+    ///
+    /// Pass the given value to `SO_KEEPALIVE`.
+    ///
+    /// **Tickrate**:
+    ///
+    /// Set how often the client background task should wakeup to check the polling queue.
+    ///
+    /// Defaults to 10 minutes, if this function is not called.
+    ///
+    /// If [`Client::start_poll`] is never called, this setting has no effect.
     pub fn new(
         server_addr: &str,
         cert_path: &str,
         pk_path: &str,
         tcp_keepalive: Option<Duration>,
+        tickrate: Option<Duration>,
     ) -> Result<Self> {
         let cfg = create_client_tls_cfg(cert_path, pk_path)?;
         let (tx, _) = broadcast::channel::<PollTaskOld>(1);
@@ -183,13 +196,16 @@ impl Client {
             broadcaster: tx,
             polls: Arc::new(RwLock::new(BinaryHeap::new())),
         };
-        tokio::spawn(out.clone().poll_task());
+        tokio::spawn(
+            out.clone()
+                .poll_task(tickrate.unwrap_or(Self::DEFAULT_TICKRATE)),
+        );
         Ok(out)
     }
 
-    async fn poll_task(self) {
+    async fn poll_task(self, tickrate: Duration) {
         loop {
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            tokio::time::sleep(tickrate).await;
             let mut polls = self.polls.write().await;
             while let Some(task) = polls.peek() {
                 if task.next < Instant::now() {

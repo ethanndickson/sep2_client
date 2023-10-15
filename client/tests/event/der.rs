@@ -28,6 +28,7 @@ fn test_setup() -> (
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
         None,
+        None,
     )
     .unwrap();
     let device = SEDevice::new_from_cert("../certs/client_cert.pem").unwrap();

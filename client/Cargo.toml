@@ -8,13 +8,13 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.72"
 async-trait = "0.1.72"
-sep2_common = { path = "../IEEE-2030.5-Common/common" }
-hyper = { version = "0.14.26", features = ["full"] }
+sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["edev"] }
+hyper = { version = "0.14.26", features = ["http1","client","runtime","tcp"] }
 hyper-openssl = "0.9.2"
 log = "0.4.17"
 openssl = "0.10.52"
 rand = "0.8.5"
-tokio = {version = "1.28.1", features = ["full"] }
+tokio = {version = "1.28.1", features = ["rt","net"] }
 tokio-openssl = "0.6.3"
 dashmap = "5.5.3"
 

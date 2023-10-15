@@ -322,6 +322,9 @@ where
 ///
 /// A [`Schedule`] instance is a handle to a handful of shared state.
 /// Cloning this struct is relatively cheap, and will involve incrementing all internal atomic reference counts.
+///
+/// However, schedules currently do not clean up their background tasks when all are dropped,
+/// thus [`Schedule::shutdown`] will perform a graceful shutdown.
 pub struct Schedule<E, H>
 where
     E: SEEvent,
@@ -336,6 +339,9 @@ where
     pub(crate) handler: Arc<H>,
     // Broadcast to tasks to shut them down
     pub(crate) bc_sd: Sender<()>,
+    // How often schedule background tasks should wake to check for an event end or event start.
+    // Our background tasks sleep intermittently as IEEE 2030.5 client devices may be sleepy.
+    // Thread / Tokio sleeps do not make progress while the device itself is slept.
     pub(crate) tickrate: Duration,
 }
 
