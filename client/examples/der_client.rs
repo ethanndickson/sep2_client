@@ -101,16 +101,15 @@ async fn process_derpl_task(
             }
             (_, Some(ddercl)) => {
                 let _: DefaultDERControl = client.get(&ddercl.href).await?;
-                todo!("Handle DefaultDERControl Case, the user needs to be able to access this somehow.")
+                // Client would apply DefaultDERControl to the device here
             }
-            _ => log::warn!("Found a DERP with no DERControls or default"),
+            _ => log::warn!("Found a DERProgram with no DERControls or default"),
         }
     }
     Ok(())
 }
 
 // Example: Recursively retrieve all resources required to create events for a DER Schedule
-// TODO: Do `.all` unwraps need to be replaced with the request minus query string?
 async fn setup_schedule(
     client: &Client,
     edr: Arc<RwLock<SEDevice>>,
@@ -207,6 +206,9 @@ async fn main() -> Result<()> {
         "https://127.0.0.1:1337",
         "../../certs/client_cert.pem",
         "../../certs/client_private_key.pem",
+        // No KeepAlive
+        None,
+        // Default Poll Tick Rate (10 minutes)
         None,
     )?;
     // Create an event handler with it's own state
