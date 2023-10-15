@@ -199,7 +199,7 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     /// Allows the client to apply the event at the device-level, and determine the correct response code.
     ///
     /// When determining the ResponseStatus to return, refer to Table 27 of IEEE 2030.5-2018
-    async fn event_update(&self, event: &EventInstance<E>, status: EIStatus) -> ResponseStatus;
+    async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus;
 }
 
 type EventsMap<E> = HashMap<MRIDType, EventInstance<E>>;
