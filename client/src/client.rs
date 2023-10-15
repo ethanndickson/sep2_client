@@ -428,17 +428,17 @@ impl Client {
         event: &DERControl,
         status: ResponseStatus,
     ) -> Result<SEPResponse> {
-        if matches!(status, ResponseStatus::EventReceived)
-            && event
-                .response_required
-                .map(|rr| {
-                    rr.contains(
-                        ResponseRequired::MessageReceived
-                            | ResponseRequired::SpecificResponse
-                            | ResponseRequired::ResponseRequired,
-                    )
-                })
-                .ok_or(anyhow!("Event does not contain a ResponseRequired field"))?
+        // TODO: Check combinations of responsestatus & reponserequired
+        if event
+            .response_required
+            .map(|rr| {
+                rr.contains(
+                    ResponseRequired::MessageReceived
+                        | ResponseRequired::SpecificResponse
+                        | ResponseRequired::ResponseRequired,
+                )
+            })
+            .ok_or(anyhow!("Event does not contain a ResponseRequired field"))?
         {
             let resp = DERControlResponse {
                 created_date_time: Some(current_time()),

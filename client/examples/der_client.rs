@@ -38,12 +38,8 @@ struct Handler {}
 // Example definition of how DER event status updates should be handled.
 #[async_trait]
 impl EventHandler<DERControl> for Handler {
-    async fn event_update(
-        &self,
-        event: &EventInstance<DERControl>,
-        status: EIStatus,
-    ) -> ResponseStatus {
-        match status {
+    async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
+        match event.status() {
             EIStatus::Scheduled => {
                 println!("Received DERControl: {:?}", event.event());
             }
@@ -63,7 +59,7 @@ impl EventHandler<DERControl> for Handler {
                 println!("DERControl Started: {:?}", event.event());
             }
         };
-        status.into_der_response()
+        event.status().into_der_response()
     }
 }
 

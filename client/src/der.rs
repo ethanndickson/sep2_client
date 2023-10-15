@@ -24,7 +24,9 @@ impl EventInstance<DERControl> {
     }
 }
 
-/// Given two DERControls, determine which is superseded, update internal states, and return the superseded event
+/// Given two DERControls, determine which is superseded,
+/// mark the superseded event as superseded_by,
+/// and return the superseded event
 pub(crate) fn der_mark_supersede<'a>(
     a: (&'a mut EventInstance<DERControl>, &'a MRIDType),
     b: (&'a mut EventInstance<DERControl>, &'a MRIDType),
@@ -39,9 +41,13 @@ pub(crate) fn der_mark_supersede<'a>(
     };
 
     out.map(|(superseding, superseded)| {
+        log::debug!(
+            "Schedule: Determined that {} superseded {}",
+            superseding.1,
+            superseded.1
+        );
         superseded.0.superseded_by(superseding.1);
-        superseded.0.update_status(EIStatus::Superseded);
-        superseding.0
+        superseded.0
     })
 }
 
@@ -88,12 +94,12 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
                     log::warn!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
-                    self.cancel_dercontrol(&mrid, incoming_status.into()).await;
+                    self.cancel_dercontrol(&mrid, current_status, incoming_status.into()).await;
                 },
                 // Scheduled -> (Cancelled || CancelledRandom)
                 (EIStatus::Scheduled, EventStatus::Cancelled | EventStatus::CancelledRandom) => {
                     log::info!("DERControlSchedule: DERControl ({mrid} has been marked as cancelled by the server. It will not be started");
-                    self.cancel_dercontrol(&mrid, incoming_status.into()).await;
+                    self.cancel_dercontrol(&mrid, current_status, incoming_status.into()).await;
                 },
                 // Scheduled -> Active
                 (EIStatus::Scheduled, EventStatus::Active) => {
@@ -172,16 +178,15 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             // Determine what events this supersedes
             let mut target = ei;
             for (o_mrid, other) in events.iter_mut() {
-                // Determine the superseded event, update internal state accordingly
                 if let Some(superseded) = der_mark_supersede((&mut target, &mrid), (other, o_mrid))
                 {
-                    if superseded.status() == EIStatus::Active {
-                        // Since the newly superseded event is over, tell the client it's finished
-                        (self.handler)
-                            .event_update(superseded, EIStatus::Superseded)
-                            .await;
-                    }
                     // Tell the server we've been informed this event is superseded
+                    let prev_status = superseded.status();
+                    superseded.update_status(EIStatus::Superseded);
+                    if prev_status == EIStatus::Active {
+                        // Since the newly superseded event is over, tell the client it's finished
+                        (self.handler).event_update(superseded).await;
+                    }
                     self.client
                         .send_der_response(
                             self.device.read().await.lfdi,
@@ -222,7 +227,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
             // Notify client and server
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target, EIStatus::Active).await;
+            let resp = self.handler.event_update(target).await;
             self.client
                 .send_der_response(self.device.read().await.lfdi, target.event(), resp)
                 .await;
@@ -251,7 +256,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
             // Notify client and server
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target, EIStatus::Complete).await;
+            let resp = self.handler.event_update(target).await;
             self.client
                 .send_der_response(self.device.read().await.lfdi, target.event(), resp)
                 .await;
@@ -265,12 +270,22 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     /// and those events have not started, they will be marked as scheduled internally - the client will not be informed.
     ///
     /// `cancel_reason` must/will be one of [`EIStatus::Cancelled`] | [`EIStatus::CancelledRandom`] | [`EIStatus::Superseded`]
-    async fn cancel_dercontrol(&mut self, target_mrid: &MRIDType, cancel_reason: EIStatus) {
+    async fn cancel_dercontrol(
+        &mut self,
+        target_mrid: &MRIDType,
+        current_status: EIStatus,
+        cancel_reason: EIStatus,
+    ) {
         let mut events = self.events.write().await;
         events.cancel_event(target_mrid, cancel_reason);
-
         let ei = events.get(target_mrid).unwrap();
-        let resp = (self.handler).event_update(ei, cancel_reason).await;
+        let resp = if current_status == EIStatus::Active {
+            // If the event was active, let the client know it is over
+            (self.handler).event_update(ei).await
+        } else {
+            // If it's not active, the client doesn't even know about this event
+            ResponseStatus::EventCancelled
+        };
         self.client
             .send_der_response(self.device.read().await.lfdi, ei.event(), resp)
             .await;
