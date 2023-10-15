@@ -52,33 +52,30 @@ struct DERControlHandler {
 
 #[async_trait]
 impl EventHandler<DERControl> for DERControlHandler {
-    async fn event_update(
-        &self,
-        event: &EventInstance<DERControl>,
-        status: EIStatus,
-    ) -> ResponseStatus {
-        let log = match status {
+    async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
+        let log = match event.status() {
             EIStatus::Scheduled => {
-                format!("Received DERControl: {}", event.event().mrid())
+                format!("Received DERControl: {}", event.event().mrid().0)
             }
             EIStatus::Active => {
-                format!("DERControl Started: {}", event.event().mrid())
+                format!("DERControl Started: {}", event.event().mrid().0)
             }
             EIStatus::Cancelled => {
-                format!("DERControl Cancelled: {}", event.event().mrid())
+                format!("DERControl Cancelled: {}", event.event().mrid().0)
             }
             EIStatus::Complete => {
-                format!("DERControl Complete: {}", event.event().mrid())
+                format!("DERControl Complete: {}", event.event().mrid().0)
             }
             EIStatus::CancelledRandom => {
-                format!("DERControl Cancelled: {}", event.event().mrid())
+                format!("DERControl Cancelled: {}", event.event().mrid().0)
             }
             EIStatus::Superseded => {
-                format!("DERControl Started: {}", event.event().mrid())
+                format!("DERControl Superseded: {}", event.event().mrid().0)
             }
         };
+        log::debug!("{log}");
         self.logs.write().await.push(log);
-        status.into_der_response()
+        event.status().into_der_response()
     }
 }
 
@@ -98,14 +95,143 @@ fn create_event(status: EventStatusType, count: i64, start: i64, duration: u32) 
 async fn basic_der_scheduler() {
     // T0
     let (mut schedule, logs) = test_setup();
-    // T3 -> T5
-    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 3, 2);
+    // T1 -> T3
+    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 2);
+    // T4 -> T6
+    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
     // T7 -> T9
-    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 7, 2);
-    // T11 -> T13
-    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 11, 2);
+    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    // Schedule in a different roder
+    schedule
+        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    schedule
+        .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
     schedule
         .add_dercontrol(first, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    // Wait until all events end
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    assert_eq!(
+        logs.logs.read().await.as_ref(),
+        vec![
+            "DERControl Started: 1",
+            "DERControl Complete: 1",
+            "DERControl Started: 2",
+            "DERControl Complete: 2",
+            "DERControl Started: 3",
+            "DERControl Complete: 3"
+        ]
+    );
+}
+
+/// Test the scheduler with overlapping events that get superseded
+#[tokio::test]
+async fn superseded_der_scheduler() {
+    // T0
+    let (mut schedule, logs) = test_setup();
+    // T2 -> T3 - Never gets run
+    let superseded = create_event(EventStatusType::Scheduled, 0, current_time().get() + 2, 1);
+    // T1 -> T5
+    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 4);
+    // T4 -> T6
+    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
+    // T7 -> T9
+    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    schedule
+        .add_dercontrol(first, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    schedule
+        .add_dercontrol(superseded, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    // T3
+    schedule
+        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    schedule
+        .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    tokio::time::sleep(Duration::from_secs(8)).await;
+    // T11
+    assert_eq!(
+        logs.logs.read().await.as_ref(),
+        vec![
+            "DERControl Started: 1",
+            "DERControl Superseded: 1",
+            "DERControl Started: 2",
+            "DERControl Complete: 2",
+            "DERControl Started: 3",
+            "DERControl Complete: 3"
+        ]
+    );
+}
+
+/// Test the scheduler with events that get cancelled while in progress
+#[tokio::test]
+async fn cancelling_der_scheduler() {
+    // T0
+    let (mut schedule, logs) = test_setup();
+    // T1 -> T3
+    let mut first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 2);
+    // T4 -> T6
+    let mut second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
+    // T7 -> T9
+    let mut third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    // Schedule in a different order
+    schedule
+        .add_dercontrol(second.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    schedule
+        .add_dercontrol(third.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    schedule
+        .add_dercontrol(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    // Cancel first event while it's running
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    first.event_status.current_status = EventStatusType::Cancelled;
+    schedule
+        .add_dercontrol(first, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    // Cancel second event while it's running
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    second.event_status.current_status = EventStatusType::Cancelled;
+    schedule
+        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    // Cancel third event before it starts
+    third.event_status.current_status = EventStatusType::Cancelled;
+    schedule
+        .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    tokio::time::sleep(Duration::from_secs(4)).await;
+    assert_eq!(
+        logs.logs.read().await.as_ref(),
+        vec![
+            "DERControl Started: 1",
+            "DERControl Cancelled: 1",
+            "DERControl Started: 2",
+            "DERControl Cancelled: 2",
+            // Client never learns about third event
+        ]
+    );
+}
+
+/// Test the scheduler with events that superseded while scheduled, then unsuperseded
+#[tokio::test]
+async fn unsupersede_der_scheduler() {
+    // T0
+    let (mut schedule, logs) = test_setup();
+    // T4 -> T6 (Tentatively superseded)
+    let second = create_event(EventStatusType::Scheduled, 0, current_time().get() + 4, 2);
+    // T1 -> T5
+    let mut first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 4);
+    // T7 -> T9
+    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    schedule
+        .add_dercontrol(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
         .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
@@ -113,6 +239,22 @@ async fn basic_der_scheduler() {
     schedule
         .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
         .await;
-    tokio::time::sleep(Duration::from_secs(15)).await;
-    println!("{:?}", logs.logs.read().await);
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    // Cancel the first event, allowing the second to run, since it was created first
+    first.event_status.current_status = EventStatusType::Cancelled;
+    schedule
+        .add_dercontrol(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    tokio::time::sleep(Duration::from_secs(8)).await;
+    assert_eq!(
+        logs.logs.read().await.as_ref(),
+        vec![
+            "DERControl Started: 1",
+            "DERControl Cancelled: 1",
+            "DERControl Started: 0",
+            "DERControl Complete: 0",
+            "DERControl Started: 3",
+            "DERControl Complete: 3"
+        ]
+    );
 }
