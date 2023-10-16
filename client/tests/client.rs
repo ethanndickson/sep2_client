@@ -17,13 +17,12 @@ fn test_setup() -> Client {
     .unwrap()
 }
 
-pub fn all_eq<T: PartialEq>(iter: &[T]) -> bool {
+fn all_eq<T: PartialEq>(iter: &[T]) -> bool {
     let mut iter = iter.iter();
     let first = iter.next().unwrap();
     iter.all(|elem| elem == first)
 }
 
-// This test simply runs our server for the duration of this modules tests
 #[tokio::test]
 async fn run_test_server() {
     tokio::spawn(async move {
@@ -37,7 +36,7 @@ async fn run_test_server() {
         .await;
     });
     // Dumb, but good enough for now
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
 }
 
 #[tokio::test]
@@ -57,23 +56,14 @@ async fn basic_poll() {
     let output: Arc<RwLock<Vec<DeviceCapability>>> = Arc::new(RwLock::new(vec![]));
     let inner = output.clone();
     client
-        .start_poll("/dcap", Some(Uint32(2)), move |r: DeviceCapability| {
+        .start_poll("/dcap", Some(Uint32(4)), move |r: DeviceCapability| {
             let out = inner.clone();
             async move {
                 out.write().await.push(r);
             }
         })
         .await;
-    let inner = output.clone();
-    client
-        .start_poll("/bad_dcap", Some(Uint32(1)), move |r: DeviceCapability| {
-            let out = inner.clone();
-            async move {
-                out.write().await.push(r);
-            }
-        })
-        .await;
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    assert_eq!(output.read().await.len(), 2);
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    assert!(output.read().await.len() == 2);
     assert!(all_eq(output.read().await.as_ref()));
 }

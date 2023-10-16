@@ -1,3 +1,5 @@
+#![cfg(feature = "der")]
+
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;

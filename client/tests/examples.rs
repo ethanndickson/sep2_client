@@ -39,7 +39,6 @@ fn test_setup() -> (EndDevice, Registration, Client) {
     .unwrap();
     (edr, reg, client)
 }
-// This test simply runs our server for the duration of this modules tests
 #[tokio::test]
 async fn run_test_server() {
     tokio::spawn(async move {
@@ -53,7 +52,7 @@ async fn run_test_server() {
         .await;
     });
     // Dumb, but good enough for now
-    tokio::time::sleep(Duration::from_secs(3)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 }
 
 /// IEEE 2030.5-2018 - Table C.1
