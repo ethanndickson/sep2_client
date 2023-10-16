@@ -423,34 +423,32 @@ impl Client {
         event: &DERControl,
         status: ResponseStatus,
     ) -> Result<SEPResponse> {
-        // TODO: Check combinations of responsestatus & reponserequired
-        if event
-            .response_required
-            .map(|rr| {
-                rr.contains(
-                    ResponseRequired::MessageReceived
-                        | ResponseRequired::SpecificResponse
-                        | ResponseRequired::ResponseRequired,
-                )
-            })
-            .ok_or(anyhow!("Event does not contain a ResponseRequired field"))?
-        {
-            let resp = DERControlResponse {
-                created_date_time: Some(current_time()),
-                end_device_lfdi: lfdi,
-                status: Some(status),
-                subject: event.mrid,
-                href: None,
-            };
-            self.post(
-                event
-                    .reply_to()
-                    .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
-                &resp,
-            )
-            .await
-        } else {
-            bail!("Attempted to send a response for an event that did not require one.")
-        }
+        // As per Table 27 - DER Column
+        match (status, event.response_required) {
+            (ResponseStatus::EventReceived, Some(rr))
+                if rr.contains(ResponseRequired::MessageReceived) => {}
+            (ResponseStatus::EventAcknowledge, Some(rr))
+                if rr.contains(ResponseRequired::ResponseRequired) => {}
+            (ResponseStatus::EventNoDisplay, _) => {
+                bail!("Attempted to send a response unsupported by this function set.")
+            }
+            (_, Some(rr)) if rr.contains(ResponseRequired::SpecificResponse) => {}
+            _ => bail!("Attempted to send a response for an event that did not require one."),
+        };
+
+        let resp = DERControlResponse {
+            created_date_time: Some(current_time()),
+            end_device_lfdi: lfdi,
+            status: Some(status),
+            subject: event.mrid,
+            href: None,
+        };
+        self.post(
+            event
+                .reply_to()
+                .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
+            &resp,
+        )
+        .await
     }
 }
