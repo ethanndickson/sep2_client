@@ -18,10 +18,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::{
-    broadcast::{self, Sender},
-    RwLock,
-};
+use tokio::sync::RwLock;
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
@@ -107,12 +104,6 @@ impl From<SEPResponse> for hyper::Response<Body> {
     }
 }
 
-#[derive(Clone)]
-enum PollTaskOld {
-    ForceRun,
-    Cancel,
-}
-
 type PollCallback = Box<
     dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>> + Send + Sync + 'static,
 >;
@@ -162,7 +153,6 @@ type PollQueue = Arc<RwLock<BinaryHeap<PollTask>>>;
 pub struct Client {
     addr: Arc<String>,
     http: HTTPSClient,
-    broadcaster: Sender<PollTaskOld>,
     polls: PollQueue,
 }
 
@@ -189,11 +179,9 @@ impl Client {
         tickrate: Option<Duration>,
     ) -> Result<Self> {
         let cfg = create_client_tls_cfg(cert_path, pk_path)?;
-        let (tx, _) = broadcast::channel::<PollTaskOld>(1);
         let out = Client {
             addr: server_addr.to_owned().into(),
             http: create_client(cfg, tcp_keepalive),
-            broadcaster: tx,
             polls: Arc::new(RwLock::new(BinaryHeap::new())),
         };
         tokio::spawn(
@@ -342,12 +330,17 @@ impl Client {
 
     /// Forcibly poll & run the callbacks of all routes polled using [`Client::start_poll`]
     pub async fn force_poll(&self) {
-        let _ = self.broadcaster.send(PollTaskOld::ForceRun);
+        let mut polls = self.polls.write().await;
+        while polls.peek().is_some() {
+            let mut cur = polls.pop().unwrap();
+            cur.execute().await;
+            polls.push(cur);
+        }
     }
 
     /// Cancel all poll tasks created using [`Client::start_poll`]
     pub async fn cancel_polls(&self) {
-        let _ = self.broadcaster.send(PollTaskOld::Cancel);
+        self.polls.write().await.clear();
     }
 
     // Create a PUT or POST request
