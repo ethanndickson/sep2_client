@@ -260,3 +260,30 @@ async fn unsupersede_der_scheduler() {
         ]
     );
 }
+
+#[tokio::test]
+async fn schedule_der_differing_primacy() {
+    let (mut schedule, logs) = test_setup();
+    // T1 -> T4
+    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 3);
+    // T2 -> T4
+    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 2, 2);
+    // T3 -> T5
+    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 3, 2);
+    schedule
+        .add_dercontrol(first, PrimacyType::NonContractualServiceProvider)
+        .await;
+    schedule
+        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .await;
+    schedule
+        .add_dercontrol(third, PrimacyType::ContractedPremisesServiceProvider)
+        .await;
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    assert_eq!(
+        logs.logs.read().await.as_ref(),
+        vec!["DERControl Started: 2", "DERControl Complete: 2",]
+    );
+}

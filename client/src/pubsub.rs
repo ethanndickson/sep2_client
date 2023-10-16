@@ -11,7 +11,7 @@ use crate::client::SEPResponse;
 use crate::tls::{create_server_tls_config, TlsServerConfig};
 
 type RouteCallback = Box<
-    dyn Fn(&str) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + Sync + 'static>>
+    dyn Fn(&str) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>>
         + Send
         + Sync
         + 'static,
@@ -31,20 +31,21 @@ impl Router {
 
     async fn router(&self, req: Request<Body>) -> Result<Response<Body>> {
         let path = req.uri().path().to_owned();
-        match req.method() {
-            &Method::POST => {
-                let body = req.into_body();
-                let bytes = hyper::body::to_bytes(body).await?;
-                let xml = String::from_utf8(bytes.to_vec())?;
-                match self.routes.get_mut(&path) {
-                    Some(mut func) => {
+        match self.routes.get_mut(&path) {
+            Some(mut func) => {
+                let method = req.method();
+                match method {
+                    &Method::POST => {
+                        let body = req.into_body();
+                        let bytes = hyper::body::to_bytes(body).await?;
+                        let xml = String::from_utf8(bytes.to_vec())?;
                         let func = func.value_mut();
                         Ok(func(&xml).await.into())
                     }
-                    None => Ok(SEPResponse::NotFound.into()),
+                    _ => Ok(SEPResponse::MethodNotAllowed("POST").into()),
                 }
             }
-            _ => Ok(SEPResponse::MethodNotAllowed("POST").into()),
+            None => Ok(SEPResponse::NotFound.into()),
         }
     }
 }
@@ -77,7 +78,7 @@ impl ClientNotifServer {
     where
         T: SEResource,
         F: Fn(Notification<T>) -> R + Send + Sync + 'static,
-        R: Future<Output = SEPResponse> + Send + Sync + 'static,
+        R: Future<Output = SEPResponse> + Send + 'static,
     {
         let path = path.into();
         let log_path = path.clone();
