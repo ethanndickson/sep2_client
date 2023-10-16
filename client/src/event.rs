@@ -57,7 +57,6 @@ pub enum EIStatus {
     Complete,
     CancelledRandom,
     Superseded,
-    // TODO: ScheduledSuperseded & Unsuperseding unstarted events
 }
 
 impl EIStatus {

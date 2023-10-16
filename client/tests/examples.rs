@@ -1,3 +1,6 @@
+use std::future;
+use std::time::Duration;
+
 use sep2_client::client::Client;
 use sep2_client::client::SEPResponse;
 use sep2_common::packages::dcap::DeviceCapability;
@@ -13,6 +16,7 @@ use sep2_common::{
         types::{PINType, SFDIType},
     },
 };
+use sep2_test_server::TestServer;
 
 // Possible Happy Path Example Tests from the IEEE 2030.5 Specification
 
@@ -34,6 +38,22 @@ fn test_setup() -> (EndDevice, Registration, Client) {
     )
     .unwrap();
     (edr, reg, client)
+}
+// This test simply runs our server for the duration of this modules tests
+#[tokio::test]
+async fn run_test_server() {
+    tokio::spawn(async move {
+        let _ = TestServer::new(
+            "127.0.0.1:1337",
+            "../certs/server_cert.pem",
+            "../certs/server_private_key.pem",
+        )
+        .unwrap()
+        .run(future::pending::<()>())
+        .await;
+    });
+    // Dumb, but good enough for now
+    tokio::time::sleep(Duration::from_secs(3)).await;
 }
 
 /// IEEE 2030.5-2018 - Table C.1
