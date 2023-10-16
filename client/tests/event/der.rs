@@ -40,7 +40,7 @@ fn test_setup() -> (
             client,
             Arc::new(RwLock::new(device)),
             handler.clone(),
-            Duration::from_secs(1),
+            Duration::from_secs(0),
         ),
         handler,
     )
@@ -112,7 +112,7 @@ async fn basic_der_scheduler() {
         .add_dercontrol(first, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     // Wait until all events end
-    tokio::time::sleep(Duration::from_secs(11)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
     assert_eq!(
         logs.logs.read().await.as_ref(),
         vec![
@@ -153,7 +153,7 @@ async fn superseded_der_scheduler() {
     schedule
         .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
         .await;
-    tokio::time::sleep(Duration::from_secs(8)).await;
+    tokio::time::sleep(Duration::from_secs(7)).await;
     // T11
     assert_eq!(
         logs.logs.read().await.as_ref(),
@@ -245,7 +245,7 @@ async fn unsupersede_der_scheduler() {
     schedule
         .add_dercontrol(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
         .await;
-    tokio::time::sleep(Duration::from_secs(8)).await;
+    tokio::time::sleep(Duration::from_secs(7)).await;
     assert_eq!(
         logs.logs.read().await.as_ref(),
         vec![

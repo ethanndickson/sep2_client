@@ -273,7 +273,9 @@ impl Client {
         }
     }
 
-    /// Begin polling the given route on a regular interval, passing the returned [`SEResource`] to the given callback.
+    /// Begin polling the given route by performing GET requests on a regular interval. Passes the returned [`SEResource`] to the given callback.
+    ///
+    /// The callback will not be run if the GET request fails, or the resource cannot be deserialized.
     ///
     /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
     ///
