@@ -104,9 +104,8 @@ impl From<SEPResponse> for hyper::Response<Body> {
     }
 }
 
-type PollCallback = Box<
-    dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>> + Send + Sync + 'static,
->;
+type PollCallback =
+    Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + Sync + 'static>;
 
 struct PollTask {
     callback: PollCallback,
@@ -288,7 +287,7 @@ impl Client {
     ) where
         T: SEResource,
         F: Fn(T) -> R + Send + Sync + Clone + 'static,
-        R: Future<Output = ()> + Send + Sync + 'static,
+        R: Future<Output = ()> + Send + 'static,
     {
         let client = self.clone();
         let path: String = path.into();
@@ -369,14 +368,14 @@ impl Client {
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
         // TODO: Improve error handling
         match res.status() {
+            // We leave the checking of the location header up to the client
             StatusCode::CREATED => {
                 let loc = res
                     .headers()
                     .get(LOCATION)
-                    .ok_or(anyhow!("201 Created - Missing Location Header"))?
-                    .to_str()?
-                    .to_string();
-                Ok(SEPResponse::Created(Some(loc)))
+                    .and_then(|h| h.to_str().ok())
+                    .map(|r| r.to_string());
+                Ok(SEPResponse::Created(loc))
             }
             StatusCode::NO_CONTENT => Ok(SEPResponse::NoContent),
             StatusCode::BAD_REQUEST => bail!("400 Bad Request"),
