@@ -104,25 +104,12 @@ impl From<SEPResponse> for hyper::Response<Body> {
     }
 }
 
-pub trait PollCallback<T: SEResource>: Clone + Send + Sync + 'static {
-    fn callback(&self, resource: T) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
-}
-
-impl<F, R, T: SEResource> PollCallback<T> for F
-where
-    F: Fn(T) -> R + Send + Sync + Clone + 'static,
-    R: Future<Output = ()> + Send + Sync + 'static,
-{
-    fn callback(&self, resource: T) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
-        Box::pin(self(resource))
-    }
-}
-
-type PollHandler =
-    Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + Sync + 'static>;
+type PollCallback = Box<
+    dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>> + Send + Sync + 'static,
+>;
 
 struct PollTask {
-    handler: PollHandler,
+    callback: PollCallback,
     interval: Duration,
     // Since poll intervals are duration based,
     // and not real-world timestamp based, we use [`Instant`]
@@ -130,9 +117,9 @@ struct PollTask {
 }
 
 impl PollTask {
-    /// Run the stored handler, and increment the `next` Instant
+    /// Run the store callback, and increment the `next` Instant
     async fn execute(&mut self) {
-        (self.handler)().await;
+        (self.callback)().await;
         self.next = Instant::now() + self.interval;
     }
 }
@@ -293,19 +280,20 @@ impl Client {
     /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
     ///
     /// All poll events created can be forcibly run using [`Client::force_poll`], such as is required when reconnecting to the server after a period of connectivity loss.
-    pub async fn start_poll<F, T>(
+    pub async fn start_poll<F, T, R>(
         &self,
         path: impl Into<String>,
         poll_rate: Option<Uint32>,
         callback: F,
     ) where
         T: SEResource,
-        F: PollCallback<T>,
+        F: Fn(T) -> R + Send + Sync + Clone + 'static,
+        R: Future<Output = ()> + Send + Sync + 'static,
     {
         let client = self.clone();
         let path: String = path.into();
         let rate = poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get();
-        let new: PollHandler = Box::new(move || {
+        let new: PollCallback = Box::new(move || {
             let path = path.clone();
             let client = client.clone();
             // Each time this closure is called, we need to produce a single future to return,
@@ -318,7 +306,7 @@ impl Client {
                             "Client: Scheduled poll for Resource {} successful.",
                             T::name()
                         );
-                        callback.callback(rsrc).await;
+                        callback(rsrc).await
                     }
                     Err(err) => {
                         log::warn!(
@@ -335,7 +323,7 @@ impl Client {
         });
         let interval = Duration::from_secs(rate as u64);
         let poll = PollTask {
-            handler: new,
+            callback: new,
             interval: interval,
             next: Instant::now() + interval,
         };
