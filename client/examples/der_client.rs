@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use sep2_client::{
     client::{Client, SEPResponse},
     edev::SEDevice,
-    event::{EIStatus, EventHandler, EventInstance, Schedule},
+    event::{EIStatus, EventHandler, EventInstance, Schedule, Scheduler},
     pubsub::ClientNotifServer,
 };
 use sep2_common::packages::{
@@ -92,7 +92,7 @@ async fn process_derpl_task(
                 let dercl: DERControlList = client.get(&dercll.href).await?;
                 for der in dercl.der_control {
                     // Add event to schedule
-                    schedule.add_dercontrol(der, derp.primacy).await;
+                    schedule.add_event(der, derp.primacy).await;
                 }
             }
             (_, Some(ddercl)) => {
@@ -210,7 +210,7 @@ async fn main() -> Result<()> {
     // Create an event handler with it's own state
     let handler = Handler::default();
     // Create a DER FS Schedule (DERControl)
-    let schedule: Schedule<DERControl, Handler> = Schedule::new(
+    let schedule: Schedule<DERControl, Handler> = Scheduler::new(
         client.clone(),
         edr.clone(),
         Arc::new(handler),

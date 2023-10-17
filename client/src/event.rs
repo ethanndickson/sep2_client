@@ -311,6 +311,19 @@ where
     }
 }
 
+/// When https://releases.rs/docs/1.75.0/ becomes stable in December of this year,
+/// we can use trait generic return types, and therefore native async trait functions.
+#[async_trait]
+pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
+    fn new(
+        client: Client,
+        device: Arc<RwLock<SEDevice>>,
+        handler: Arc<H>,
+        tickrate: Duration,
+    ) -> Self;
+    async fn add_event(&mut self, event: E, primacy: PrimacyType);
+}
+
 /// Schedule for a given function set, and a specific server.
 ///
 /// Schedules are bound by the [`SEEvent`] pertaining to a specific function set,
