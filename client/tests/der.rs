@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use sep2_client::{
     client::Client,
     edev::SEDevice,
-    event::{EIStatus, EventHandler, EventInstance, Schedule},
+    event::{EIStatus, EventHandler, EventInstance, Schedule, Scheduler},
     time::current_time,
 };
 use sep2_common::{
@@ -105,13 +105,13 @@ async fn basic_der_scheduler() {
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
     // Schedule in a different roder
     schedule
-        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(second, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(third, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(first, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(first, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     // Wait until all events end
     tokio::time::sleep(Duration::from_secs(10)).await;
@@ -142,18 +142,18 @@ async fn superseded_der_scheduler() {
     // T7 -> T9
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
     schedule
-        .add_dercontrol(first, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(first, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(superseded, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(superseded, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     tokio::time::sleep(Duration::from_secs(3)).await;
     // T3
     schedule
-        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(second, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(third, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     tokio::time::sleep(Duration::from_secs(7)).await;
     // T11
@@ -183,30 +183,30 @@ async fn cancelling_der_scheduler() {
     let mut third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
     // Schedule in a different order
     schedule
-        .add_dercontrol(second.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(second.clone(), PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(third.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(third.clone(), PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
         .await;
     // Cancel first event while it's running
     tokio::time::sleep(Duration::from_secs(3)).await;
     first.event_status.current_status = EventStatusType::Cancelled;
     schedule
-        .add_dercontrol(first, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(first, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     // Cancel second event while it's running
     tokio::time::sleep(Duration::from_secs(3)).await;
     second.event_status.current_status = EventStatusType::Cancelled;
     schedule
-        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(second, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     // Cancel third event before it starts
     third.event_status.current_status = EventStatusType::Cancelled;
     schedule
-        .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(third, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     tokio::time::sleep(Duration::from_secs(4)).await;
     assert_eq!(
@@ -233,19 +233,19 @@ async fn unsupersede_der_scheduler() {
     // T7 -> T9
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
     schedule
-        .add_dercontrol(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(second, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(third, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(third, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     tokio::time::sleep(Duration::from_secs(3)).await;
     // Cancel the first event, allowing the second to run, since it was created first
     first.event_status.current_status = EventStatusType::Cancelled;
     schedule
-        .add_dercontrol(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
         .await;
     tokio::time::sleep(Duration::from_secs(7)).await;
     assert_eq!(
@@ -271,13 +271,13 @@ async fn schedule_der_differing_primacy() {
     // T3 -> T5
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 3, 2);
     schedule
-        .add_dercontrol(first, PrimacyType::NonContractualServiceProvider)
+        .add_event(first, PrimacyType::NonContractualServiceProvider)
         .await;
     schedule
-        .add_dercontrol(second, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(second, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_dercontrol(third, PrimacyType::ContractedPremisesServiceProvider)
+        .add_event(third, PrimacyType::ContractedPremisesServiceProvider)
         .await;
 
     tokio::time::sleep(Duration::from_secs(5)).await;

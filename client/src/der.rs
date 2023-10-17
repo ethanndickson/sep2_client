@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use async_trait::async_trait;
 use sep2_common::packages::{
     der::DERControl,
     identification::ResponseStatus,
@@ -11,7 +12,7 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 use crate::{
     client::Client,
     edev::SEDevice,
-    event::{EIStatus, EventHandler, EventInstance, Events, Schedule},
+    event::{EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
     time::current_time,
 };
 
@@ -52,10 +53,99 @@ pub(crate) fn der_mark_supersede<'a>(
 }
 
 impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
+    async fn der_start_task(self, mut rx: Receiver<()>) {
+        loop {
+            // Intermittently sleep until next event start time
+            tokio::select! {
+                _ = tokio::time::sleep(self.tickrate) => (),
+                _ = rx.recv() => {
+                    log::info!("DERControlSchedule: Shutting down event start task...");
+                    break
+                },
+            }
+            let mut events = self.events.write().await;
+            let mrid = match events.next_start() {
+                Some((time, mrid)) if time < current_time().get() => mrid,
+                // If no next, or not time yet
+                _ => continue,
+            };
+
+            // Mark event as complete
+            events.update_event(&mrid, EIStatus::Active);
+
+            // Notify client and server
+            let target = events.get(&mrid).unwrap();
+            let resp = self.handler.event_update(target).await;
+            self.client
+                .send_der_response(self.device.read().await.lfdi, target.event(), resp)
+                .await;
+        }
+    }
+
+    async fn der_end_task(self, mut rx: Receiver<()>) {
+        loop {
+            // Intermittently sleep until next event end time
+            tokio::select! {
+                _ = tokio::time::sleep(self.tickrate) => (),
+                _ = rx.recv() => {
+                    log::info!("DERControlSchedule: Shutting down event end task...");
+                    break
+                },
+            }
+            let mut events = self.events.write().await;
+            let mrid = match events.next_end() {
+                Some((time, mrid)) if time < current_time().get() => mrid,
+                // If no next, or not time yet
+                _ => continue,
+            };
+
+            // Mark event as complete
+            events.update_event(&mrid, EIStatus::Complete);
+
+            // Notify client and server
+            let target = events.get(&mrid).unwrap();
+            let resp = self.handler.event_update(target).await;
+            self.client
+                .send_der_response(self.device.read().await.lfdi, target.event(), resp)
+                .await;
+        }
+    }
+
+    /// Cancel an [`EventInstance<DerControl>`] that has been previously added to the schedule
+    ///
+    /// Update the internal [`EventInstance<DerControl>`] state.
+    /// If the event is responsible for superseding other events,
+    /// and those events have not started, they will be marked as scheduled internally - the client will not be informed.
+    ///
+    /// `cancel_reason` must/will be one of [`EIStatus::Cancelled`] | [`EIStatus::CancelledRandom`] | [`EIStatus::Superseded`]
+    async fn cancel_dercontrol(
+        &mut self,
+        target_mrid: &MRIDType,
+        current_status: EIStatus,
+        cancel_reason: EIStatus,
+    ) {
+        let mut events = self.events.write().await;
+        events.cancel_event(target_mrid, cancel_reason);
+        let ei = events.get(target_mrid).unwrap();
+        let resp = if current_status == EIStatus::Active {
+            // If the event was active, let the client know it is over
+            (self.handler).event_update(ei).await
+        } else {
+            // If it's not active, the client doesn't even know about this event
+            ResponseStatus::EventCancelled
+        };
+        self.client
+            .send_der_response(self.device.read().await.lfdi, ei.event(), resp)
+            .await;
+    }
+}
+
+#[async_trait]
+impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERControl, H> {
     /// Create a schedule for the given [`Client`] & it's [`EndDevice`] representation.
     ///
     /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
-    pub fn new(
+    fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
         handler: Arc<H>,
@@ -75,10 +165,9 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         tokio::spawn(out.clone().der_end_task(tx.subscribe()));
         out
     }
-
     /// Add a [`DERControl`] Event to the schedule.
     /// Subsequent retrievals/notifications of any and all [`DERControl`] resources should call this function.
-    pub async fn add_dercontrol(&mut self, event: DERControl, primacy: PrimacyType) {
+    async fn add_event(&mut self, event: DERControl, primacy: PrimacyType) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
 
@@ -203,91 +292,5 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             // Add it to our schedule
             events.insert(&mrid, target);
         };
-    }
-
-    async fn der_start_task(self, mut rx: Receiver<()>) {
-        loop {
-            // Intermittently sleep until next event start time
-            tokio::select! {
-                _ = tokio::time::sleep(self.tickrate) => (),
-                _ = rx.recv() => {
-                    log::info!("DERControlSchedule: Shutting down event start task...");
-                    break
-                },
-            }
-            let mut events = self.events.write().await;
-            let mrid = match events.next_start() {
-                Some((time, mrid)) if time < current_time().get() => mrid,
-                // If no next, or not time yet
-                _ => continue,
-            };
-
-            // Mark event as complete
-            events.update_event(&mrid, EIStatus::Active);
-
-            // Notify client and server
-            let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
-            self.client
-                .send_der_response(self.device.read().await.lfdi, target.event(), resp)
-                .await;
-        }
-    }
-
-    async fn der_end_task(self, mut rx: Receiver<()>) {
-        loop {
-            // Intermittently sleep until next event end time
-            tokio::select! {
-                _ = tokio::time::sleep(self.tickrate) => (),
-                _ = rx.recv() => {
-                    log::info!("DERControlSchedule: Shutting down event end task...");
-                    break
-                },
-            }
-            let mut events = self.events.write().await;
-            let mrid = match events.next_end() {
-                Some((time, mrid)) if time < current_time().get() => mrid,
-                // If no next, or not time yet
-                _ => continue,
-            };
-
-            // Mark event as complete
-            events.update_event(&mrid, EIStatus::Complete);
-
-            // Notify client and server
-            let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
-            self.client
-                .send_der_response(self.device.read().await.lfdi, target.event(), resp)
-                .await;
-        }
-    }
-
-    /// Cancel an [`EventInstance<DerControl>`] that has been previously added to the schedule
-    ///
-    /// Update the internal [`EventInstance<DerControl>`] state.
-    /// If the event is responsible for superseding other events,
-    /// and those events have not started, they will be marked as scheduled internally - the client will not be informed.
-    ///
-    /// `cancel_reason` must/will be one of [`EIStatus::Cancelled`] | [`EIStatus::CancelledRandom`] | [`EIStatus::Superseded`]
-    async fn cancel_dercontrol(
-        &mut self,
-        target_mrid: &MRIDType,
-        current_status: EIStatus,
-        cancel_reason: EIStatus,
-    ) {
-        let mut events = self.events.write().await;
-        events.cancel_event(target_mrid, cancel_reason);
-        let ei = events.get(target_mrid).unwrap();
-        let resp = if current_status == EIStatus::Active {
-            // If the event was active, let the client know it is over
-            (self.handler).event_update(ei).await
-        } else {
-            // If it's not active, the client doesn't even know about this event
-            ResponseStatus::EventCancelled
-        };
-        self.client
-            .send_der_response(self.device.read().await.lfdi, ei.event(), resp)
-            .await;
     }
 }
