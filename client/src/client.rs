@@ -103,12 +103,26 @@ impl From<SEPResponse> for hyper::Response<Body> {
         res
     }
 }
+// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
+pub trait PollCallback<T: SEResource>: Clone + Send + Sync + 'static {
+    fn callback(&self, resource: T) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+}
 
-type PollCallback =
+impl<F, R, T: SEResource> PollCallback<T> for F
+where
+    F: Fn(T) -> R + Send + Sync + Clone + 'static,
+    R: Future<Output = ()> + Send + Sync + 'static,
+{
+    fn callback(&self, resource: T) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
+        Box::pin(self(resource))
+    }
+}
+
+type PollHandler =
     Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + Sync + 'static>;
 
 struct PollTask {
-    callback: PollCallback,
+    handler: PollHandler,
     interval: Duration,
     // Since poll intervals are duration based,
     // and not real-world timestamp based, we use [`Instant`]
@@ -116,9 +130,9 @@ struct PollTask {
 }
 
 impl PollTask {
-    /// Run the store callback, and increment the `next` Instant
+    /// Run the stored handler, and increment the `next` Instant
     async fn execute(&mut self) {
-        (self.callback)().await;
+        (self.handler)().await;
         self.next = Instant::now() + self.interval;
     }
 }
@@ -279,20 +293,19 @@ impl Client {
     /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
     ///
     /// All poll events created can be forcibly run using [`Client::force_poll`], such as is required when reconnecting to the server after a period of connectivity loss.
-    pub async fn start_poll<F, T, R>(
+    pub async fn start_poll<F, T>(
         &self,
         path: impl Into<String>,
         poll_rate: Option<Uint32>,
         callback: F,
     ) where
         T: SEResource,
-        F: Fn(T) -> R + Send + Sync + Clone + 'static,
-        R: Future<Output = ()> + Send + 'static,
+        F: PollCallback<T>,
     {
         let client = self.clone();
         let path: String = path.into();
         let rate = poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get();
-        let new: PollCallback = Box::new(move || {
+        let new: PollHandler = Box::new(move || {
             let path = path.clone();
             let client = client.clone();
             // Each time this closure is called, we need to produce a single future to return,
@@ -305,7 +318,7 @@ impl Client {
                             "Client: Scheduled poll for Resource {} successful.",
                             T::name()
                         );
-                        callback(rsrc).await
+                        callback.callback(rsrc).await;
                     }
                     Err(err) => {
                         log::warn!(
@@ -322,7 +335,7 @@ impl Client {
         });
         let interval = Duration::from_secs(rate as u64);
         let poll = PollTask {
-            callback: new,
+            handler: new,
             interval: interval,
             next: Instant::now() + interval,
         };

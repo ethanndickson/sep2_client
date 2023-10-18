@@ -10,7 +10,28 @@ use tokio_openssl::SslStream;
 use crate::client::SEPResponse;
 use crate::tls::{create_server_tls_config, TlsServerConfig};
 
-type RouteCallback = Box<
+// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
+pub trait RouteCallback<T: SEResource>: Send + Sync + 'static {
+    fn callback(
+        &self,
+        notif: Notification<T>,
+    ) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>>;
+}
+
+impl<F, R, T: SEResource> RouteCallback<T> for F
+where
+    F: Fn(Notification<T>) -> R + Send + Sync + 'static,
+    R: Future<Output = SEPResponse> + Send + 'static,
+{
+    fn callback(
+        &self,
+        notif: Notification<T>,
+    ) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>> {
+        Box::pin(self(notif))
+    }
+}
+
+type RouteHandler = Box<
     dyn Fn(&str) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>>
         + Send
         + Sync
@@ -19,7 +40,7 @@ type RouteCallback = Box<
 
 /// A lightweight
 struct Router {
-    routes: DashMap<String, RouteCallback>,
+    routes: DashMap<String, RouteHandler>,
 }
 
 impl Router {
@@ -74,20 +95,19 @@ impl ClientNotifServer {
     /// - A `Fn` callback accepting a [`Notification<T>`]`, where T is the expected [`SEResource`] on the route  
     ///
     /// [`SEResource`]: sep2_common::traits::SEResource
-    pub fn add<F, T, R>(self, path: impl Into<String>, callback: F) -> Self
+    pub fn add<F, T>(self, path: impl Into<String>, callback: F) -> Self
     where
         T: SEResource,
-        F: Fn(Notification<T>) -> R + Send + Sync + 'static,
-        R: Future<Output = SEPResponse> + Send + 'static,
+        F: RouteCallback<T>,
     {
         let path = path.into();
         let log_path = path.clone();
-        let new: RouteCallback = Box::new(move |e| {
+        let new: RouteHandler = Box::new(move |e| {
             let e = deserialize::<Notification<T>>(e);
             match e {
                 Ok(resource) => {
                     log::debug!("NotifServer: Successfully deserialized a resource on {log_path}");
-                    Box::pin(callback(resource))
+                    Box::pin(callback.callback(resource))
                 }
                 Err(err) => {
                     log::error!("NotifServer: Failed to deserialize resource on {log_path}: {err}");

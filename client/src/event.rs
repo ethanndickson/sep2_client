@@ -190,6 +190,7 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
     })
 }
 
+// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait]
 pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     /// Called whenever the state of an event is updated such that a response to the server is required.
@@ -311,8 +312,7 @@ where
     }
 }
 
-/// When https://releases.rs/docs/1.75.0/ becomes stable in December of this year,
-/// we can use trait generic return types, and therefore native async trait functions.
+// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait]
 pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
     fn new(
