@@ -1,6 +1,6 @@
 use sep2_client::{
     client::{Client, SEPResponse},
-    pubsub::ClientNotifServer,
+    pubsub::{ClientNotifServer, RouteCallback},
 };
 use sep2_common::packages::{dcap::DeviceCapability, edev::EndDevice, pubsub::Notification};
 use std::{future, time::Duration};
@@ -17,6 +17,18 @@ fn test_setup() -> Client {
     .unwrap()
 }
 
+#[derive(Clone)]
+struct DCAPHandler;
+
+impl RouteCallback<DeviceCapability> for DCAPHandler {
+    fn callback(
+        &self,
+        _: Notification<DeviceCapability>,
+    ) -> std::pin::Pin<Box<dyn future::Future<Output = SEPResponse> + Send + 'static>> {
+        Box::pin(async move { SEPResponse::Created(None) })
+    }
+}
+
 #[tokio::test]
 async fn run_notif_server() {
     let client = ClientNotifServer::new(
@@ -25,9 +37,7 @@ async fn run_notif_server() {
         "../certs/client_private_key.pem",
     )
     .unwrap()
-    .add("/dcap", |_: Notification<DeviceCapability>| async move {
-        SEPResponse::Created(None)
-    })
+    .add("/dcap", DCAPHandler)
     .add("/edev", |_: Notification<EndDevice>| async move {
         SEPResponse::Created(None)
     });
