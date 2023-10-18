@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use sep2_common::packages::{
     der::DERControl,
     identification::ResponseStatus,
@@ -140,7 +139,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     }
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERControl, H> {
     /// Create a schedule for the given [`Client`] & it's [`EndDevice`] representation.
     ///

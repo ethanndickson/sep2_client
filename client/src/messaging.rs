@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use sep2_common::packages::{messaging::TextMessage, types::PrimacyType};
 use tokio::sync::RwLock;
 
@@ -13,7 +12,7 @@ use crate::{
 // Messaging Function Set
 impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {}
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMessage, H> {
     #[allow(unused_variables)]
     fn new(

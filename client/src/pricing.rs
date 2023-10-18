@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use sep2_common::packages::{pricing::TimeTariffInterval, types::PrimacyType};
 use tokio::sync::RwLock;
 
@@ -13,7 +12,7 @@ use crate::{
 // Pricing Function Set
 impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {}
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
     for Schedule<TimeTariffInterval, H>
 {

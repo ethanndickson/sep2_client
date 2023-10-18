@@ -12,7 +12,6 @@ use std::{
 };
 
 use crate::{client::Client, edev::SEDevice, time::current_time};
-use async_trait::async_trait;
 use rand::Rng;
 use sep2_common::packages::{
     identification::ResponseStatus,
@@ -191,7 +190,7 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
 }
 
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
-#[async_trait]
+#[async_trait::async_trait]
 pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     /// Called whenever the state of an event is updated such that a response to the server is required.
     /// Type is bound by an [`SEEvent`] pertaining to a specific function set.
@@ -313,7 +312,7 @@ where
 }
 
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
-#[async_trait]
+#[async_trait::async_trait]
 pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
     fn new(
         client: Client,

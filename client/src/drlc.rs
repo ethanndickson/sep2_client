@@ -4,7 +4,6 @@ use crate::event::{EventHandler, Schedule};
 
 use std::{sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use sep2_common::packages::types::PrimacyType;
 use tokio::sync::RwLock;
 
@@ -17,7 +16,7 @@ use crate::{
 // Demand Response Load Control Function Set
 impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {}
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
     for Schedule<EndDeviceControl, H>
 {

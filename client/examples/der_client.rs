@@ -3,7 +3,6 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use sep2_client::{
     client::{Client, SEPResponse},
     edev::SEDevice,
@@ -36,7 +35,7 @@ impl TypeMapKey for ReadingResource {
 struct Handler {}
 
 // Example definition of how DER event status updates should be handled.
-#[async_trait]
+#[async_trait::async_trait]
 impl EventHandler<DERControl> for Handler {
     async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
         match event.status() {

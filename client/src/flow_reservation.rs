@@ -4,7 +4,6 @@ use crate::event::{EventHandler, Schedule};
 
 use std::{sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use sep2_common::packages::types::PrimacyType;
 use tokio::sync::RwLock;
 
@@ -17,7 +16,7 @@ use crate::{
 // Flow Reservation Function Set
 impl<H: EventHandler<FlowReservationResponse>> Schedule<FlowReservationResponse, H> {}
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse, H>
     for Schedule<FlowReservationResponse, H>
 {

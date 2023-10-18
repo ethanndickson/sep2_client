@@ -95,10 +95,9 @@ impl ClientNotifServer {
     /// - A `Fn` callback accepting a [`Notification<T>`]`, where T is the expected [`SEResource`] on the route  
     ///
     /// [`SEResource`]: sep2_common::traits::SEResource
-    pub fn add<F, T>(self, path: impl Into<String>, callback: F) -> Self
+    pub fn add<T>(self, path: impl Into<String>, callback: impl RouteCallback<T>) -> Self
     where
         T: SEResource,
-        F: RouteCallback<T>,
     {
         let path = path.into();
         let log_path = path.clone();

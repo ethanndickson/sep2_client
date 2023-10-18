@@ -2,7 +2,6 @@
 
 use std::{sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use sep2_client::{
     client::Client,
     edev::SEDevice,
@@ -52,7 +51,7 @@ struct DERControlHandler {
     logs: RwLock<Vec<String>>,
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl EventHandler<DERControl> for DERControlHandler {
     async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
         let log = match event.status() {
