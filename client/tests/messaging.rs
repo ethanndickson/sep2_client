@@ -1,4 +1,4 @@
-#![cfg(feature = "der")]
+#![cfg(feature = "messaging")]
 
 use std::{sync::Arc, time::Duration};
 
@@ -10,8 +10,8 @@ use sep2_client::{
 };
 use sep2_common::{
     packages::{
-        der::DERControl,
         identification::ResponseStatus,
+        messaging::TextMessage,
         objects::EventStatusType,
         primitives::{HexBinary128, Int64, Uint32},
         types::PrimacyType,
@@ -21,8 +21,8 @@ use sep2_common::{
 use tokio::sync::RwLock;
 
 fn test_setup() -> (
-    Schedule<DERControl, DERControlHandler>,
-    Arc<DERControlHandler>,
+    Schedule<TextMessage, TextMessageHandler>,
+    Arc<TextMessageHandler>,
 ) {
     let client = Client::new(
         "https://127.0.0.1:1337",
@@ -33,7 +33,7 @@ fn test_setup() -> (
     )
     .unwrap();
     let device = SEDevice::new_from_cert("../certs/client_cert.pem").unwrap();
-    let handler = Arc::new(DERControlHandler {
+    let handler = Arc::new(TextMessageHandler {
         logs: RwLock::new(vec![]),
     });
     (
@@ -47,31 +47,31 @@ fn test_setup() -> (
     )
 }
 
-struct DERControlHandler {
+struct TextMessageHandler {
     logs: RwLock<Vec<String>>,
 }
 
 #[async_trait::async_trait]
-impl EventHandler<DERControl> for DERControlHandler {
-    async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
+impl EventHandler<TextMessage> for TextMessageHandler {
+    async fn event_update(&self, event: &EventInstance<TextMessage>) -> ResponseStatus {
         let log = match event.status() {
             EIStatus::Scheduled => {
-                format!("Received DERControl: {}", event.event().mrid().0)
+                format!("Received TextMessage: {}", event.event().mrid().0)
             }
             EIStatus::Active => {
-                format!("DERControl Started: {}", event.event().mrid().0)
+                format!("TextMessage Started: {}", event.event().mrid().0)
             }
             EIStatus::Cancelled => {
-                format!("DERControl Cancelled: {}", event.event().mrid().0)
+                format!("TextMessage Cancelled: {}", event.event().mrid().0)
             }
             EIStatus::Complete => {
-                format!("DERControl Complete: {}", event.event().mrid().0)
+                format!("TextMessage Complete: {}", event.event().mrid().0)
             }
             EIStatus::CancelledRandom => {
-                format!("DERControl Cancelled: {}", event.event().mrid().0)
+                format!("TextMessage Cancelled: {}", event.event().mrid().0)
             }
             EIStatus::Superseded => {
-                format!("DERControl Superseded: {}", event.event().mrid().0)
+                format!("TextMessage Superseded: {}", event.event().mrid().0)
             }
         };
         log::debug!("{log}");
@@ -81,8 +81,8 @@ impl EventHandler<DERControl> for DERControlHandler {
 }
 
 // Create an event, as would be acquired from the server
-fn create_event(status: EventStatusType, count: i64, start: i64, duration: u32) -> DERControl {
-    let mut out = DERControl::default();
+fn create_event(status: EventStatusType, count: i64, start: i64, duration: u32) -> TextMessage {
+    let mut out = TextMessage::default();
     out.mrid = HexBinary128(count.try_into().unwrap());
     out.creation_time = Int64(count);
     out.event_status.current_status = status;
@@ -93,7 +93,7 @@ fn create_event(status: EventStatusType, count: i64, start: i64, duration: u32) 
 
 /// Test the scheduler with non-overlapping events
 #[tokio::test]
-async fn basic_der_scheduler() {
+async fn basic_msg_scheduler() {
     // T0
     let (mut schedule, logs) = test_setup();
     // T1 -> T3
@@ -117,61 +117,60 @@ async fn basic_der_scheduler() {
     assert_eq!(
         logs.logs.read().await.as_ref(),
         vec![
-            "DERControl Started: 1",
-            "DERControl Complete: 1",
-            "DERControl Started: 2",
-            "DERControl Complete: 2",
-            "DERControl Started: 3",
-            "DERControl Complete: 3"
+            "TextMessage Started: 1",
+            "TextMessage Complete: 1",
+            "TextMessage Started: 2",
+            "TextMessage Complete: 2",
+            "TextMessage Started: 3",
+            "TextMessage Complete: 3"
         ]
     );
 }
 
-/// Test the scheduler with overlapping events that get superseded
+/// Test the scheduler with overlapping events that would get superseded in another schedule, but don't in messaging
 #[tokio::test]
-async fn superseded_der_scheduler() {
+async fn superseded_msg_scheduler() {
     // T0
     let (mut schedule, logs) = test_setup();
-    // T2 -> T3 - Never gets run
-    let superseded = create_event(EventStatusType::Scheduled, 0, current_time().get() + 2, 1);
     // T1 -> T5
     let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 4);
     // T4 -> T6
     let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
     // T7 -> T9
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    // T2 -> T3
+    let fourth = create_event(EventStatusType::Scheduled, 4, current_time().get() + 2, 1);
     schedule
         .add_event(first, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
-        .add_event(superseded, PrimacyType::InHomeEnergyManagementSystem)
+        .add_event(fourth, PrimacyType::InHomeEnergyManagementSystem)
         .await;
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    // T3
     schedule
         .add_event(second, PrimacyType::InHomeEnergyManagementSystem)
         .await;
     schedule
         .add_event(third, PrimacyType::InHomeEnergyManagementSystem)
         .await;
-    tokio::time::sleep(Duration::from_secs(7)).await;
-    // T11
+    tokio::time::sleep(Duration::from_secs(10)).await;
     assert_eq!(
         logs.logs.read().await.as_ref(),
         vec![
-            "DERControl Started: 1",
-            "DERControl Superseded: 1",
-            "DERControl Started: 2",
-            "DERControl Complete: 2",
-            "DERControl Started: 3",
-            "DERControl Complete: 3"
+            "TextMessage Started: 1",
+            "TextMessage Started: 4",
+            "TextMessage Complete: 4",
+            "TextMessage Started: 2",
+            "TextMessage Complete: 1",
+            "TextMessage Complete: 2",
+            "TextMessage Started: 3",
+            "TextMessage Complete: 3"
         ]
     );
 }
 
 /// Test the scheduler with events that get cancelled while in progress
 #[tokio::test]
-async fn cancelling_der_scheduler() {
+async fn cancelling_msg_scheduler() {
     // T0
     let (mut schedule, logs) = test_setup();
     // T1 -> T3
@@ -211,64 +210,25 @@ async fn cancelling_der_scheduler() {
     assert_eq!(
         logs.logs.read().await.as_ref(),
         vec![
-            "DERControl Started: 1",
-            "DERControl Cancelled: 1",
-            "DERControl Started: 2",
-            "DERControl Cancelled: 2",
+            "TextMessage Started: 1",
+            "TextMessage Cancelled: 1",
+            "TextMessage Started: 2",
+            "TextMessage Cancelled: 2",
             // Client never learns about third event
         ]
     );
 }
 
-/// Test the scheduler with events that superseded while scheduled, then unsuperseded
+/// Test that events with differing primacys do not effect event execution order
 #[tokio::test]
-async fn unsupersede_der_scheduler() {
-    // T0
+async fn schedule_msg_differing_primacy() {
     let (mut schedule, logs) = test_setup();
-    // T4 -> T6 (Tentatively superseded)
-    let second = create_event(EventStatusType::Scheduled, 0, current_time().get() + 4, 2);
-    // T1 -> T5
-    let mut first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 4);
+    // T1 -> T3
+    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 2);
+    // T4 -> T6
+    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
     // T7 -> T9
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
-    schedule
-        .add_event(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
-        .await;
-    schedule
-        .add_event(second, PrimacyType::InHomeEnergyManagementSystem)
-        .await;
-    schedule
-        .add_event(third, PrimacyType::InHomeEnergyManagementSystem)
-        .await;
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    // Cancel the first event, allowing the second to run, since it was created first
-    first.event_status.current_status = EventStatusType::Cancelled;
-    schedule
-        .add_event(first.clone(), PrimacyType::InHomeEnergyManagementSystem)
-        .await;
-    tokio::time::sleep(Duration::from_secs(7)).await;
-    assert_eq!(
-        logs.logs.read().await.as_ref(),
-        vec![
-            "DERControl Started: 1",
-            "DERControl Cancelled: 1",
-            "DERControl Started: 0",
-            "DERControl Complete: 0",
-            "DERControl Started: 3",
-            "DERControl Complete: 3"
-        ]
-    );
-}
-
-#[tokio::test]
-async fn schedule_der_differing_primacy() {
-    let (mut schedule, logs) = test_setup();
-    // T1 -> T4
-    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 3);
-    // T2 -> T4
-    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 2, 2);
-    // T3 -> T5
-    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 3, 2);
     schedule
         .add_event(first, PrimacyType::NonContractualServiceProvider)
         .await;
@@ -279,10 +239,17 @@ async fn schedule_der_differing_primacy() {
         .add_event(third, PrimacyType::ContractedPremisesServiceProvider)
         .await;
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     assert_eq!(
         logs.logs.read().await.as_ref(),
-        vec!["DERControl Started: 2", "DERControl Complete: 2",]
+        [
+            "TextMessage Started: 1",
+            "TextMessage Complete: 1",
+            "TextMessage Started: 2",
+            "TextMessage Complete: 2",
+            "TextMessage Started: 3",
+            "TextMessage Complete: 3"
+        ]
     );
 }

@@ -58,10 +58,9 @@ pub enum EIStatus {
     Superseded,
 }
 
-impl EIStatus {
-    /// Given the status of an EventInstance, convert it to a ResponseStatus, as per the DER FS
-    pub fn into_der_response(self) -> ResponseStatus {
-        match self {
+impl From<EIStatus> for ResponseStatus {
+    fn from(value: EIStatus) -> Self {
+        match value {
             EIStatus::Scheduled => ResponseStatus::EventReceived,
             EIStatus::Active => ResponseStatus::EventStarted,
             EIStatus::Cancelled => ResponseStatus::EventCancelled,
@@ -85,7 +84,7 @@ impl From<EventStatusType> for EIStatus {
 }
 
 impl<E: SEEvent> EventInstance<E> {
-    pub(crate) fn new(event: E, primacy: PrimacyType) -> Self {
+    pub(crate) fn new(primacy: PrimacyType, event: E) -> Self {
         let start: i64 = event.interval().start.get();
         let end: i64 = start + i64::from(event.interval().duration.get());
         EventInstance {
@@ -320,6 +319,8 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
         handler: Arc<H>,
         tickrate: Duration,
     ) -> Self;
+    // TODO: This needs to take into account a server ID,
+    // in order to determine when another server produces a superseding event
     async fn add_event(&mut self, event: E, primacy: PrimacyType);
 }
 

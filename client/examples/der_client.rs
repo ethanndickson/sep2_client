@@ -58,7 +58,7 @@ impl EventHandler<DERControl> for Handler {
                 println!("DERControl Started: {:?}", event.event());
             }
         };
-        event.status().into_der_response()
+        event.status().into()
     }
 }
 

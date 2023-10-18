@@ -23,17 +23,21 @@ use tokio::sync::RwLock;
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
 #[cfg(feature = "der")]
-use crate::time::current_time;
-#[cfg(feature = "der")]
-use sep2_common::{
-    packages::{
-        der::DERControl,
-        identification::{ResponseRequired, ResponseStatus},
-        primitives::HexBinary160,
-        response::DERControlResponse,
+use {
+    crate::time::current_time,
+    sep2_common::{
+        packages::{
+            der::DERControl,
+            identification::{ResponseRequired, ResponseStatus},
+            primitives::HexBinary160,
+            response::DERControlResponse,
+        },
+        traits::SERespondableResource,
     },
-    traits::SERespondableResource,
 };
+
+#[cfg(feature = "messaging")]
+use sep2_common::packages::{messaging::TextMessage, response::TextResponse};
 
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
 pub enum SEPResponse {
@@ -399,14 +403,87 @@ impl Client {
         }
     }
 
+    #[cfg(feature = "messaging")]
+    pub(crate) async fn auto_msg_response(
+        &self,
+        lfdi: HexBinary160,
+        event: &TextMessage,
+        status: ResponseStatus,
+    ) {
+        match self.send_msg_response(lfdi, event, status).await {
+            Ok(
+                e @ (SEPResponse::BadRequest(_)
+                | SEPResponse::NotFound
+                | SEPResponse::MethodNotAllowed(_)),
+            ) => log::warn!(
+                "Client: Messaging response POST attempt failed with HTTP status code: {}",
+                e
+            ),
+            Err(e) => log::warn!(
+                "Client: Messaging response POST attempted failed with reason: {}",
+                e
+            ),
+            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
+                log::info!(
+                    "Client: Messaging response POST attempt succeeded with reason: {}",
+                    r
+                )
+            }
+        }
+    }
+
+    #[cfg(feature = "messaging")]
+    pub async fn send_msg_response(
+        &self,
+        lfdi: HexBinary160,
+        event: &TextMessage,
+        status: ResponseStatus,
+    ) -> Result<SEPResponse> {
+        match (status, event.response_required) {
+            (ResponseStatus::EventReceived, Some(rr))
+                if rr.contains(ResponseRequired::MessageReceived) => {}
+            (ResponseStatus::EventStarted, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventCompleted, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventSuperseded, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventAcknowledge, Some(rr))
+                if rr.contains(ResponseRequired::ResponseRequired) => {}
+            (ResponseStatus::EventNoDisplay, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventAbortedServer, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventAbortedProgram, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventExpired, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            _ => bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field.")
+        };
+        let resp = TextResponse {
+            created_date_time: Some(current_time()),
+            end_device_lfdi: lfdi,
+            status: Some(status),
+            subject: event.mrid,
+            href: None,
+        };
+        self.post(
+            event
+                .reply_to()
+                .ok_or(anyhow!("Event does not contain a ReplyToField"))?,
+            &resp,
+        )
+        .await
+    }
+
     #[cfg(feature = "der")]
-    pub(crate) async fn send_der_response(
+    pub(crate) async fn auto_der_response(
         &self,
         lfdi: HexBinary160,
         event: &DERControl,
         status: ResponseStatus,
     ) {
-        match self.do_der_response(lfdi, event, status).await {
+        match self.send_der_response(lfdi, event, status).await {
             Ok(
                 e @ (SEPResponse::BadRequest(_)
                 | SEPResponse::NotFound
@@ -431,7 +508,7 @@ impl Client {
     }
     #[cfg(feature = "der")]
     #[inline(always)]
-    async fn do_der_response(
+    pub async fn send_der_response(
         &self,
         lfdi: HexBinary160,
         event: &DERControl,
@@ -444,10 +521,10 @@ impl Client {
             (ResponseStatus::EventAcknowledge, Some(rr))
                 if rr.contains(ResponseRequired::ResponseRequired) => {}
             (ResponseStatus::EventNoDisplay, _) => {
-                bail!("Attempted to send a response unsupported by this function set.")
+                bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field.")
             }
             (_, Some(rr)) if rr.contains(ResponseRequired::SpecificResponse) => {}
-            _ => bail!("Attempted to send a response for an event that did not require one."),
+            _ => bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field."),
         };
 
         let resp = DERControlResponse {

@@ -1,3 +1,9 @@
+//! Distributed Energy Resources Function Set
+//!
+//! This module is primarily an implementation of a Schedule for DERControl events.
+//!
+//!
+
 use std::{sync::Arc, time::Duration};
 
 use sep2_common::packages::{
@@ -31,6 +37,7 @@ pub(crate) fn der_mark_supersede<'a>(
     a: (&'a mut EventInstance<DERControl>, &'a MRIDType),
     b: (&'a mut EventInstance<DERControl>, &'a MRIDType),
 ) -> Option<&'a mut EventInstance<DERControl>> {
+    // TODO: Check DeviceCategory
     let same_target = a.0.has_same_target(b.0);
     let out = if a.0.does_supersede(b.0) && same_target {
         Some((a, b))
@@ -73,10 +80,11 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             events.update_event(&mrid, EIStatus::Active);
 
             // Notify client and server
+            let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.client
-                .send_der_response(self.device.read().await.lfdi, target.event(), resp)
+                .auto_der_response(self.device.read().await.lfdi, target.event(), resp)
                 .await;
         }
     }
@@ -102,10 +110,11 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             events.update_event(&mrid, EIStatus::Complete);
 
             // Notify client and server
+            let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.client
-                .send_der_response(self.device.read().await.lfdi, target.event(), resp)
+                .auto_der_response(self.device.read().await.lfdi, target.event(), resp)
                 .await;
         }
     }
@@ -125,6 +134,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
     ) {
         let mut events = self.events.write().await;
         events.cancel_event(target_mrid, cancel_reason);
+        let events = events.downgrade();
         let ei = events.get(target_mrid).unwrap();
         let resp = if current_status == EIStatus::Active {
             // If the event was active, let the client know it is over
@@ -134,11 +144,13 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             ResponseStatus::EventCancelled
         };
         self.client
-            .send_der_response(self.device.read().await.lfdi, ei.event(), resp)
+            .auto_der_response(self.device.read().await.lfdi, ei.event(), resp)
             .await;
     }
 }
 
+/// DER is a function set where events exhibit 'direct control', according to the specification.
+/// Thus, this Schedule will determine when overlapping or superseded events should be superseded based off their target, their primacy, and their creation time and when they are no longer superseded, if their superseding event is cancelled.
 #[async_trait::async_trait]
 impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERControl, H> {
     /// Create a schedule for the given [`Client`] & it's [`EndDevice`] representation.
@@ -173,11 +185,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
         // If the event already exists in the schedule
         if self.events.read().await.contains(&mrid) {
             // "Editing events shall NOT be allowed, except for updating status"
-            let current_status = {
-                let events = self.events.read().await;
-                let ei = events.get(&mrid).unwrap();
-                ei.status()
-            };
+            let current_status = self.events.read().await.get(&mrid).unwrap().status();
             match (current_status, incoming_status) {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
@@ -213,7 +221,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
             let mut events = self.events.write().await;
             // Inform server event was received
             self.client
-                .send_der_response(
+                .auto_der_response(
                     self.device.read().await.lfdi,
                     &event,
                     ResponseStatus::EventReceived,
@@ -227,16 +235,17 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
             ) {
                 log::warn!("DERControlSchedule: Told to schedule DERControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
                 self.client
-                    .send_der_response(
+                    .auto_der_response(
                         self.device.read().await.lfdi,
                         &event,
-                        incoming_status.into_der_response(),
+                        incoming_status.into(),
                     )
                     .await;
                 return;
             }
 
             // Calculate start & end times
+            // TODO: Clamp the duration and start time to remove gaps between successive events
             let ei = EventInstance::new_rand(
                 primacy,
                 event.randomize_duration,
@@ -248,8 +257,9 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
             if ei.end_time() <= current_time().get() {
                 log::warn!("DERControlSchedule: Told to schedule DERControl ({mrid}) which has already ended, sending server response and not scheduling.");
                 // Do not add event to schedule
+                // For function sets with direct control ... Do this response
                 self.client
-                    .send_der_response(
+                    .auto_der_response(
                         self.device.read().await.lfdi,
                         ei.event(),
                         ResponseStatus::EventExpired,
@@ -276,7 +286,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
                         (self.handler).event_update(superseded).await;
                     }
                     self.client
-                        .send_der_response(
+                        .auto_der_response(
                             self.device.read().await.lfdi,
                             superseded.event(),
                             ResponseStatus::EventSuperseded,
