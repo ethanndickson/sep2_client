@@ -1,3 +1,10 @@
+//! TLS Configuration for a IEEE 2030.5 Client & Notification Server
+//!
+//! Missing from this section is a verification callback that checks the presence of critical & non-critical extensions required by IEEE 2030.5 sections 8.11.6, 8.11.8, and 8.11.10
+//! The `rust-openssl` crate we use for openssl bindings currently does not expose the extensions necessary to check these extensions: https://github.com/sfackler/rust-openssl/issues/373
+//! TODO: In the meantime, we use `x509_parser` to verify the presence of extensions in the given certificates
+//!
+
 use std::time::Duration;
 
 use anyhow::Result;
@@ -66,6 +73,5 @@ pub(crate) fn create_server_tls_config(
     builder.set_ca_file(rootca_path)?;
     log::debug!("Setting verification mode");
     builder.set_verify(SslVerifyMode::FAIL_IF_NO_PEER_CERT | SslVerifyMode::PEER);
-    builder.set_default_verify_paths()?;
     Ok(builder)
 }
