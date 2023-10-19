@@ -4,7 +4,7 @@ use anyhow::Result;
 use hyper::client::HttpConnector;
 use hyper::{Body, Client};
 use hyper_openssl::HttpsConnector;
-use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod};
+use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod, SslVerifyMode};
 
 #[cfg(feature = "pubsub")]
 use openssl::ssl::{SslAcceptor, SslAcceptorBuilder};
@@ -21,6 +21,10 @@ pub(crate) fn create_client_tls_cfg(cert_path: &str, pk_path: &str) -> Result<Tl
     builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
     log::debug!("Loading Private Key File");
     builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
+    log::debug!("Setting verification mode");
+    // FAIL_IF_NO_PEER_CERT has no effect as a client
+    builder.set_verify(SslVerifyMode::FAIL_IF_NO_PEER_CERT | SslVerifyMode::PEER);
+    builder.set_default_verify_paths()?;
     Ok(builder)
 }
 
@@ -47,5 +51,8 @@ pub(crate) fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result
     builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
     log::debug!("Loading Private Key File");
     builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
+    log::debug!("Setting verification mode");
+    builder.set_verify(SslVerifyMode::FAIL_IF_NO_PEER_CERT | SslVerifyMode::PEER);
+    builder.set_default_verify_paths()?;
     Ok(builder)
 }

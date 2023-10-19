@@ -9,8 +9,8 @@ fn test_setup() -> Client {
     Client::new(
         // Point to Notif Server
         "https://127.0.0.1:1338",
-        "../certs/server_cert.pem",
-        "../certs/server_private_key.pem",
+        "../certs/client_cert.pem",
+        "../certs/client_private_key.pem",
         None,
         None,
     )
@@ -33,8 +33,8 @@ impl RouteCallback<DeviceCapability> for DCAPHandler {
 async fn run_notif_server() {
     let client = ClientNotifServer::new(
         "127.0.0.1:1338",
-        "../certs/client_cert.pem",
-        "../certs/client_private_key.pem",
+        "../certs/server_cert.pem",
+        "../certs/server_private_key.pem",
     )
     .unwrap()
     .add("/dcap", DCAPHandler)
