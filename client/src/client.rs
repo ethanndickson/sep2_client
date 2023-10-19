@@ -194,10 +194,11 @@ impl Client {
         server_addr: &str,
         cert_path: &str,
         pk_path: &str,
+        rootca_path: &str,
         tcp_keepalive: Option<Duration>,
         tickrate: Option<Duration>,
     ) -> Result<Self> {
-        let cfg = create_client_tls_cfg(cert_path, pk_path)?;
+        let cfg = create_client_tls_cfg(cert_path, pk_path, rootca_path)?;
         let out = Client {
             addr: server_addr.to_owned().into(),
             http: create_client(cfg, tcp_keepalive),

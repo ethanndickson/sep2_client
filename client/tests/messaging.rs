@@ -28,6 +28,7 @@ fn test_setup() -> (
         "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
+        "../certs/rootCA.pem",
         None,
         None,
     )

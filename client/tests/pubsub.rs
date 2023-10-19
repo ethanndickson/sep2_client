@@ -11,6 +11,7 @@ fn test_setup() -> Client {
         "https://127.0.0.1:1338",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
+        "../certs/rootCA.pem",
         None,
         None,
     )
@@ -35,6 +36,7 @@ async fn run_notif_server() {
         "127.0.0.1:1338",
         "../certs/server_cert.pem",
         "../certs/server_private_key.pem",
+        "../certs/rootCA.pem",
     )
     .unwrap()
     .add("/dcap", DCAPHandler)
@@ -42,7 +44,7 @@ async fn run_notif_server() {
         SEPResponse::Created(None)
     });
     tokio::spawn(client.run(future::pending::<()>()));
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(4)).await;
 }
 
 #[tokio::test]
