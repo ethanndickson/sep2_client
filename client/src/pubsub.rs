@@ -80,8 +80,8 @@ pub struct ClientNotifServer {
 }
 
 impl ClientNotifServer {
-    pub fn new(addr: &str, cert_path: &str, pk_path: &str) -> Result<Self> {
-        let cfg = create_server_tls_config(cert_path, pk_path)?;
+    pub fn new(addr: &str, cert_path: &str, pk_path: &str, rootca_path: &str) -> Result<Self> {
+        let cfg = create_server_tls_config(cert_path, pk_path, rootca_path)?;
         Ok(ClientNotifServer {
             addr: addr.parse()?,
             cfg,

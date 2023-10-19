@@ -14,7 +14,11 @@ use tokio::net::TcpListener;
 use tokio_openssl::SslStream;
 
 type TlsServerConfig = SslAcceptorBuilder;
-fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerConfig> {
+fn create_server_tls_config(
+    cert_path: &str,
+    pk_path: &str,
+    rootca_path: &str,
+) -> Result<TlsServerConfig> {
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
@@ -22,8 +26,10 @@ fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerC
     builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
     log::debug!("Loading Private Key File");
     builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
+    log::debug!("Loading Certificate Authority File");
+    builder.set_ca_file(rootca_path)?;
+    log::debug!("Setting verification mode");
     builder.set_verify(SslVerifyMode::FAIL_IF_NO_PEER_CERT | SslVerifyMode::PEER);
-    builder.set_default_verify_paths()?;
     Ok(builder)
 }
 
@@ -33,8 +39,8 @@ pub struct TestServer {
 }
 
 impl TestServer {
-    pub fn new(addr: &str, cert_path: &str, pk_path: &str) -> Result<Self> {
-        let cfg = create_server_tls_config(cert_path, pk_path)?;
+    pub fn new(addr: &str, cert_path: &str, pk_path: &str, rootca_path: &str) -> Result<Self> {
+        let cfg = create_server_tls_config(cert_path, pk_path, rootca_path)?;
         Ok(TestServer {
             addr: addr.parse()?,
             cfg,

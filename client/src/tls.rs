@@ -13,7 +13,11 @@ pub(crate) type Connector = HttpsConnector<HttpConnector>;
 pub(crate) type HTTPSClient = Client<Connector, Body>;
 pub(crate) type TlsClientConfig = SslConnectorBuilder;
 
-pub(crate) fn create_client_tls_cfg(cert_path: &str, pk_path: &str) -> Result<TlsClientConfig> {
+pub(crate) fn create_client_tls_cfg(
+    cert_path: &str,
+    pk_path: &str,
+    rootca_path: &str,
+) -> Result<TlsClientConfig> {
     let mut builder = SslConnector::builder(SslMethod::tls_client())?;
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
@@ -21,10 +25,10 @@ pub(crate) fn create_client_tls_cfg(cert_path: &str, pk_path: &str) -> Result<Tl
     builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
     log::debug!("Loading Private Key File");
     builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
+    log::debug!("Loading Certificate Authority File");
+    builder.set_ca_file(rootca_path)?;
     log::debug!("Setting verification mode");
-    // FAIL_IF_NO_PEER_CERT has no effect as a client
-    builder.set_verify(SslVerifyMode::FAIL_IF_NO_PEER_CERT | SslVerifyMode::PEER);
-    builder.set_default_verify_paths()?;
+    builder.set_verify(SslVerifyMode::PEER);
     Ok(builder)
 }
 
@@ -43,7 +47,11 @@ pub(crate) fn create_client(
 pub(crate) type TlsServerConfig = SslAcceptorBuilder;
 
 #[cfg(feature = "pubsub")]
-pub(crate) fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerConfig> {
+pub(crate) fn create_server_tls_config(
+    cert_path: &str,
+    pk_path: &str,
+    rootca_path: &str,
+) -> Result<TlsServerConfig> {
     // rust-openssl forces us to create this default config that we immediately overwrite
     // If they gave us a way to cosntruct Acceptors and Connectors from Contexts,
     // we wouldn't need to double up on configs here
@@ -54,6 +62,8 @@ pub(crate) fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result
     builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
     log::debug!("Loading Private Key File");
     builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
+    log::debug!("Loading Certificate Authority File");
+    builder.set_ca_file(rootca_path)?;
     log::debug!("Setting verification mode");
     builder.set_verify(SslVerifyMode::FAIL_IF_NO_PEER_CERT | SslVerifyMode::PEER);
     builder.set_default_verify_paths()?;

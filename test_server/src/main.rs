@@ -11,12 +11,14 @@ struct Args {
     cert: String,
     /// Path to the Server's SSL Private Key
     key: String,
+    /// Path to the rootCA
+    ca: String,
 }
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
     let addr = format!("127.0.0.1:{}", args.port);
     log::info!("Server listening on {addr}");
-    let server = TestServer::new(&addr, &args.cert, &args.key).unwrap();
+    let server = TestServer::new(&addr, &args.cert, &args.key, &args.ca).unwrap();
     server.run(tokio::signal::ctrl_c()).await
 }

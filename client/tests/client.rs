@@ -10,6 +10,7 @@ fn test_setup() -> Client {
         "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",
+        "../certs/rootCA.pem",
         None,
         // Make the client constantly check for the latest poll task to service
         Some(Duration::from_secs(0)),
@@ -30,6 +31,7 @@ async fn run_test_server() {
             "127.0.0.1:1337",
             "../certs/server_cert.pem",
             "../certs/server_private_key.pem",
+            "../certs/rootCA.pem",
         )
         .unwrap()
         .run(future::pending::<()>())

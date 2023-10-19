@@ -177,6 +177,7 @@ async fn main() -> Result<()> {
         "127.0.0.1:1338",
         "../../certs/client_cert.pem",
         "../../certs/client_private_key.pem",
+        "../../certs/rootCA.pem",
     )?
     // Example route that adds to some thread-safe state
     .add("/reading", move |notif: Notification<Reading>| {
@@ -201,6 +202,7 @@ async fn main() -> Result<()> {
         "https://127.0.0.1:1337",
         "../../certs/client_cert.pem",
         "../../certs/client_private_key.pem",
+        "../../certs/rootCA.pem",
         // No KeepAlive
         None,
         // Default Poll Tick Rate (10 minutes)
