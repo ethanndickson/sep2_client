@@ -5,7 +5,7 @@ use hyper::{
     header::LOCATION, server::conn::Http, service::service_fn, Body, Method, Request, Response,
     StatusCode,
 };
-use openssl::ssl::{Ssl, SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod};
+use openssl::ssl::{Ssl, SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod, SslVerifyMode};
 
 use sep2_common::examples::{
     DC_16_04_11, EDL_16_02_08, ED_16_01_08, ED_16_03_06, ER_16_04_06, FSAL_16_03_11, REG_16_01_10,
@@ -15,6 +15,9 @@ use tokio_openssl::SslStream;
 
 type TlsServerConfig = SslAcceptorBuilder;
 fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerConfig> {
+    // rust-openssl forces us to create this default config that we immediately overwrite
+    // If they gave us a way to cosntruct Acceptors and Connectors from Contexts,
+    // we wouldn't need to double up on configs here
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
@@ -22,6 +25,8 @@ fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerC
     builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
     log::debug!("Loading Private Key File");
     builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
+    builder.set_verify(SslVerifyMode::FAIL_IF_NO_PEER_CERT | SslVerifyMode::PEER);
+    builder.set_default_verify_paths()?;
     Ok(builder)
 }
 
