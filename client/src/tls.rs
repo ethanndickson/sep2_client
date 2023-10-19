@@ -44,6 +44,9 @@ pub(crate) type TlsServerConfig = SslAcceptorBuilder;
 
 #[cfg(feature = "pubsub")]
 pub(crate) fn create_server_tls_config(cert_path: &str, pk_path: &str) -> Result<TlsServerConfig> {
+    // rust-openssl forces us to create this default config that we immediately overwrite
+    // If they gave us a way to cosntruct Acceptors and Connectors from Contexts,
+    // we wouldn't need to double up on configs here
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
