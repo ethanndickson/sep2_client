@@ -16,7 +16,7 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 
 use crate::{
     client::Client,
-    edev::SEDevice,
+    device::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
     time::current_time,
 };
@@ -33,7 +33,7 @@ impl EventInstance<DERControl> {
 /// Given two DERControls, determine which is superseded,
 /// mark the superseded event as superseded_by,
 /// and return the superseded event
-pub(crate) fn der_mark_supersede<'a>(
+fn der_mark_supersede<'a>(
     a: (&'a mut EventInstance<DERControl>, &'a MRIDType),
     b: (&'a mut EventInstance<DERControl>, &'a MRIDType),
 ) -> Option<&'a mut EventInstance<DERControl>> {
@@ -48,11 +48,6 @@ pub(crate) fn der_mark_supersede<'a>(
     };
 
     out.map(|(superseding, superseded)| {
-        log::debug!(
-            "Schedule: Determined that {} superseded {}",
-            superseding.1,
-            superseded.1
-        );
         superseded.0.superseded_by(superseding.1);
         superseded.0
     })

@@ -39,6 +39,12 @@ use {
 #[cfg(feature = "messaging")]
 use sep2_common::packages::{messaging::TextMessage, response::TextResponse};
 
+#[cfg(feature = "drlc")]
+use {
+    crate::device::SEDevice,
+    sep2_common::packages::{drlc::EndDeviceControl, response::DrResponse},
+};
+
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
 pub enum SEPResponse {
     // HTTP 201 w/ Location header value, if it exists - 2030.5-2018 - 5.5.2.4
@@ -507,6 +513,7 @@ impl Client {
             }
         }
     }
+
     #[cfg(feature = "der")]
     #[inline(always)]
     pub async fn send_der_response(
@@ -534,6 +541,81 @@ impl Client {
             status: Some(status),
             subject: event.mrid,
             href: None,
+        };
+        self.post(
+            event
+                .reply_to()
+                .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
+            &resp,
+        )
+        .await
+    }
+
+    #[cfg(feature = "drlc")]
+    pub(crate) async fn auto_drlc_response(
+        &self,
+        device: &SEDevice,
+        event: &EndDeviceControl,
+        status: ResponseStatus,
+    ) {
+        match self.send_drlc_response(device, event, status).await {
+            Ok(
+                e @ (SEPResponse::BadRequest(_)
+                | SEPResponse::NotFound
+                | SEPResponse::MethodNotAllowed(_)),
+            ) => {
+                log::warn!(
+                    "Client: DRLC response POST attempt failed with HTTP status code: {}",
+                    e
+                );
+            }
+            Err(e) => log::warn!(
+                "Client: DRLC response POST attempt failed with reason: {}",
+                e
+            ),
+            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
+                log::info!(
+                    "Client: DRLC response POST attempt succeeded with reason: {}",
+                    r
+                )
+            }
+        }
+    }
+
+    #[cfg(feature = "drlc")]
+    #[inline(always)]
+    pub async fn send_drlc_response(
+        &self,
+        device: &SEDevice,
+        event: &EndDeviceControl,
+        status: ResponseStatus,
+    ) -> Result<SEPResponse> {
+        // As per Table 27 - DRLC Column
+
+        match (status, event.response_required) {
+            (ResponseStatus::EventReceived, Some(rr))
+                if rr.contains(ResponseRequired::MessageReceived) => {}
+            (ResponseStatus::EventAcknowledge, Some(rr))
+                if rr.contains(ResponseRequired::ResponseRequired) => {}
+            (ResponseStatus::EventNoDisplay, _) => {
+                bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field.")
+            }
+            (_, Some(rr)) if rr.contains(ResponseRequired::SpecificResponse) => {}
+            _ => bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field."),
+        };
+
+        let resp = DrResponse {
+            created_date_time: Some(current_time()),
+            end_device_lfdi: device.lfdi,
+            status: Some(status),
+            subject: event.mrid,
+            href: None,
+            appliance_load_reduction: device.appliance_load_reduction,
+            applied_target_reduction: device.applied_target_reduction,
+            duty_cycle: device.duty_cycle,
+            offset: device.offset.clone(),
+            override_duration: device.override_duration,
+            set_point: device.set_point.clone(),
         };
         self.post(
             event

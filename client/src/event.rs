@@ -144,8 +144,7 @@ impl<E: SEEvent> EventInstance<E> {
 
         out.map(|(superseding, superseded)| {
             superseded.0.superseded_by(superseding.1);
-            superseded.0.update_status(EIStatus::Superseded);
-            superseding.0
+            superseded.0
         })
     }
 
