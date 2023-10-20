@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{client::Client, edev::SEDevice, time::current_time};
+use crate::{client::Client, device::SEDevice, time::current_time};
 use rand::Rng;
 use sep2_common::packages::{
     identification::ResponseStatus,
@@ -197,6 +197,9 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     /// Allows the client to apply the event at the device-level, and determine the correct response code.
     ///
     /// When determining the ResponseStatus to return, refer to Table 27 of IEEE 2030.5-2018
+    ///
+    /// Currently, calling this function acquires a global lock on the scheduler, stopping it from making progress.
+    /// This may be changed in the future.
     async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus;
 }
 
@@ -322,6 +325,7 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
     // TODO: This needs to take into account a server ID,
     // in order to determine when another server produces a superseding event
     async fn add_event(&mut self, event: E, primacy: PrimacyType);
+    // TODO: Add a function that accepts a time resource and sets a per-schedule time-offset
 }
 
 /// Schedule for a given function set, and a specific server.

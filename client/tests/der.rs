@@ -4,7 +4,7 @@ use std::{sync::Arc, time::Duration};
 
 use sep2_client::{
     client::Client,
-    edev::SEDevice,
+    device::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Schedule, Scheduler},
     time::current_time,
 };

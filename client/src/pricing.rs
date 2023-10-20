@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     client::Client,
-    edev::SEDevice,
+    device::SEDevice,
     event::{EventHandler, Events, Schedule, Scheduler},
 };
 

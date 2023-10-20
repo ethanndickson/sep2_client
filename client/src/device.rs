@@ -1,12 +1,35 @@
 use crate::{security::security_init, time::current_time};
 use anyhow::Result;
-use sep2_common::packages::{edev::EndDevice, primitives::HexBinary160, types::SFDIType};
+use sep2_common::packages::{
+    edev::EndDevice,
+    primitives::{HexBinary160, Uint16},
+    types::SFDIType,
+};
+
+#[cfg(feature = "drlc")]
+use sep2_common::packages::{
+    drlc::{ApplianceLoadReduction, DutyCycle, Offset, SetPoint},
+    response::AppliedTargetReduction,
+};
 
 /// A representation of an IEEE 2030.5 End Device.
+/// DRLC fields allow for the scheduler to create `DrResponse` instances with the correct information
 pub struct SEDevice {
     pub lfdi: HexBinary160,
     pub sfdi: SFDIType,
     pub edev: EndDevice,
+    #[cfg(feature = "drlc")]
+    pub appliance_load_reduction: Option<ApplianceLoadReduction>,
+    #[cfg(feature = "drlc")]
+    pub applied_target_reduction: Option<AppliedTargetReduction>,
+    #[cfg(feature = "drlc")]
+    pub duty_cycle: Option<DutyCycle>,
+    #[cfg(feature = "drlc")]
+    pub offset: Option<Offset>,
+    #[cfg(feature = "drlc")]
+    pub override_duration: Option<Uint16>,
+    #[cfg(feature = "drlc")]
+    pub set_point: Option<SetPoint>,
     // TODO: What else might users want here?
 }
 
@@ -43,6 +66,12 @@ impl SEDevice {
                 subscribable: None,
                 href: None,
             },
+            appliance_load_reduction: None,
+            applied_target_reduction: None,
+            duty_cycle: None,
+            offset: None,
+            override_duration: None,
+            set_point: None,
         }
     }
 }
