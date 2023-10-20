@@ -2,7 +2,9 @@
 //!
 //! Missing from this section is a verification callback that checks the presence of critical & non-critical extensions required by IEEE 2030.5 section 6.11
 //! The `rust-openssl` crate we use for openssl bindings currently does not expose an interface necessary to check these extensions: https://github.com/sfackler/rust-openssl/issues/373
-//! In the meantime, we use `x509_parser` to parse and verify
+//! In the meantime, we use `x509_parser` to parse and verify that the required extensions are present, for both self-signed Client Certificates and device certificates, as per the specification.
+//!
+//! TODO: Should this module also check the supplied CA is valid as per the spec? Awaiting SunSpec Cert package.
 //!
 
 use std::time::Duration;
@@ -77,44 +79,124 @@ pub(crate) fn create_server_tls_config(
     Ok(builder)
 }
 
-fn check_cert(cert_path: &str) -> Result<()> {
+// A valid 'device certificate' *must* be used by a [`ClientNotifServer`]
+// "The use of TLS (IETF RFC 5246) requires that all hosts implementing server functionality SHALL use a
+// device certificate whereby the server presents its device certificate as part of the TLS handshake"
+fn check_device_cert(cert_path: &str) -> Result<()> {
     let contents = std::fs::read(cert_path)?;
     let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;
     let cert = cert.parse_x509()?;
+    // TODO: Check Issued by & Subject name
     let exts = cert.extensions();
+    let mut key_usage = false;
+    let mut certificate_policies = false;
+    let mut san = false;
+    let mut aki = false;
     for ext in exts {
         let critical = ext.critical;
         match ext.parsed_extension() {
             // "certificates containing policy mappings MUST be rejected"
             ParsedExtension::PolicyMappings(_) => {
-                bail!("Certificates cannot contain policy mappings.")
+                bail!("Device Certificates cannot contain policy mappings.")
             }
             // "Name-constraints are not supported and certificates containing name-constraints MUST be rejected."
             ParsedExtension::NameConstraints(_) => {
-                bail!("Certificates cannot contain name constraints.")
+                bail!("Device Certificates cannot contain name constraints.")
             }
             // TODO: What do we need to examine inside the rest of these extensions? What can we reasonably check?
-            ParsedExtension::KeyUsage(_)
-            | ParsedExtension::BasicConstraints(_)
-            | ParsedExtension::CertificatePolicies(_)
-            | ParsedExtension::SubjectAlternativeName(_) => {
-                if !critical {
-                    bail!(
-                        "KeyUsage, BasicConstraints & CertificatePolicies extensions must be critical."
-                    )
-                }
-            }
-            ParsedExtension::AuthorityKeyIdentifier(_)
-            | ParsedExtension::SubjectKeyIdentifier(_) => {
+            ParsedExtension::CertificatePolicies(_) => {
                 if critical {
-                    bail!(
-                        "AuthorityKeyIdentifier & SubjectKeyIdentifier extensions cannot be critical."
-                    )
+                    certificate_policies = true;
+                } else {
+                    bail!("CertificatePolicies extension must be critical.")
                 }
             }
-            // All other extensions are ignored
-            _ => (),
+            ParsedExtension::SubjectAlternativeName(_) => {
+                if critical {
+                    san = true;
+                } else {
+                    bail!("SubjectAlternativeName extension must be critical")
+                }
+            }
+            ParsedExtension::KeyUsage(_) => {
+                if critical {
+                    key_usage = true;
+                } else {
+                    bail!("KeyUsage extension must be critical.")
+                }
+            }
+            ParsedExtension::AuthorityKeyIdentifier(_) => {
+                if critical {
+                    bail!("AuthorityKeyIdentifier extension cannot be critical.")
+                } else {
+                    aki = true;
+                }
+            }
+            // All other extensions constitute an invalid certificate
+            // TODO: This might need to be relaxed to allow for modifications
+            _ => bail!("Unexpected extension or unparsed extension encountered."),
         }
+    }
+    if !key_usage {
+        bail!("KeyUsage extension not present")
+    }
+    if !certificate_policies {
+        bail!("CertificatePolicies extension not present")
+    }
+    if !san {
+        bail!("SubjectAlternativeName extension not present")
+    }
+    if !aki {
+        bail!("AuthorityKeyIdentifier extension not present")
     }
     Ok(())
 }
+
+fn check_self_signed_client_cert(cert_path: &str) -> Result<()> {
+    let contents = std::fs::read(cert_path)?;
+    let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;
+    let cert = cert.parse_x509()?;
+    let exts = cert.extensions();
+    let mut key_usage = false;
+    let mut certificate_policies = false;
+    // TODO: Check Issued by, Subject Name, Issuer Name, Validity, and Subject Public Key and Signature
+    for ext in exts {
+        let critical = ext.critical;
+        match ext.parsed_extension() {
+            // "certificates containing policy mappings MUST be rejected"
+            ParsedExtension::PolicyMappings(_) => {
+                bail!("Device Certificates cannot contain policy mappings.")
+            }
+            // "Name-constraints are not supported and certificates containing name-constraints MUST be rejected."
+            ParsedExtension::NameConstraints(_) => {
+                bail!("Device Certificates cannot contain name constraints.")
+            }
+            ParsedExtension::CertificatePolicies(_) => {
+                if critical {
+                    certificate_policies = true;
+                } else {
+                    bail!("CertificatePolicies extension must be critical.")
+                }
+            }
+            ParsedExtension::KeyUsage(_) => {
+                if critical {
+                    key_usage = true;
+                } else {
+                    bail!("KeyUsage extension must be critical.")
+                }
+            }
+            // All other extensions constitute an invalid certificate
+            // TODO: This might need to be relaxed to allow for modifications
+            _ => bail!("Unexpected extension or unparsed extension encountered."),
+        }
+    }
+    if !key_usage {
+        bail!("KeyUsage extension not present.")
+    }
+    if !certificate_policies {
+        bail!("CertificatePolicies extension not present.")
+    }
+    Ok(())
+}
+
+// TODO: Should we do checks on the supplied root ca?
