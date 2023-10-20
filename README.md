@@ -35,7 +35,6 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
   - [x] DER Non-Aggregate Client Sample Impl.
 ### Stretch Goals
 - [ ] DNS-SD
-- [ ] Client EXI Support (Requires a Rust EXI Library)
 ### Future
 - [ ] Australian CSIP Extensions
 - [ ] [rustls ECDHE-ECDSA-AES128-CCM8 Support](https://github.com/rustls/rustls/issues/1034)
