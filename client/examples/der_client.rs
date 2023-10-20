@@ -5,7 +5,7 @@ use std::{sync::Arc, time::Duration};
 use anyhow::{anyhow, Result};
 use sep2_client::{
     client::{Client, SEPResponse},
-    edev::SEDevice,
+    device::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Schedule, Scheduler},
     pubsub::ClientNotifServer,
 };

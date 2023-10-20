@@ -1,5 +1,5 @@
 pub mod client;
-pub mod edev;
+pub mod device;
 pub mod security;
 pub mod time;
 pub mod tls;

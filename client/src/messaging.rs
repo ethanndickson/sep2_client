@@ -15,7 +15,7 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 
 use crate::{
     client::Client,
-    edev::SEDevice,
+    device::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
     time::current_time,
 };
