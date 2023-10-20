@@ -7,9 +7,9 @@ use std::{sync::Arc, time::Duration};
 
 use sep2_common::packages::{
     identification::ResponseStatus,
-    messaging::TextMessage,
+    messaging::{MessagingProgram, TextMessage},
     objects::EventStatusType as EventStatus,
-    types::{MRIDType, PrimacyType},
+    types::MRIDType,
 };
 use tokio::sync::{broadcast::Receiver, RwLock};
 
@@ -111,6 +111,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
 /// TODO: This implementation currently does not support manual acknowledgement of text messages, as while the client's handler is called, a lock is acquired on the scheduler, meaning it cannot progress.
 #[async_trait::async_trait]
 impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMessage, H> {
+    type Program = MessagingProgram;
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
@@ -132,7 +133,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
         out
     }
 
-    async fn add_event(&mut self, event: TextMessage, primacy: PrimacyType) {
+    async fn add_event(&mut self, event: TextMessage, program: &Self::Program) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
 
@@ -195,7 +196,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
                 return;
             }
 
-            let ei = EventInstance::new(primacy, event);
+            let ei = EventInstance::new(program.primacy, event, program.mrid);
             // The event may have expired already
             if ei.end_time() <= current_time().get() {
                 log::warn!("TextMessageSchedule: Told to schedule TextMessage ({mrid}) which has already ended, ignoring.");

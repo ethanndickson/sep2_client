@@ -86,12 +86,12 @@ async fn process_derpl_task(
     derpl: DERProgramList,
 ) -> Result<()> {
     for derp in derpl.der_program {
-        match (derp.der_control_list_link, derp.default_der_control_link) {
+        match (&derp.der_control_list_link, &derp.default_der_control_link) {
             (Some(dercll), _) => {
                 let dercl: DERControlList = client.get(&dercll.href).await?;
                 for der in dercl.der_control {
                     // Add event to schedule
-                    schedule.add_event(der, derp.primacy).await;
+                    schedule.add_event(der, &derp).await;
                 }
             }
             (_, Some(ddercl)) => {

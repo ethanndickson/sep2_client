@@ -25,7 +25,10 @@ use tokio::sync::{
 };
 
 /// A wrapper around an [`SEEvent`] resource.
-pub struct EventInstance<E: SEEvent> {
+pub struct EventInstance<E>
+where
+    E: SEEvent,
+{
     // Event start time, after randomisation
     start: i64,
     // Event end time, after randomisation
@@ -34,6 +37,8 @@ pub struct EventInstance<E: SEEvent> {
     primacy: PrimacyType,
     // The SEEvent instance
     event: E,
+    // The MRID of the program this event belongs to
+    program_mrid: MRIDType,
     // The current status of the Event,
     status: EIStatus,
     // When the event status was last updated
@@ -84,7 +89,7 @@ impl From<EventStatusType> for EIStatus {
 }
 
 impl<E: SEEvent> EventInstance<E> {
-    pub(crate) fn new(primacy: PrimacyType, event: E) -> Self {
+    pub(crate) fn new(primacy: PrimacyType, event: E, program_mrid: MRIDType) -> Self {
         let start: i64 = event.interval().start.get();
         let end: i64 = start + i64::from(event.interval().duration.get());
         EventInstance {
@@ -95,6 +100,7 @@ impl<E: SEEvent> EventInstance<E> {
             end,
             last_updated: current_time().get(),
             superseded_by: vec![],
+            program_mrid,
         }
     }
 
@@ -103,6 +109,7 @@ impl<E: SEEvent> EventInstance<E> {
         rand_duration: Option<OneHourRangeType>,
         rand_start: Option<OneHourRangeType>,
         event: E,
+        program_mrid: MRIDType,
     ) -> Self {
         let start: i64 = event.interval().start.get() + randomize(rand_duration);
         let end: i64 = start + i64::from(event.interval().duration.get()) + randomize(rand_start);
@@ -114,6 +121,7 @@ impl<E: SEEvent> EventInstance<E> {
             end,
             last_updated: current_time().get(),
             superseded_by: vec![],
+            program_mrid,
         }
     }
 
@@ -133,7 +141,7 @@ impl<E: SEEvent> EventInstance<E> {
     pub(crate) fn mark_supersede<'a>(
         a: (&'a mut EventInstance<E>, &'a MRIDType),
         b: (&'a mut EventInstance<E>, &'a MRIDType),
-    ) -> Option<&'a mut EventInstance<E>> {
+    ) -> Option<(&'a mut EventInstance<E>, &'a mut EventInstance<E>)> {
         let out = if a.0.does_supersede(b.0) {
             Some((a, b))
         } else if b.0.does_supersede(a.0) {
@@ -144,7 +152,7 @@ impl<E: SEEvent> EventInstance<E> {
 
         out.map(|(superseding, superseded)| {
             superseded.0.superseded_by(superseding.1);
-            superseded.0
+            (superseded.0, superseding.0)
         })
     }
 
@@ -157,24 +165,34 @@ impl<E: SEEvent> EventInstance<E> {
         self.superseded_by.push(*other);
     }
 
+    #[inline(always)]
     pub fn status(&self) -> EIStatus {
         self.status
     }
 
+    #[inline(always)]
     pub fn event(&self) -> &E {
         &self.event
     }
 
+    #[inline(always)]
     pub fn primacy(&self) -> &PrimacyType {
         &self.primacy
     }
 
+    #[inline(always)]
     pub fn start_time(&self) -> i64 {
         self.start
     }
 
+    #[inline(always)]
     pub fn end_time(&self) -> i64 {
         self.end
+    }
+
+    #[inline(always)]
+    pub fn program_mrid(&self) -> &MRIDType {
+        &self.program_mrid
     }
 }
 
@@ -315,6 +333,7 @@ where
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait::async_trait]
 pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
+    type Program;
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
@@ -323,7 +342,7 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
     ) -> Self;
     // TODO: This needs to take into account a server ID,
     // in order to determine when another server produces a superseding event
-    async fn add_event(&mut self, event: E, primacy: PrimacyType);
+    async fn add_event(&mut self, event: E, program: &Self::Program);
     // TODO: Add a function that accepts a time resource and sets a per-schedule time-offset
 }
 

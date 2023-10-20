@@ -6,8 +6,10 @@
 //!
 
 use sep2_common::packages::{
-    drlc::EndDeviceControl, identification::ResponseStatus,
-    objects::EventStatusType as EventStatus, types::MRIDType,
+    drlc::{DemandResponseProgram, EndDeviceControl},
+    identification::ResponseStatus,
+    objects::EventStatusType as EventStatus,
+    types::MRIDType,
 };
 
 use crate::{
@@ -17,7 +19,6 @@ use crate::{
 
 use std::{sync::Arc, time::Duration};
 
-use sep2_common::packages::types::PrimacyType;
 use tokio::sync::{broadcast::Receiver, RwLock};
 
 use crate::{
@@ -107,6 +108,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
 impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
     for Schedule<EndDeviceControl, H>
 {
+    type Program = DemandResponseProgram;
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
@@ -128,7 +130,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
         out
     }
 
-    async fn add_event(&mut self, event: EndDeviceControl, primacy: PrimacyType) {
+    async fn add_event(&mut self, event: EndDeviceControl, program: &Self::Program) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
 
@@ -193,10 +195,11 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             // Calculate start & end times
             // TODO: Clamp the duration and start time to remove gaps between successive events
             let ei = EventInstance::new_rand(
-                primacy,
+                program.primacy,
                 event.randomize_duration,
                 event.randomize_start,
                 event,
+                program.mrid,
             );
 
             // The event may have expired already
@@ -222,22 +225,26 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             // Determine what events this supersedes
             let mut target = ei;
             for (o_mrid, other) in events.iter_mut() {
-                if let Some(superseded) =
+                if let Some((superseded, superseding)) =
                     EventInstance::mark_supersede((&mut target, &mrid), (other, o_mrid))
                 {
-                    // Tell the server we've been informed this event is superseded
+                    // Determine appropriate response
                     let prev_status = superseded.status();
                     superseded.update_status(EIStatus::Superseded);
-                    if prev_status == EIStatus::Active {
+                    let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler).event_update(superseded).await;
-                    }
+                        // If the two events come from different programs
+                        if superseded.program_mrid() != superseding.program_mrid() {
+                            ResponseStatus::EventAbortedProgram
+                        } else {
+                            ResponseStatus::EventSuperseded
+                        }
+                    } else {
+                        ResponseStatus::EventSuperseded
+                    };
                     self.client
-                        .auto_drlc_response(
-                            &*self.device.read().await,
-                            superseded.event(),
-                            ResponseStatus::EventSuperseded,
-                        )
+                        .auto_drlc_response(&*self.device.read().await, superseded.event(), status)
                         .await;
                 }
             }
