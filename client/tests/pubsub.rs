@@ -1,3 +1,4 @@
+#![cfg(feature = "messaging")]
 use sep2_client::{
     client::{Client, SEPResponse},
     pubsub::{ClientNotifServer, RouteCallback},
