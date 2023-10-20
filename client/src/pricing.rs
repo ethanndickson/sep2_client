@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use sep2_common::packages::{pricing::TimeTariffInterval, types::PrimacyType};
+use sep2_common::packages::pricing::{TariffProfile, TimeTariffInterval};
 use tokio::sync::RwLock;
 
 use crate::{
@@ -16,6 +16,7 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {}
 impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
     for Schedule<TimeTariffInterval, H>
 {
+    type Program = TariffProfile;
     #[allow(unused_variables)]
     fn new(
         client: Client,
@@ -34,5 +35,5 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
         }
     }
     #[allow(unused_variables)]
-    async fn add_event(&mut self, event: TimeTariffInterval, primacy: PrimacyType) {}
+    async fn add_event(&mut self, event: TimeTariffInterval, program: &Self::Program) {}
 }

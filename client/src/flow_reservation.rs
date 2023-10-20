@@ -4,7 +4,6 @@ use crate::event::{EventHandler, Schedule};
 
 use std::{sync::Arc, time::Duration};
 
-use sep2_common::packages::types::PrimacyType;
 use tokio::sync::RwLock;
 
 use crate::{
@@ -14,13 +13,7 @@ use crate::{
 };
 
 // Flow Reservation Function Set
-impl<H: EventHandler<FlowReservationResponse>> Schedule<FlowReservationResponse, H> {}
-
-#[async_trait::async_trait]
-impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse, H>
-    for Schedule<FlowReservationResponse, H>
-{
-    #[allow(unused_variables)]
+impl<H: EventHandler<FlowReservationResponse>> Schedule<FlowReservationResponse, H> {
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
@@ -37,7 +30,4 @@ impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse
             tickrate,
         }
     }
-
-    #[allow(unused_variables)]
-    async fn add_event(&mut self, event: FlowReservationResponse, primacy: PrimacyType) {}
 }

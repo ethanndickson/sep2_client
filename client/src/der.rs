@@ -7,10 +7,10 @@
 use std::{sync::Arc, time::Duration};
 
 use sep2_common::packages::{
-    der::DERControl,
+    der::{DERControl, DERProgram},
     identification::ResponseStatus,
     objects::EventStatusType as EventStatus,
-    types::{MRIDType, PrimacyType},
+    types::MRIDType,
 };
 use tokio::sync::{broadcast::Receiver, RwLock};
 
@@ -36,7 +36,10 @@ impl EventInstance<DERControl> {
 fn der_mark_supersede<'a>(
     a: (&'a mut EventInstance<DERControl>, &'a MRIDType),
     b: (&'a mut EventInstance<DERControl>, &'a MRIDType),
-) -> Option<&'a mut EventInstance<DERControl>> {
+) -> Option<(
+    &'a mut EventInstance<DERControl>,
+    &'a mut EventInstance<DERControl>,
+)> {
     // TODO: Check DeviceCategory
     let same_target = a.0.has_same_target(b.0);
     let out = if a.0.does_supersede(b.0) && same_target {
@@ -49,7 +52,7 @@ fn der_mark_supersede<'a>(
 
     out.map(|(superseding, superseded)| {
         superseded.0.superseded_by(superseding.1);
-        superseded.0
+        (superseded.0, superseding.0)
     })
 }
 
@@ -148,6 +151,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 /// Thus, this Schedule will determine when overlapping or superseded events should be superseded based off their target, their primacy, and their creation time and when they are no longer superseded, if their superseding event is cancelled.
 #[async_trait::async_trait]
 impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERControl, H> {
+    type Program = DERProgram;
     /// Create a schedule for the given [`Client`] & it's [`EndDevice`] representation.
     ///
     /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
@@ -173,7 +177,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
     }
     /// Add a [`DERControl`] Event to the schedule.
     /// Subsequent retrievals/notifications of any and all [`DERControl`] resources should call this function.
-    async fn add_event(&mut self, event: DERControl, primacy: PrimacyType) {
+    async fn add_event(&mut self, event: DERControl, program: &Self::Program) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
 
@@ -242,10 +246,11 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
             // Calculate start & end times
             // TODO: Clamp the duration and start time to remove gaps between successive events
             let ei = EventInstance::new_rand(
-                primacy,
+                program.primacy,
                 event.randomize_duration,
                 event.randomize_start,
                 event,
+                program.mrid,
             );
 
             // The event may have expired already
@@ -271,20 +276,29 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
             // Determine what events this supersedes
             let mut target = ei;
             for (o_mrid, other) in events.iter_mut() {
-                if let Some(superseded) = der_mark_supersede((&mut target, &mrid), (other, o_mrid))
+                if let Some((superseded, superseding)) =
+                    der_mark_supersede((&mut target, &mrid), (other, o_mrid))
                 {
-                    // Tell the server we've been informed this event is superseded
+                    // Determine appropriate response
                     let prev_status = superseded.status();
                     superseded.update_status(EIStatus::Superseded);
-                    if prev_status == EIStatus::Active {
+                    let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler).event_update(superseded).await;
-                    }
+                        // If the two events come from different programs
+                        if superseded.program_mrid() != superseding.program_mrid() {
+                            ResponseStatus::EventAbortedProgram
+                        } else {
+                            ResponseStatus::EventSuperseded
+                        }
+                    } else {
+                        ResponseStatus::EventSuperseded
+                    };
                     self.client
                         .auto_der_response(
                             self.device.read().await.lfdi,
                             superseded.event(),
-                            ResponseStatus::EventSuperseded,
+                            status,
                         )
                         .await;
                 }

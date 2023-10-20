@@ -515,7 +515,6 @@ impl Client {
     }
 
     #[cfg(feature = "der")]
-    #[inline(always)]
     pub async fn send_der_response(
         &self,
         lfdi: HexBinary160,
@@ -583,7 +582,6 @@ impl Client {
     }
 
     #[cfg(feature = "drlc")]
-    #[inline(always)]
     pub async fn send_drlc_response(
         &self,
         device: &SEDevice,

@@ -17,21 +17,21 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
 # Progress
 ### Core
 - [x] Application Support Function Set (TCP, HTTP)
-- [x] Security Function Set (TLS, HTTPS, Certificate Management)
+- [x] Security Function Set (TLS + Certificate Verification, HTTPS)
 - [x] IEEE 2030.5 Base Client Capabilities (GET, POST, PUT, DELETE) 
 - [x] Asynchronous Resource Polling
 - [x] Notification / Subscription Client Server Mechanism
 - [ ] Event Scheduler
   - [x] DER
-  - [ ] DRLC
-  - [ ] Messaging
+  - [x] DRLC
+  - [x] Messaging
   - [ ] Flow Reservation
   - [ ] Pricing
-- [ ] Global Time Offset (Server Time Sync)
+  - [ ] Schedule Time Offset (Server Time Sync)
 - [ ] Tests / Documentation
   - [x] IEEE 2030.5 Examples as System Tests
   - [ ] Event Scheduler Tests
-  - [ ] Subscription/Notification Tests
+  - [x] Subscription/Notification Tests
   - [x] DER Non-Aggregate Client Sample Impl.
 ### Stretch Goals
 - [ ] DNS-SD
