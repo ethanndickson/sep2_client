@@ -287,7 +287,9 @@ where
     /// Given an event, and a reason for it's cancellation:
     /// - unsupersede (reschedule) unstarted events that are no longer superseded by any other events
     /// - mark the given event as cancelled, and re-evaulate the upcoming events
-    pub(crate) fn cancel_event(&mut self, event: &MRIDType, reason: EIStatus) {
+    ///
+    /// Uses the schedule's current time, as provided
+    pub(crate) fn cancel_event(&mut self, event: &MRIDType, reason: EIStatus, current_time: i64) {
         self.map
             .iter_mut()
             .filter(|(_, ei)| ei.status() == EIStatus::Superseded)
@@ -295,7 +297,7 @@ where
                 // Current event is no longer superseded by the given event
                 ei.superseded_by.retain(|f| f != event);
                 // If the event is no longer superseded by anything, and hasn't started yet, reschedule it
-                if ei.superseded_by.is_empty() && ei.start > current_time().get() {
+                if ei.superseded_by.is_empty() && ei.start > current_time {
                     ei.update_status(EIStatus::Scheduled)
                 }
             });

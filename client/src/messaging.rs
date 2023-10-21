@@ -20,7 +20,6 @@ use crate::{
     client::{Client, SEPResponse},
     device::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
-    time::current_time,
 };
 
 // Messaging Function Set
@@ -36,7 +35,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
             }
             let mut events = self.events.write().await;
             let mrid = match events.next_start() {
-                Some((time, mrid)) if time < current_time().get() => mrid,
+                Some((time, mrid)) if time < self.schedule_time().get() => mrid,
                 _ => continue,
             };
 
@@ -60,7 +59,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
             }
             let mut events = self.events.write().await;
             let mrid = match events.next_end() {
-                Some((time, mrid)) if time < current_time().get() => mrid,
+                Some((time, mrid)) if time < self.schedule_time().get() => mrid,
                 _ => continue,
             };
 
@@ -83,7 +82,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
         cancel_reason: EIStatus,
     ) {
         let mut events = self.events.write().await;
-        events.cancel_event(target_mrid, cancel_reason);
+        events.cancel_event(target_mrid, cancel_reason, self.schedule_time().get());
 
         let events = events.downgrade();
         let ei = events.get(target_mrid).unwrap();
@@ -217,7 +216,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
 
             let ei = EventInstance::new(program.primacy, event, program.mrid);
             // The event may have expired already
-            if ei.end_time() <= current_time().get() {
+            if ei.end_time() <= self.schedule_time().get() {
                 log::warn!("TextMessageSchedule: Told to schedule TextMessage ({mrid}) which has already ended, ignoring.");
                 // We do NOT send a response, as required by the spec
                 return;
