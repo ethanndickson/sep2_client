@@ -148,6 +148,13 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
     async fn add_event(&mut self, event: EndDeviceControl, program: &Self::Program) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
+        if !event
+            .device_category
+            .intersects(self.device.read().await.device_categories)
+        {
+            log::warn!("DRLCSchedule: EndDeviceControl ({mrid}) does not target this category of device. Not scheduling event.");
+            return;
+        }
 
         // If the event already exists in the schedule
         if self.events.read().await.contains(&mrid) {
