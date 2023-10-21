@@ -15,7 +15,7 @@ use sep2_common::{
         objects::EventStatusType,
         pricing::{RateComponent, TariffProfile, TimeTariffInterval},
         primitives::{HexBinary128, Int64, Uint32},
-        types::PrimacyType,
+        types::{DeviceCategoryType, PrimacyType},
     },
     traits::SEIdentifiedObject,
 };
@@ -35,7 +35,8 @@ fn test_setup() -> (
         None,
     )
     .unwrap();
-    let device = SEDevice::new_from_cert("../certs/client_cert.pem").unwrap();
+    let device =
+        SEDevice::new_from_cert("../certs/client_cert.pem", DeviceCategoryType::all()).unwrap();
     let handler = Arc::new(TimeTariffIntervalHandler {
         logs: RwLock::new(vec![]),
     });

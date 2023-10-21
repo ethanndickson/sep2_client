@@ -35,7 +35,6 @@ fn der_supersedes<'a>(
     a: EIPair<'a, DERControl>,
     b: EIPair<'a, DERControl>,
 ) -> Option<(EIPair<'a, DERControl>, EIPair<'a, DERControl>)> {
-    // TODO: Check DeviceCategory
     let same_target = a.0.has_same_target(b.0);
     if a.0.does_supersede(b.0) && same_target {
         Some((b, a))

@@ -14,7 +14,7 @@ use sep2_common::{
         messaging::{MessagingProgram, TextMessage},
         objects::EventStatusType,
         primitives::{HexBinary128, Int64, Uint32},
-        types::PrimacyType,
+        types::{DeviceCategoryType, PrimacyType},
     },
     traits::SEIdentifiedObject,
 };
@@ -33,7 +33,8 @@ fn test_setup() -> (
         None,
     )
     .unwrap();
-    let device = SEDevice::new_from_cert("../certs/client_cert.pem").unwrap();
+    let device =
+        SEDevice::new_from_cert("../certs/client_cert.pem", DeviceCategoryType::all()).unwrap();
     let handler = Arc::new(TextMessageHandler {
         logs: RwLock::new(vec![]),
     });

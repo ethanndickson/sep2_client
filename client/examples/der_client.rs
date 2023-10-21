@@ -18,6 +18,7 @@ use sep2_common::packages::{
     metering::Reading,
     primitives::Uint32,
     pubsub::Notification,
+    types::DeviceCategoryType,
 };
 use simple_logger::SimpleLogger;
 use tokio::sync::{
@@ -167,7 +168,8 @@ async fn main() -> Result<()> {
 
     // Initialise an EndDevice resource representing this device
     // (or acquire multiple out of band EndDevices if aggregate client)
-    let edr = SEDevice::new_from_cert("../../certs/client_cert.pem").unwrap();
+    let edr =
+        SEDevice::new_from_cert("../../certs/client_cert.pem", DeviceCategoryType::all()).unwrap();
     let edr = Arc::new(RwLock::new(edr));
 
     // Create a Notificaton server listening on 1338
