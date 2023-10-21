@@ -21,16 +21,17 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
 - [x] IEEE 2030.5 Base Client Capabilities (GET, POST, PUT, DELETE) 
 - [x] Asynchronous Resource Polling
 - [x] Notification / Subscription Client Server Mechanism
-- [ ] Event Scheduler
+- [x] Global Time Offset (Server Time Sync)
+- [x] Event Scheduler
   - [x] DER
   - [x] DRLC
   - [x] Messaging
-  - [ ] Flow Reservation
-  - [ ] Pricing
-  - [ ] Schedule Time Offset (Server Time Sync)
-- [ ] Tests / Documentation
+  - [x] Flow Reservation
+  - [x] Pricing
+  - [x] Per-Schedule Time Offset 
+- [x] Tests / Documentation
   - [x] IEEE 2030.5 Examples as System Tests
-  - [ ] Event Scheduler Tests
+  - [x] Event Scheduler Tests
   - [x] Subscription/Notification Tests
   - [x] DER Non-Aggregate Client Sample Impl.
 ### Stretch Goals

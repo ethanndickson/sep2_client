@@ -56,7 +56,7 @@ pub enum SEPResponse {
     // HTTP 404 - 2030.5-2018 - 5.5.2.11
     NotFound,
     // HTTP 405 w/ Allow header value - 2030.5-2018 - 5.5.2.12
-    MethodNotAllowed(&'static str),
+    MethodNotAllowed(String),
 }
 
 impl Display for SEPResponse {
@@ -107,12 +107,49 @@ impl From<SEPResponse> for hyper::Response<Body> {
             SEPResponse::MethodNotAllowed(methods) => {
                 *res.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
                 res.headers_mut()
-                    .insert(ALLOW, HeaderValue::from_static(methods));
+                    .insert(ALLOW, HeaderValue::try_from(methods).unwrap());
             }
         };
         res
     }
 }
+
+// async `TryFrom<Response<Body>> for SEPResponse`` implementation
+async fn into_sepresponse(res: hyper::Response<Body>) -> Result<SEPResponse> {
+    match res.status() {
+        // We leave the checking of the location header up to the client
+        StatusCode::CREATED => {
+            let loc = res
+                .headers()
+                .get(LOCATION)
+                .and_then(|h| h.to_str().ok())
+                .map(|r| r.to_string());
+            Ok(SEPResponse::Created(loc))
+        }
+        StatusCode::NO_CONTENT => Ok(SEPResponse::NoContent),
+        StatusCode::BAD_REQUEST => Ok(SEPResponse::BadRequest(
+            hyper::body::to_bytes(res.into_body())
+                .await
+                .ok()
+                .and_then(|b| {
+                    let out = String::from_utf8_lossy(&b);
+                    deserialize(&out).ok()
+                }),
+        )),
+        StatusCode::NOT_FOUND => Ok(SEPResponse::NotFound),
+        StatusCode::METHOD_NOT_ALLOWED => {
+            let loc = res
+                .headers()
+                .get(ALLOW)
+                .and_then(|h| h.to_str().ok())
+                .map(|r| r.to_string())
+                .unwrap();
+            Ok(SEPResponse::MethodNotAllowed(loc))
+        }
+        _ => bail!("Unexpected HTTP response from server"),
+    }
+}
+
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait::async_trait]
 pub trait PollCallback<T: SEResource>: Clone + Send + Sync + 'static {
@@ -252,8 +289,7 @@ impl Client {
         // TODO: Handle moved resources - implement HTTP redirects
         match res.status() {
             StatusCode::OK => (),
-            StatusCode::NOT_FOUND => bail!("404 Not Found"),
-            _ => bail!("Unexpected HTTP response from server"),
+            e => bail!("Unexpected HTTP response from server: {}", e),
         }
         let body = hyper::body::to_bytes(res.into_body()).await?;
         let xml = String::from_utf8_lossy(&body);
@@ -277,7 +313,7 @@ impl Client {
     /// Delete the [`SEResource`] at the given path.
     ///
     /// Returns an error if the server does not respond with 204 No Content.
-    pub async fn delete(&self, path: &str) -> Result<()> {
+    pub async fn delete(&self, path: &str) -> Result<SEPResponse> {
         let uri: Uri = format!("{}{}", self.addr, path)
             .parse()
             .context("Failed to parse address")?;
@@ -289,12 +325,7 @@ impl Client {
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
-        match res.status() {
-            StatusCode::NO_CONTENT => Ok(()),
-            StatusCode::BAD_REQUEST => bail!("400 Bad Request"),
-            StatusCode::NOT_FOUND => bail!("404 Not Found"),
-            _ => bail!("Unexpected HTTP response from server"),
-        }
+        into_sepresponse(res).await
     }
 
     /// Begin polling the given route by performing GET requests on a regular interval. Passes the returned [`SEResource`] to the given callback.
@@ -390,21 +421,7 @@ impl Client {
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
-        match res.status() {
-            // We leave the checking of the location header up to the client
-            StatusCode::CREATED => {
-                let loc = res
-                    .headers()
-                    .get(LOCATION)
-                    .and_then(|h| h.to_str().ok())
-                    .map(|r| r.to_string());
-                Ok(SEPResponse::Created(loc))
-            }
-            StatusCode::NO_CONTENT => Ok(SEPResponse::NoContent),
-            StatusCode::BAD_REQUEST => bail!("400 Bad Request"),
-            StatusCode::NOT_FOUND => bail!("404 Not Found"),
-            _ => bail!("Unexpected HTTP response from server"),
-        }
+        into_sepresponse(res).await
     }
 
     #[cfg(feature = "messaging")]
