@@ -218,7 +218,7 @@ async fn main() -> Result<()> {
         edr.clone(),
         Arc::new(handler),
         // 10 minute intermittent sleeps
-        Duration::from_secs(60 * 60 * 10),
+        Duration::from_secs(60 * 10),
     );
 
     // Setup DERControl event polling retrieval

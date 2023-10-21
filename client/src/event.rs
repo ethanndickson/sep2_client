@@ -7,7 +7,7 @@
 
 use std::{
     collections::{hash_map, HashMap},
-    sync::Arc,
+    sync::{atomic::AtomicI64, Arc},
     time::Duration,
 };
 
@@ -16,6 +16,8 @@ use rand::Rng;
 use sep2_common::packages::{
     identification::ResponseStatus,
     objects::EventStatusType,
+    primitives::Int64,
+    time::Time,
     types::{MRIDType, OneHourRangeType, PrimacyType},
 };
 use sep2_common::traits::SEEvent;
@@ -328,10 +330,10 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
         handler: Arc<H>,
         tickrate: Duration,
     ) -> Self;
+
     // TODO: This needs to take into account a server ID,
     // in order to determine when another server produces a superseding event
     async fn add_event(&mut self, event: E, program: &Self::Program);
-    // TODO: Add a function that accepts a time resource and sets a per-schedule time-offset
 }
 
 /// Schedule for a given function set, and a specific server.
@@ -365,6 +367,8 @@ where
     // Our background tasks sleep intermittently as IEEE 2030.5 client devices may be sleepy.
     // Thread / Tokio sleeps do not make progress while the device itself is slept.
     pub(crate) tickrate: Duration,
+    // Schedule-specific time offset, as set by a Time resource
+    pub(crate) time_offset: Arc<AtomicI64>,
 }
 
 // Manual clone implementation since H doesn't need to be clone
@@ -381,6 +385,7 @@ where
             handler: self.handler.clone(),
             bc_sd: self.bc_sd.clone(),
             tickrate: self.tickrate.clone(),
+            time_offset: Arc::new(AtomicI64::new(0)),
         }
     }
 }
@@ -390,8 +395,27 @@ where
     E: SEEvent,
     H: EventHandler<E>,
 {
+    /// Updates the schedule-specific time offset.
+    /// "If FunctionSetAssignments contain both Event-based function sets (e.g., DRLC, pricing, message) and a
+    /// Time resource, then devices SHALL use the Time resource from the same FunctionSetAssignments when
+    /// executing the events from the associated Event-based function set."
+    pub async fn update_time(&mut self, time: Time) {
+        let offset = time.current_time.get() - current_time().get();
+        self.time_offset
+            .store(offset, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn shutdown(&mut self) {
+        let _ = self.bc_sd.send(());
+    }
+
+    pub(crate) fn schedule_time(&self) -> Int64 {
+        Int64(current_time().get() + self.time_offset.load(std::sync::atomic::Ordering::Relaxed))
+    }
+
     pub(crate) async fn clean_events(self, mut rx: Receiver<()>) {
-        let week = 60 * 60 * 24 * 30;
+        // Can/Should be adjusted - but a week is pretty safe for servers
+        let week = 60 * 60 * 24 * 7;
         let mut last = current_time().get();
         let mut next = current_time().get() + week;
         loop {
@@ -413,9 +437,5 @@ where
             last = current_time().get();
             next = last + week;
         }
-    }
-
-    pub fn shutdown(&mut self) {
-        let _ = self.bc_sd.send(());
     }
 }

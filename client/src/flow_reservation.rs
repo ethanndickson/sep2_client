@@ -11,7 +11,10 @@ use sep2_common::packages::flow_reservation::FlowReservationResponse;
 
 use crate::event::{EventHandler, Schedule};
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{atomic::AtomicI64, Arc},
+    time::Duration,
+};
 
 use tokio::sync::RwLock;
 
@@ -42,6 +45,7 @@ impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse
             handler,
             bc_sd: tx.clone(),
             tickrate,
+            time_offset: Arc::new(AtomicI64::new(0)),
         }
     }
     #[allow(unused_variables)]

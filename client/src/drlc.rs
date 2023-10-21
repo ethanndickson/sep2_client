@@ -17,7 +17,10 @@ use crate::{
     time::current_time,
 };
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{atomic::AtomicI64, Arc},
+    time::Duration,
+};
 
 use tokio::sync::{broadcast::Receiver, RwLock};
 
@@ -64,7 +67,12 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.client
-                .auto_drlc_response(&*self.device.read().await, target.event(), resp)
+                .auto_drlc_response(
+                    &*self.device.read().await,
+                    target.event(),
+                    resp,
+                    self.schedule_time(),
+                )
                 .await;
         }
     }
@@ -92,7 +100,12 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.client
-                .auto_drlc_response(&*self.device.read().await, target.event(), resp)
+                .auto_drlc_response(
+                    &*self.device.read().await,
+                    target.event(),
+                    resp,
+                    self.schedule_time(),
+                )
                 .await;
         }
     }
@@ -113,7 +126,12 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             ResponseStatus::EventCancelled
         };
         self.client
-            .auto_drlc_response(&*self.device.read().await, ei.event(), resp)
+            .auto_drlc_response(
+                &*self.device.read().await,
+                ei.event(),
+                resp,
+                self.schedule_time(),
+            )
             .await;
     }
 }
@@ -137,6 +155,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             handler,
             bc_sd: tx.clone(),
             tickrate,
+            time_offset: Arc::new(AtomicI64::new(0)),
         };
         tokio::spawn(out.clone().clean_events(rx));
         tokio::spawn(out.clone().drlc_start_task(tx.subscribe()));
@@ -198,6 +217,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                     &*self.device.read().await,
                     &event,
                     ResponseStatus::EventReceived,
+                    self.schedule_time(),
                 )
                 .await;
 
@@ -208,7 +228,12 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             ) {
                 log::warn!("DRLCSchedule: Told to schedule EndDeviceControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
                 self.client
-                    .auto_drlc_response(&*self.device.read().await, &event, incoming_status.into())
+                    .auto_drlc_response(
+                        &*self.device.read().await,
+                        &event,
+                        incoming_status.into(),
+                        self.schedule_time(),
+                    )
                     .await;
                 return;
             }
@@ -233,6 +258,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                         &*self.device.read().await,
                         ei.event(),
                         ResponseStatus::EventExpired,
+                        self.schedule_time(),
                     )
                     .await;
                 return;
@@ -267,7 +293,12 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                         ResponseStatus::EventSuperseded
                     };
                     self.client
-                        .auto_drlc_response(&*self.device.read().await, superseded.event(), status)
+                        .auto_drlc_response(
+                            &*self.device.read().await,
+                            superseded.event(),
+                            status,
+                            self.schedule_time(),
+                        )
                         .await;
                 }
             }
