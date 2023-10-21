@@ -8,7 +8,7 @@
 use std::{
     collections::{hash_map, HashMap},
     sync::{atomic::AtomicI64, Arc},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{client::Client, device::SEDevice, time::current_time};
@@ -49,7 +49,7 @@ where
     // The current status of the Event,
     status: EIStatus,
     // When the event status was last updated
-    last_updated: i64,
+    last_updated: Instant,
     // The event(s) this supersedes, if any
     superseded_by: Vec<MRIDType>,
 }
@@ -107,7 +107,7 @@ impl<E: SEEvent> EventInstance<E> {
             primacy,
             start,
             end,
-            last_updated: current_time().get(),
+            last_updated: Instant::now(),
             superseded_by: vec![],
             program_mrid,
         }
@@ -128,7 +128,7 @@ impl<E: SEEvent> EventInstance<E> {
             primacy,
             start,
             end,
-            last_updated: current_time().get(),
+            last_updated: Instant::now(),
             superseded_by: vec![],
             program_mrid,
         }
@@ -148,7 +148,7 @@ impl<E: SEEvent> EventInstance<E> {
 
     pub(crate) fn update_status(&mut self, status: EIStatus) {
         self.status = status;
-        self.last_updated = current_time().get();
+        self.last_updated = Instant::now();
     }
 
     pub(crate) fn superseded_by(&mut self, other: &MRIDType) {
@@ -417,9 +417,9 @@ where
 
     pub(crate) async fn clean_events(self, mut rx: Receiver<()>) {
         // Can/Should be adjusted - but a week is pretty safe for servers
-        let week = 60 * 60 * 24 * 7;
-        let mut last = current_time().get();
-        let mut next = current_time().get() + week;
+        let week = Duration::from_secs(60 * 60 * 24 * 7);
+        let mut last = Instant::now();
+        let mut next = last + week;
         loop {
             tokio::select! {
                 _ = crate::time::sleep_until(next,self.tickrate) => (),
@@ -436,7 +436,7 @@ where
                 matches!(ei.status, EIStatus::Active | EIStatus::Scheduled)
                     || ei.last_updated > last
             });
-            last = current_time().get();
+            last = Instant::now();
             next = last + week;
         }
     }

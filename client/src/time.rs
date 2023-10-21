@@ -1,6 +1,6 @@
 use std::{
     sync::atomic::AtomicI64,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use sep2_common::packages::{primitives::Int64, time::Time};
@@ -32,12 +32,12 @@ pub fn update_time_offset(time: Time) {
     TIME_OFFSET.store(offset, std::sync::atomic::Ordering::Relaxed);
 }
 
-/// Intermittently sleep until the provided timestamp,
+/// Intermittently sleep until the provided instant,
 /// waking at an interval defined by `rate`.
-pub async fn sleep_until(timestamp: i64, rate: Duration) {
+pub async fn sleep_until(timestamp: Instant, tickrate: Duration) {
     loop {
-        tokio::time::sleep(rate).await;
-        if current_time().get() > timestamp {
+        tokio::time::sleep(tickrate).await;
+        if Instant::now() > timestamp {
             break;
         }
     }
