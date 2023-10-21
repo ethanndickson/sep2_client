@@ -13,6 +13,7 @@ use sep2_common::packages::{
 };
 
 use crate::{
+    client::SEPResponse,
     event::{EIPair, EIStatus, EventHandler, EventInstance, Schedule},
     time::current_time,
 };
@@ -66,14 +67,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
-            self.client
-                .auto_drlc_response(
-                    &*self.device.read().await,
-                    target.event(),
-                    resp,
-                    self.schedule_time(),
-                )
-                .await;
+            self.auto_drlc_response(target.event(), resp).await;
         }
     }
 
@@ -99,14 +93,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
-            self.client
-                .auto_drlc_response(
-                    &*self.device.read().await,
-                    target.event(),
-                    resp,
-                    self.schedule_time(),
-                )
-                .await;
+            self.auto_drlc_response(target.event(), resp).await;
         }
     }
 
@@ -125,14 +112,41 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
         } else {
             ResponseStatus::EventCancelled
         };
-        self.client
-            .auto_drlc_response(
+        self.auto_drlc_response(ei.event(), resp).await;
+    }
+
+    async fn auto_drlc_response(&self, event: &EndDeviceControl, status: ResponseStatus) {
+        match self
+            .client
+            .send_drlc_response(
                 &*self.device.read().await,
-                ei.event(),
-                resp,
+                event,
+                status,
                 self.schedule_time(),
             )
-            .await;
+            .await
+        {
+            Ok(
+                e @ (SEPResponse::BadRequest(_)
+                | SEPResponse::NotFound
+                | SEPResponse::MethodNotAllowed(_)),
+            ) => {
+                log::warn!(
+                    "Client: DRLC response POST attempt failed with HTTP status code: {}",
+                    e
+                );
+            }
+            Err(e) => log::warn!(
+                "Client: DRLC response POST attempt failed with reason: {}",
+                e
+            ),
+            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
+                log::info!(
+                    "Client: DRLC response POST attempt succeeded with reason: {}",
+                    r
+                )
+            }
+        }
     }
 }
 
@@ -212,13 +226,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             // We intentionally hold this lock for this entire scope
             let mut events = self.events.write().await;
             // Inform server event was received
-            self.client
-                .auto_drlc_response(
-                    &*self.device.read().await,
-                    &event,
-                    ResponseStatus::EventReceived,
-                    self.schedule_time(),
-                )
+            self.auto_drlc_response(&event, ResponseStatus::EventReceived)
                 .await;
 
             // Event arrives cancelled or superseded
@@ -227,13 +235,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                 EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
             ) {
                 log::warn!("DRLCSchedule: Told to schedule EndDeviceControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
-                self.client
-                    .auto_drlc_response(
-                        &*self.device.read().await,
-                        &event,
-                        incoming_status.into(),
-                        self.schedule_time(),
-                    )
+                self.auto_drlc_response(&event, incoming_status.into())
                     .await;
                 return;
             }
@@ -253,13 +255,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                 log::warn!("DRLCSchedule: Told to schedule EndDeviceControl ({mrid}) which has already ended, sending server response and not scheduling.");
                 // Do not add event to schedule
                 // For function sets with direct control ... Do this response
-                self.client
-                    .auto_drlc_response(
-                        &*self.device.read().await,
-                        ei.event(),
-                        ResponseStatus::EventExpired,
-                        self.schedule_time(),
-                    )
+                self.auto_drlc_response(ei.event(), ResponseStatus::EventExpired)
                     .await;
                 return;
             }
@@ -292,14 +288,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                     } else {
                         ResponseStatus::EventSuperseded
                     };
-                    self.client
-                        .auto_drlc_response(
-                            &*self.device.read().await,
-                            superseded.event(),
-                            status,
-                            self.schedule_time(),
-                        )
-                        .await;
+                    self.auto_drlc_response(superseded.event(), status).await;
                 }
             }
 

@@ -12,7 +12,7 @@ use sep2_common::packages::{
 use tokio::sync::{broadcast::Receiver, RwLock};
 
 use crate::{
-    client::Client,
+    client::{Client, SEPResponse},
     device::SEDevice,
     event::{EIPair, EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
     time::current_time,
@@ -63,14 +63,7 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
-            self.client
-                .auto_pricing_response(
-                    self.device.read().await.lfdi,
-                    target.event(),
-                    resp,
-                    self.schedule_time(),
-                )
-                .await;
+            self.auto_pricing_response(target.event(), resp).await;
         }
     }
 
@@ -98,14 +91,7 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
-            self.client
-                .auto_pricing_response(
-                    self.device.read().await.lfdi,
-                    target.event(),
-                    resp,
-                    self.schedule_time(),
-                )
-                .await;
+            self.auto_pricing_response(target.event(), resp).await;
         }
     }
 
@@ -124,14 +110,39 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
         } else {
             ResponseStatus::EventCancelled
         };
-        self.client
-            .auto_pricing_response(
+        self.auto_pricing_response(ei.event(), resp).await;
+    }
+
+    async fn auto_pricing_response(&self, event: &TimeTariffInterval, status: ResponseStatus) {
+        match self
+            .client
+            .send_pricing_response(
                 self.device.read().await.lfdi,
-                ei.event(),
-                resp,
+                event,
+                status,
                 self.schedule_time(),
             )
-            .await;
+            .await
+        {
+            Ok(
+                e @ (SEPResponse::BadRequest(_)
+                | SEPResponse::NotFound
+                | SEPResponse::MethodNotAllowed(_)),
+            ) => log::warn!(
+                "Client: Pricing response POST attempt failed with HTTP status code: {}",
+                e
+            ),
+            Err(e) => log::warn!(
+                "Client: Pricing response POST attempted failed with reason: {}",
+                e
+            ),
+            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
+                log::info!(
+                    "Client: Pricing response POST attempt succeeded with reason: {}",
+                    r
+                )
+            }
+        }
     }
 }
 
@@ -206,13 +217,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
             // We intentionally hold this lock for this entire scope
             let mut events = self.events.write().await;
             // Inform server event was received
-            self.client
-                .auto_pricing_response(
-                    self.device.read().await.lfdi,
-                    &event,
-                    ResponseStatus::EventReceived,
-                    self.schedule_time(),
-                )
+            self.auto_pricing_response(&event, ResponseStatus::EventReceived)
                 .await;
 
             // Event arrives cancelled or superseded
@@ -221,13 +226,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                 EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
             ) {
                 log::warn!("PricingSchedule: Told to schedule TimeTariffInterval ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
-                self.client
-                    .auto_pricing_response(
-                        self.device.read().await.lfdi,
-                        &event,
-                        incoming_status.into(),
-                        self.schedule_time(),
-                    )
+                self.auto_pricing_response(&event, incoming_status.into())
                     .await;
                 return;
             }
@@ -247,13 +246,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                 log::warn!("PricingSchedule: Told to schedule TimeTariffInterval ({mrid}) which has already ended, sending server response and not scheduling.");
                 // Do not add event to schedule
                 // For function sets with direct control ... Do this response
-                self.client
-                    .auto_pricing_response(
-                        self.device.read().await.lfdi,
-                        ei.event(),
-                        ResponseStatus::EventExpired,
-                        self.schedule_time(),
-                    )
+                self.auto_pricing_response(ei.event(), ResponseStatus::EventExpired)
                     .await;
                 return;
             }
@@ -287,14 +280,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                     } else {
                         ResponseStatus::EventSuperseded
                     };
-                    self.client
-                        .auto_pricing_response(
-                            self.device.read().await.lfdi,
-                            superseded.event(),
-                            status,
-                            self.schedule_time(),
-                        )
-                        .await;
+                    self.auto_pricing_response(superseded.event(), status).await;
                 }
             }
 

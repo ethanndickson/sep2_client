@@ -90,6 +90,7 @@ fn create_event(
     duration: u32,
 ) -> EndDeviceControl {
     let mut out = EndDeviceControl::default();
+    out.device_category = DeviceCategoryType::all();
     out.mrid = HexBinary128(count.try_into().unwrap());
     out.creation_time = Int64(count);
     out.event_status.current_status = status;

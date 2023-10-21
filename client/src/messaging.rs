@@ -17,7 +17,7 @@ use sep2_common::packages::{
 use tokio::sync::{broadcast::Receiver, RwLock};
 
 use crate::{
-    client::Client,
+    client::{Client, SEPResponse},
     device::SEDevice,
     event::{EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
     time::current_time,
@@ -45,14 +45,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
-            self.client
-                .auto_msg_response(
-                    self.device.read().await.lfdi,
-                    target.event(),
-                    resp,
-                    self.schedule_time(),
-                )
-                .await;
+            self.auto_msg_response(target.event(), resp).await;
         }
     }
 
@@ -76,14 +69,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
-            self.client
-                .auto_msg_response(
-                    self.device.read().await.lfdi,
-                    target.event(),
-                    resp,
-                    self.schedule_time(),
-                )
-                .await;
+            self.auto_msg_response(target.event(), resp).await;
         }
     }
 
@@ -108,14 +94,39 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
             // If it's not active, the client doesn't even know about this event
             ResponseStatus::EventCancelled
         };
-        self.client
-            .auto_msg_response(
+        self.auto_msg_response(ei.event(), resp).await;
+    }
+
+    async fn auto_msg_response(&self, event: &TextMessage, status: ResponseStatus) {
+        match self
+            .client
+            .send_msg_response(
                 self.device.read().await.lfdi,
-                ei.event(),
-                resp,
+                event,
+                status,
                 self.schedule_time(),
             )
-            .await;
+            .await
+        {
+            Ok(
+                e @ (SEPResponse::BadRequest(_)
+                | SEPResponse::NotFound
+                | SEPResponse::MethodNotAllowed(_)),
+            ) => log::warn!(
+                "Client: Messaging response POST attempt failed with HTTP status code: {}",
+                e
+            ),
+            Err(e) => log::warn!(
+                "Client: Messaging response POST attempted failed with reason: {}",
+                e
+            ),
+            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
+                log::info!(
+                    "Client: Messaging response POST attempt succeeded with reason: {}",
+                    r
+                )
+            }
+        }
     }
 }
 
@@ -191,13 +202,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
         } else {
             let mut events = self.events.write().await;
 
-            self.client
-                .auto_msg_response(
-                    self.device.read().await.lfdi,
-                    &event,
-                    ResponseStatus::EventReceived,
-                    self.schedule_time(),
-                )
+            self.auto_msg_response(&event, ResponseStatus::EventReceived)
                 .await;
 
             // Event arrives cancelled or superseded
@@ -206,14 +211,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
                 EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
             ) {
                 log::warn!("TextMessageSchedule: Told to schedule DERControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
-                self.client
-                    .auto_msg_response(
-                        self.device.read().await.lfdi,
-                        &event,
-                        incoming_status.into(),
-                        self.schedule_time(),
-                    )
-                    .await;
+                self.auto_msg_response(&event, incoming_status.into()).await;
                 return;
             }
 

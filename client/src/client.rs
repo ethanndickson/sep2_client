@@ -408,36 +408,6 @@ impl Client {
     }
 
     #[cfg(feature = "messaging")]
-    pub(crate) async fn auto_msg_response(
-        &self,
-        lfdi: HexBinary160,
-        event: &TextMessage,
-        status: ResponseStatus,
-        time: Int64,
-    ) {
-        match self.send_msg_response(lfdi, event, status, time).await {
-            Ok(
-                e @ (SEPResponse::BadRequest(_)
-                | SEPResponse::NotFound
-                | SEPResponse::MethodNotAllowed(_)),
-            ) => log::warn!(
-                "Client: Messaging response POST attempt failed with HTTP status code: {}",
-                e
-            ),
-            Err(e) => log::warn!(
-                "Client: Messaging response POST attempted failed with reason: {}",
-                e
-            ),
-            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
-                log::info!(
-                    "Client: Messaging response POST attempt succeeded with reason: {}",
-                    r
-                )
-            }
-        }
-    }
-
-    #[cfg(feature = "messaging")]
     pub async fn send_msg_response(
         &self,
         lfdi: HexBinary160,
@@ -484,38 +454,6 @@ impl Client {
     }
 
     #[cfg(feature = "der")]
-    pub(crate) async fn auto_der_response(
-        &self,
-        lfdi: HexBinary160,
-        event: &DERControl,
-        status: ResponseStatus,
-        time: Int64,
-    ) {
-        match self.send_der_response(lfdi, event, status, time).await {
-            Ok(
-                e @ (SEPResponse::BadRequest(_)
-                | SEPResponse::NotFound
-                | SEPResponse::MethodNotAllowed(_)),
-            ) => {
-                log::warn!(
-                    "Client: DER response POST attempt failed with HTTP status code: {}",
-                    e
-                );
-            }
-            Err(e) => log::warn!(
-                "Client: DER response POST attempt failed with reason: {}",
-                e
-            ),
-            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
-                log::info!(
-                    "Client: DER response POST attempt succeeded with reason: {}",
-                    r
-                )
-            }
-        }
-    }
-
-    #[cfg(feature = "der")]
     pub async fn send_der_response(
         &self,
         lfdi: HexBinary160,
@@ -550,38 +488,6 @@ impl Client {
             &resp,
         )
         .await
-    }
-
-    #[cfg(feature = "drlc")]
-    pub(crate) async fn auto_drlc_response(
-        &self,
-        device: &SEDevice,
-        event: &EndDeviceControl,
-        status: ResponseStatus,
-        time: Int64,
-    ) {
-        match self.send_drlc_response(device, event, status, time).await {
-            Ok(
-                e @ (SEPResponse::BadRequest(_)
-                | SEPResponse::NotFound
-                | SEPResponse::MethodNotAllowed(_)),
-            ) => {
-                log::warn!(
-                    "Client: DRLC response POST attempt failed with HTTP status code: {}",
-                    e
-                );
-            }
-            Err(e) => log::warn!(
-                "Client: DRLC response POST attempt failed with reason: {}",
-                e
-            ),
-            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
-                log::info!(
-                    "Client: DRLC response POST attempt succeeded with reason: {}",
-                    r
-                )
-            }
-        }
     }
 
     #[cfg(feature = "drlc")]
@@ -626,36 +532,6 @@ impl Client {
             &resp,
         )
         .await
-    }
-
-    #[cfg(feature = "pricing")]
-    pub(crate) async fn auto_pricing_response(
-        &self,
-        lfdi: HexBinary160,
-        event: &TimeTariffInterval,
-        status: ResponseStatus,
-        time: Int64,
-    ) {
-        match self.send_pricing_response(lfdi, event, status, time).await {
-            Ok(
-                e @ (SEPResponse::BadRequest(_)
-                | SEPResponse::NotFound
-                | SEPResponse::MethodNotAllowed(_)),
-            ) => log::warn!(
-                "Client: Pricing response POST attempt failed with HTTP status code: {}",
-                e
-            ),
-            Err(e) => log::warn!(
-                "Client: Pricing response POST attempted failed with reason: {}",
-                e
-            ),
-            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
-                log::info!(
-                    "Client: Pricing response POST attempt succeeded with reason: {}",
-                    r
-                )
-            }
-        }
     }
 
     #[cfg(feature = "pricing")]
