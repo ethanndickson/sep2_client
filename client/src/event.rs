@@ -38,6 +38,11 @@ where
     // The SEEvent instance
     event: E,
     // The MRID of the program this event belongs to
+    // In the pricing function set,
+    // multiple TimeTariffIntervals can be active
+    // for a specific TariffProfile (program)
+    // In that case, we store the MRID of the Rate Component,
+    // of which there can only be one TimeTariffInterval active at a time
     program_mrid: MRIDType,
     // The current status of the Event,
     status: EIStatus,
@@ -46,6 +51,8 @@ where
     // The event(s) this supersedes, if any
     superseded_by: Vec<MRIDType>,
 }
+
+pub(crate) type EIPair<'a, E> = (&'a mut EventInstance<E>, &'a MRIDType);
 
 /// The current state of an [`EventInstance`] in the schedule.
 /// Can be created from a [`EventStatusType`] for the purpose of reading [`SEEvent`] resources.
@@ -135,25 +142,6 @@ impl<E: SEEvent> EventInstance<E> {
                 // Or same primacy, and this one is newer
                 || self.primacy == other.primacy
                     && self.event.creation_time() > other.event.creation_time())
-    }
-
-    /// Given two events, determine which is superseded, update internal states, and return the superseded event
-    pub(crate) fn mark_supersede<'a>(
-        a: (&'a mut EventInstance<E>, &'a MRIDType),
-        b: (&'a mut EventInstance<E>, &'a MRIDType),
-    ) -> Option<(&'a mut EventInstance<E>, &'a mut EventInstance<E>)> {
-        let out = if a.0.does_supersede(b.0) {
-            Some((a, b))
-        } else if b.0.does_supersede(a.0) {
-            Some((b, a))
-        } else {
-            None
-        };
-
-        out.map(|(superseding, superseded)| {
-            superseded.0.superseded_by(superseding.1);
-            (superseded.0, superseding.0)
-        })
     }
 
     pub(crate) fn update_status(&mut self, status: EIStatus) {

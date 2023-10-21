@@ -45,6 +45,9 @@ use {
     sep2_common::packages::{drlc::EndDeviceControl, response::DrResponse},
 };
 
+#[cfg(feature = "pricing")]
+use sep2_common::packages::{pricing::TimeTariffInterval, response::PriceResponse};
+
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
 pub enum SEPResponse {
     // HTTP 201 w/ Location header value, if it exists - 2030.5-2018 - 5.5.2.4
@@ -446,6 +449,7 @@ impl Client {
         event: &TextMessage,
         status: ResponseStatus,
     ) -> Result<SEPResponse> {
+        // As per Messaging in Table 27
         match (status, event.response_required) {
             (ResponseStatus::EventReceived, Some(rr))
                 if rr.contains(ResponseRequired::MessageReceived) => {}
@@ -619,6 +623,78 @@ impl Client {
             event
                 .reply_to()
                 .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
+            &resp,
+        )
+        .await
+    }
+
+    #[cfg(feature = "pricing")]
+    pub(crate) async fn auto_pricing_response(
+        &self,
+        lfdi: HexBinary160,
+        event: &TimeTariffInterval,
+        status: ResponseStatus,
+    ) {
+        match self.send_pricing_response(lfdi, event, status).await {
+            Ok(
+                e @ (SEPResponse::BadRequest(_)
+                | SEPResponse::NotFound
+                | SEPResponse::MethodNotAllowed(_)),
+            ) => log::warn!(
+                "Client: Pricing response POST attempt failed with HTTP status code: {}",
+                e
+            ),
+            Err(e) => log::warn!(
+                "Client: Pricing response POST attempted failed with reason: {}",
+                e
+            ),
+            Ok(r @ (SEPResponse::Created(_) | SEPResponse::NoContent)) => {
+                log::info!(
+                    "Client: Pricing response POST attempt succeeded with reason: {}",
+                    r
+                )
+            }
+        }
+    }
+
+    #[cfg(feature = "pricing")]
+    pub async fn send_pricing_response(
+        &self,
+        lfdi: HexBinary160,
+        event: &TimeTariffInterval,
+        status: ResponseStatus,
+    ) -> Result<SEPResponse> {
+        // As per Pricing in Table 27
+        match (status, event.response_required) {
+            (ResponseStatus::EventReceived, Some(rr))
+                if rr.contains(ResponseRequired::MessageReceived) => {}
+            (ResponseStatus::EventStarted, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventCompleted, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventSuperseded, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventAcknowledge, Some(rr))
+                if rr.contains(ResponseRequired::ResponseRequired) => {}
+            (ResponseStatus::EventAbortedServer, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventAbortedProgram, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            (ResponseStatus::EventExpired, Some(rr))
+                if rr.contains(ResponseRequired::SpecificResponse) => {}
+            _ => bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field.")
+        };
+        let resp = PriceResponse {
+            created_date_time: Some(current_time()),
+            end_device_lfdi: lfdi,
+            status: Some(status),
+            subject: event.mrid,
+            href: None,
+        };
+        self.post(
+            event
+                .reply_to()
+                .ok_or(anyhow!("Event does not contain a ReplyToField"))?,
             &resp,
         )
         .await

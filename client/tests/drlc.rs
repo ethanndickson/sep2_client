@@ -236,6 +236,7 @@ async fn unsupersede_drlc_scheduler() {
     );
 }
 
+/// Test the scheduler with events that come from programs with differing primacies, and that they get superseded as expected
 #[tokio::test]
 async fn schedule_drlc_differing_primacy() {
     let (program1, mut program2, mut program3) = (
