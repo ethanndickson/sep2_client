@@ -252,8 +252,7 @@ impl Client {
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
-        // TODO: Improve error handling
-        // TODO: Handle moved resources
+        // TODO: Handle moved resources - implement HTTP redirects
         match res.status() {
             StatusCode::OK => (),
             StatusCode::NOT_FOUND => bail!("404 Not Found"),
@@ -293,7 +292,6 @@ impl Client {
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
-        // TODO: Improve error handling
         match res.status() {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::BAD_REQUEST => bail!("400 Bad Request"),
@@ -395,7 +393,6 @@ impl Client {
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
-        // TODO: Improve error handling
         match res.status() {
             // We leave the checking of the location header up to the client
             StatusCode::CREATED => {

@@ -32,7 +32,6 @@ fn drlc_mark_supersede<'a>(
     a: EIPair<'a, EndDeviceControl>,
     b: EIPair<'a, EndDeviceControl>,
 ) -> Option<(EIPair<'a, EndDeviceControl>, EIPair<'a, EndDeviceControl>)> {
-    // TODO: Check DeviceCategory
     if a.0.does_supersede(b.0) {
         Some((b, a))
     } else if b.0.does_supersede(a.0) {
