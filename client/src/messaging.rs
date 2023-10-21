@@ -3,7 +3,10 @@
 //! This module is primarily an implementation of a Schedule for TextMessage events.
 //!
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{atomic::AtomicI64, Arc},
+    time::Duration,
+};
 
 use sep2_common::packages::{
     identification::ResponseStatus,
@@ -43,7 +46,12 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.client
-                .auto_msg_response(self.device.read().await.lfdi, target.event(), resp)
+                .auto_msg_response(
+                    self.device.read().await.lfdi,
+                    target.event(),
+                    resp,
+                    self.schedule_time(),
+                )
                 .await;
         }
     }
@@ -69,7 +77,12 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.client
-                .auto_msg_response(self.device.read().await.lfdi, target.event(), resp)
+                .auto_msg_response(
+                    self.device.read().await.lfdi,
+                    target.event(),
+                    resp,
+                    self.schedule_time(),
+                )
                 .await;
         }
     }
@@ -96,7 +109,12 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
             ResponseStatus::EventCancelled
         };
         self.client
-            .auto_msg_response(self.device.read().await.lfdi, ei.event(), resp)
+            .auto_msg_response(
+                self.device.read().await.lfdi,
+                ei.event(),
+                resp,
+                self.schedule_time(),
+            )
             .await;
     }
 }
@@ -126,6 +144,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
             handler,
             bc_sd: tx.clone(),
             tickrate,
+            time_offset: Arc::new(AtomicI64::new(0)),
         };
         tokio::spawn(out.clone().clean_events(rx));
         tokio::spawn(out.clone().msg_start_task(tx.subscribe()));
@@ -177,6 +196,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
                     self.device.read().await.lfdi,
                     &event,
                     ResponseStatus::EventReceived,
+                    self.schedule_time(),
                 )
                 .await;
 
@@ -191,6 +211,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
                         self.device.read().await.lfdi,
                         &event,
                         incoming_status.into(),
+                        self.schedule_time(),
                     )
                     .await;
                 return;

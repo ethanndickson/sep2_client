@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{atomic::AtomicI64, Arc},
+    time::Duration,
+};
 
 use sep2_common::packages::{
     identification::ResponseStatus,
@@ -61,7 +64,12 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.client
-                .auto_pricing_response(self.device.read().await.lfdi, target.event(), resp)
+                .auto_pricing_response(
+                    self.device.read().await.lfdi,
+                    target.event(),
+                    resp,
+                    self.schedule_time(),
+                )
                 .await;
         }
     }
@@ -91,7 +99,12 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.client
-                .auto_pricing_response(self.device.read().await.lfdi, target.event(), resp)
+                .auto_pricing_response(
+                    self.device.read().await.lfdi,
+                    target.event(),
+                    resp,
+                    self.schedule_time(),
+                )
                 .await;
         }
     }
@@ -112,7 +125,12 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
             ResponseStatus::EventCancelled
         };
         self.client
-            .auto_pricing_response(self.device.read().await.lfdi, ei.event(), resp)
+            .auto_pricing_response(
+                self.device.read().await.lfdi,
+                ei.event(),
+                resp,
+                self.schedule_time(),
+            )
             .await;
     }
 }
@@ -136,6 +154,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
             handler,
             bc_sd: tx.clone(),
             tickrate,
+            time_offset: Arc::new(AtomicI64::new(0)),
         };
         tokio::spawn(out.clone().clean_events(rx));
         tokio::spawn(out.clone().pricing_start_task(tx.subscribe()));
@@ -192,6 +211,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                     self.device.read().await.lfdi,
                     &event,
                     ResponseStatus::EventReceived,
+                    self.schedule_time(),
                 )
                 .await;
 
@@ -206,6 +226,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                         self.device.read().await.lfdi,
                         &event,
                         incoming_status.into(),
+                        self.schedule_time(),
                     )
                     .await;
                 return;
@@ -231,6 +252,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                         self.device.read().await.lfdi,
                         ei.event(),
                         ResponseStatus::EventExpired,
+                        self.schedule_time(),
                     )
                     .await;
                 return;
@@ -270,6 +292,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                             self.device.read().await.lfdi,
                             superseded.event(),
                             status,
+                            self.schedule_time(),
                         )
                         .await;
                 }

@@ -23,17 +23,14 @@ use tokio::sync::RwLock;
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
 #[cfg(feature = "der")]
-use {
-    crate::time::current_time,
-    sep2_common::{
-        packages::{
-            der::DERControl,
-            identification::{ResponseRequired, ResponseStatus},
-            primitives::HexBinary160,
-            response::DERControlResponse,
-        },
-        traits::SERespondableResource,
+use sep2_common::{
+    packages::{
+        der::DERControl,
+        identification::{ResponseRequired, ResponseStatus},
+        primitives::{HexBinary160, Int64},
+        response::DERControlResponse,
     },
+    traits::SERespondableResource,
 };
 
 #[cfg(feature = "messaging")]
@@ -416,8 +413,9 @@ impl Client {
         lfdi: HexBinary160,
         event: &TextMessage,
         status: ResponseStatus,
+        time: Int64,
     ) {
-        match self.send_msg_response(lfdi, event, status).await {
+        match self.send_msg_response(lfdi, event, status, time).await {
             Ok(
                 e @ (SEPResponse::BadRequest(_)
                 | SEPResponse::NotFound
@@ -445,6 +443,7 @@ impl Client {
         lfdi: HexBinary160,
         event: &TextMessage,
         status: ResponseStatus,
+        time: Int64,
     ) -> Result<SEPResponse> {
         // As per Messaging in Table 27
         match (status, event.response_required) {
@@ -469,7 +468,7 @@ impl Client {
             _ => bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field.")
         };
         let resp = TextResponse {
-            created_date_time: Some(current_time()),
+            created_date_time: Some(time),
             end_device_lfdi: lfdi,
             status: Some(status),
             subject: event.mrid,
@@ -490,8 +489,9 @@ impl Client {
         lfdi: HexBinary160,
         event: &DERControl,
         status: ResponseStatus,
+        time: Int64,
     ) {
-        match self.send_der_response(lfdi, event, status).await {
+        match self.send_der_response(lfdi, event, status, time).await {
             Ok(
                 e @ (SEPResponse::BadRequest(_)
                 | SEPResponse::NotFound
@@ -521,6 +521,7 @@ impl Client {
         lfdi: HexBinary160,
         event: &DERControl,
         status: ResponseStatus,
+        time: Int64,
     ) -> Result<SEPResponse> {
         // As per Table 27 - DER Column
         match (status, event.response_required) {
@@ -536,7 +537,7 @@ impl Client {
         };
 
         let resp = DERControlResponse {
-            created_date_time: Some(current_time()),
+            created_date_time: Some(time),
             end_device_lfdi: lfdi,
             status: Some(status),
             subject: event.mrid,
@@ -557,8 +558,9 @@ impl Client {
         device: &SEDevice,
         event: &EndDeviceControl,
         status: ResponseStatus,
+        time: Int64,
     ) {
-        match self.send_drlc_response(device, event, status).await {
+        match self.send_drlc_response(device, event, status, time).await {
             Ok(
                 e @ (SEPResponse::BadRequest(_)
                 | SEPResponse::NotFound
@@ -588,6 +590,7 @@ impl Client {
         device: &SEDevice,
         event: &EndDeviceControl,
         status: ResponseStatus,
+        time: Int64,
     ) -> Result<SEPResponse> {
         // As per Table 27 - DRLC Column
 
@@ -604,7 +607,7 @@ impl Client {
         };
 
         let resp = DrResponse {
-            created_date_time: Some(current_time()),
+            created_date_time: Some(time),
             end_device_lfdi: device.lfdi,
             status: Some(status),
             subject: event.mrid,
@@ -631,8 +634,9 @@ impl Client {
         lfdi: HexBinary160,
         event: &TimeTariffInterval,
         status: ResponseStatus,
+        time: Int64,
     ) {
-        match self.send_pricing_response(lfdi, event, status).await {
+        match self.send_pricing_response(lfdi, event, status, time).await {
             Ok(
                 e @ (SEPResponse::BadRequest(_)
                 | SEPResponse::NotFound
@@ -660,6 +664,7 @@ impl Client {
         lfdi: HexBinary160,
         event: &TimeTariffInterval,
         status: ResponseStatus,
+        time: Int64,
     ) -> Result<SEPResponse> {
         // As per Pricing in Table 27
         match (status, event.response_required) {
@@ -682,7 +687,7 @@ impl Client {
             _ => bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field.")
         };
         let resp = PriceResponse {
-            created_date_time: Some(current_time()),
+            created_date_time: Some(time),
             end_device_lfdi: lfdi,
             status: Some(status),
             subject: event.mrid,
