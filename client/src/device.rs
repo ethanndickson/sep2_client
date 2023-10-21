@@ -3,7 +3,7 @@ use anyhow::Result;
 use sep2_common::packages::{
     edev::EndDevice,
     primitives::{HexBinary160, Uint16},
-    types::SFDIType,
+    types::{DeviceCategoryType, SFDIType},
 };
 
 #[cfg(feature = "drlc")]
@@ -18,6 +18,7 @@ pub struct SEDevice {
     pub lfdi: HexBinary160,
     pub sfdi: SFDIType,
     pub edev: EndDevice,
+    pub device_categories: DeviceCategoryType,
     #[cfg(feature = "drlc")]
     pub appliance_load_reduction: Option<ApplianceLoadReduction>,
     #[cfg(feature = "drlc")]
@@ -34,14 +35,15 @@ pub struct SEDevice {
 }
 
 impl SEDevice {
-    pub fn new_from_cert(cert_path: &str) -> Result<Self> {
+    pub fn new_from_cert(cert_path: &str, device_category: DeviceCategoryType) -> Result<Self> {
         let (lfdi, sfdi) = security_init(cert_path)?;
-        Ok(Self::new(lfdi, sfdi))
+        Ok(Self::new(lfdi, sfdi, device_category))
     }
-    pub fn new(lfdi: HexBinary160, sfdi: SFDIType) -> Self {
+    pub fn new(lfdi: HexBinary160, sfdi: SFDIType, device_category: DeviceCategoryType) -> Self {
         SEDevice {
-            lfdi: lfdi,
-            sfdi: sfdi,
+            lfdi,
+            sfdi,
+            device_categories: device_category,
             edev: EndDevice {
                 changed_time: current_time(),
                 enabled: Some(false),

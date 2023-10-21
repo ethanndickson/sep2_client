@@ -170,6 +170,14 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
     async fn add_event(&mut self, event: DERControl, program: &Self::Program) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
+        // Devices SHOULD ignore events that do not indicate their device category.
+        // If not present, all devices SHOULD respond
+        if let Some(category) = event.device_category {
+            if !category.intersects(self.device.read().await.device_categories) {
+                log::warn!("DERControlSchedule: DERControl ({mrid}) does not target this category of device. Not scheduling event.");
+                return;
+            }
+        }
 
         // If the event already exists in the schedule
         if self.events.read().await.contains(&mrid) {
