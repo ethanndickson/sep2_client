@@ -63,7 +63,7 @@ impl Router {
                         let func = func.value_mut();
                         Ok(func(&xml).await.into())
                     }
-                    _ => Ok(SEPResponse::MethodNotAllowed("POST").into()),
+                    _ => Ok(SEPResponse::MethodNotAllowed("POST".to_owned()).into()),
                 }
             }
             None => Ok(SEPResponse::NotFound.into()),

@@ -62,11 +62,26 @@ async fn basic_post() {
         SEPResponse::Created(None)
     ));
     // Bad method
-    assert!(client.put("/edev", &notif).await.is_err());
-    assert!(client.delete("/edev").await.is_err());
+    assert!(matches!(
+        client.put("/edev", &notif).await.unwrap(),
+        SEPResponse::MethodNotAllowed(_),
+    ));
+    assert!(matches!(
+        client.delete("/edev").await.unwrap(),
+        SEPResponse::MethodNotAllowed(_),
+    ));
     assert!(client.get::<EndDevice>("/edev").await.is_err());
     // Bad route
-    assert!(client.post("/bad_route", &notif).await.is_err());
-    assert!(client.post("", &notif).await.is_err());
-    assert!(client.post("/", &notif).await.is_err());
+    assert!(matches!(
+        client.post("/bad_route", &notif).await.unwrap(),
+        SEPResponse::NotFound,
+    ));
+    assert!(matches!(
+        client.post("", &notif).await.unwrap(),
+        SEPResponse::NotFound,
+    ));
+    assert!(matches!(
+        client.post("/", &notif).await.unwrap(),
+        SEPResponse::NotFound,
+    ));
 }
