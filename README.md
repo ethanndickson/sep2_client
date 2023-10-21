@@ -1,6 +1,6 @@
-# IEEE 2030.5 Client (Smart Energy Profile 2.0)
+# IEEE 2030.5 Client (Smart Energy Profile 2.0) (SEP2)
 
-`sep2_client` is a Rust library for developing IEEE 2030.5 compliant clients on Linux based operating systems.
+`sep2_client` is a (WIP) Rust library for developing IEEE 2030.5 compliant clients on Linux based operating systems.
 
 It relies on, and should be used alongside, the [`sep2_common`](https://github.com/ethanndickson/IEEE-2030.5-Common) crate, and it's implementation of the IEEE 2030.5 XSD.
 
@@ -15,7 +15,7 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
 `IEEE-2030.5-Common` - Git submodule for the IEEE 2030.5 Rust server & client common library
 
 # Progress
-### Core
+### Core Features
 - [x] Application Support Function Set (TCP, HTTP)
 - [x] Security Function Set (TLS + Certificate Verification, HTTPS)
 - [x] IEEE 2030.5 Base Client Capabilities (GET, POST, PUT, DELETE) 
@@ -34,8 +34,7 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
   - [x] Event Scheduler Tests
   - [x] Subscription/Notification Tests
   - [x] DER Non-Aggregate Client Sample Impl.
-### Stretch Goals
-- [ ] DNS-SD
 ### Future
+- [ ] DNS-SD
 - [ ] Australian CSIP Extensions
 - [ ] [rustls ECDHE-ECDSA-AES128-CCM8 Support](https://github.com/rustls/rustls/issues/1034)
