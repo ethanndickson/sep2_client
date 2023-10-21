@@ -21,7 +21,6 @@ use crate::{
     client::{Client, SEPResponse},
     device::SEDevice,
     event::{EIPair, EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
-    time::current_time,
 };
 
 impl EventInstance<DERControl> {
@@ -61,7 +60,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             }
             let mut events = self.events.write().await;
             let mrid = match events.next_start() {
-                Some((time, mrid)) if time < current_time().get() => mrid,
+                Some((time, mrid)) if time < self.schedule_time().get() => mrid,
                 // If no next, or not time yet
                 _ => continue,
             };
@@ -89,7 +88,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             }
             let mut events = self.events.write().await;
             let mrid = match events.next_end() {
-                Some((time, mrid)) if time < current_time().get() => mrid,
+                Some((time, mrid)) if time < self.schedule_time().get() => mrid,
                 // If no next, or not time yet
                 _ => continue,
             };
@@ -119,7 +118,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         cancel_reason: EIStatus,
     ) {
         let mut events = self.events.write().await;
-        events.cancel_event(target_mrid, cancel_reason);
+        events.cancel_event(target_mrid, cancel_reason, self.schedule_time().get());
         let events = events.downgrade();
         let ei = events.get(target_mrid).unwrap();
         let resp = if current_status == EIStatus::Active {
@@ -272,7 +271,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
             );
 
             // The event may have expired already
-            if ei.end_time() <= current_time().get() {
+            if ei.end_time() <= self.schedule_time().get() {
                 log::warn!("DERControlSchedule: Told to schedule DERControl ({mrid}) which has already ended, sending server response and not scheduling.");
                 // Do not add event to schedule
                 // For function sets with direct control ... Do this response
