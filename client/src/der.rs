@@ -17,7 +17,7 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 use crate::{
     client::Client,
     device::SEDevice,
-    event::{EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
+    event::{EIPair, EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
     time::current_time,
 };
 
@@ -30,30 +30,20 @@ impl EventInstance<DERControl> {
     }
 }
 
-/// Given two DERControls, determine which is superseded,
-/// mark the superseded event as superseded_by,
-/// and return the superseded event
-fn der_mark_supersede<'a>(
-    a: (&'a mut EventInstance<DERControl>, &'a MRIDType),
-    b: (&'a mut EventInstance<DERControl>, &'a MRIDType),
-) -> Option<(
-    &'a mut EventInstance<DERControl>,
-    &'a mut EventInstance<DERControl>,
-)> {
+/// Given two DERControls, determine which is superseded, and which is superseding, or None if neither supersede one another
+fn der_supersedes<'a>(
+    a: EIPair<'a, DERControl>,
+    b: EIPair<'a, DERControl>,
+) -> Option<(EIPair<'a, DERControl>, EIPair<'a, DERControl>)> {
     // TODO: Check DeviceCategory
     let same_target = a.0.has_same_target(b.0);
-    let out = if a.0.does_supersede(b.0) && same_target {
-        Some((a, b))
-    } else if b.0.does_supersede(a.0) && same_target {
+    if a.0.does_supersede(b.0) && same_target {
         Some((b, a))
+    } else if b.0.does_supersede(a.0) && same_target {
+        Some((a, b))
     } else {
         None
-    };
-
-    out.map(|(superseding, superseded)| {
-        superseded.0.superseded_by(superseding.1);
-        (superseded.0, superseding.0)
-    })
+    }
 }
 
 impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
@@ -276,12 +266,15 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
             // Determine what events this supersedes
             let mut target = ei;
             for (o_mrid, other) in events.iter_mut() {
-                if let Some((superseded, superseding)) =
-                    der_mark_supersede((&mut target, &mrid), (other, o_mrid))
+                if let Some(((superseded, _), (superseding, superseding_mrid))) =
+                    der_supersedes((&mut target, &mrid), (other, o_mrid))
                 {
-                    // Determine appropriate response
+                    // Mark as superseded
                     let prev_status = superseded.status();
                     superseded.update_status(EIStatus::Superseded);
+                    superseded.superseded_by(superseding_mrid);
+
+                    // Determine appropriate status
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler).event_update(superseded).await;

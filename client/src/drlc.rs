@@ -13,7 +13,7 @@ use sep2_common::packages::{
 };
 
 use crate::{
-    event::{EIStatus, EventHandler, EventInstance, Schedule},
+    event::{EIPair, EIStatus, EventHandler, EventInstance, Schedule},
     time::current_time,
 };
 
@@ -26,6 +26,21 @@ use crate::{
     device::SEDevice,
     event::{Events, Scheduler},
 };
+
+/// Given two EndDeviceControls, determine which is superseded, and which is superseding, or None if neither supersede one another
+fn drlc_mark_supersede<'a>(
+    a: EIPair<'a, EndDeviceControl>,
+    b: EIPair<'a, EndDeviceControl>,
+) -> Option<(EIPair<'a, EndDeviceControl>, EIPair<'a, EndDeviceControl>)> {
+    // TODO: Check DeviceCategory
+    if a.0.does_supersede(b.0) {
+        Some((b, a))
+    } else if b.0.does_supersede(a.0) {
+        Some((a, b))
+    } else {
+        None
+    }
+}
 
 // Demand Response Load Control Function Set
 impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
@@ -225,12 +240,14 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             // Determine what events this supersedes
             let mut target = ei;
             for (o_mrid, other) in events.iter_mut() {
-                if let Some((superseded, superseding)) =
-                    EventInstance::mark_supersede((&mut target, &mrid), (other, o_mrid))
+                if let Some(((superseded, _), (superseding, superseding_mrid))) =
+                    drlc_mark_supersede((&mut target, &mrid), (other, o_mrid))
                 {
-                    // Determine appropriate response
+                    // Mark as superseded
                     let prev_status = superseded.status();
                     superseded.update_status(EIStatus::Superseded);
+                    superseded.superseded_by(superseding_mrid);
+                    // Determine appropriate response
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler).event_update(superseded).await;
