@@ -52,7 +52,7 @@ impl TestServer {
         let acceptor = self.cfg.build();
         let listener = TcpListener::bind(self.addr).await?;
         let mut set = tokio::task::JoinSet::new();
-        log::info!("NotifServer: Listening on {}", self.addr);
+        log::info!("TestServer: Listening on {}", self.addr);
         loop {
             // Accept TCP Connection
             let (stream, addr) = tokio::select! {
@@ -60,31 +60,34 @@ impl TestServer {
                 res = listener.accept() => match res {
                     Ok((s,a)) => (s,a),
                     Err(err) => {
-                        log::error!("NotifServer: Failed to accept connection: {err}");
+                        log::error!("TestServer: Failed to accept connection: {err}");
                         continue;
                     }
                 }
             };
-            log::debug!("NotifServer: Remote connecting from {}", addr);
+            log::debug!("TestServer: Remote connecting from {}", addr);
 
             // Perform TLS handshake
             let ssl = Ssl::new(acceptor.context())?;
             let stream = SslStream::new(ssl, stream)?;
             let mut stream = Box::pin(stream);
-            stream.as_mut().accept().await?;
+            if let Err(e) = stream.as_mut().accept().await {
+                log::error!("TestServer: Failed to perform TLS handshake: {e}");
+                continue;
+            }
 
             // Bind connection to service
             let service = service_fn(move |req| async move { router(req).await });
             set.spawn(async move {
                 if let Err(err) = Http::new().serve_connection(stream, service).await {
-                    log::error!("NotifServer: Failed to handle connection: {err}");
+                    log::error!("TestServer: Failed to handle connection: {err}");
                 }
             });
         }
         // Wait for all connection handlers to finish
-        log::debug!("NotifServer: Attempting graceful shutdown");
+        log::debug!("TestServer: Attempting graceful shutdown");
         set.shutdown().await;
-        log::info!("NotifServer: Server has been shutdown.");
+        log::info!("TestServer: Server has been shutdown.");
         Ok(())
     }
 }

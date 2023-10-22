@@ -18,6 +18,7 @@ pub trait RouteCallback<T: SEResource>: Send + Sync + 'static {
     ) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>>;
 }
 
+// Our RouteCallback trait is automatically implemented for all functions with a matching function signature
 impl<F, R, T: SEResource> RouteCallback<T> for F
 where
     F: Fn(Notification<T>) -> R + Send + Sync + 'static,
@@ -38,8 +39,10 @@ type RouteHandler = Box<
         + 'static,
 >;
 
-/// A lightweight
 struct Router {
+    // We use dashmap to allow for multiple concurrent lookups into the map.
+    // The map is never resized once the server is started, so it doesn't make sense to use a big lock.
+    // It's likely a NotifServer will never store segmented paths, so a hash lookup is acceptable.
     routes: DashMap<String, RouteHandler>,
 }
 
@@ -94,6 +97,8 @@ impl ClientNotifServer {
     /// - A relative URI of the form "/foo"
     /// - A `Fn` callback accepting a [`Notification<T>`]`, where T is the expected [`SEResource`] on the route  
     ///
+    /// The `RouteCallback` trait can be implemented on any threadsafe type,
+    /// however it is automatically implemented for any applicable 'Fn'
     /// [`SEResource`]: sep2_common::traits::SEResource
     pub fn add<T>(self, path: impl Into<String>, callback: impl RouteCallback<T>) -> Self
     where
@@ -121,7 +126,9 @@ impl ClientNotifServer {
     /// Start the Notification Server.
     ///
     /// When the provided `shutdown` future completes, the server will shutdown gracefully.
-    /// Will return an error if the server crashes.
+    ///
+    /// This function will return an error IFF the server could not be started.
+    /// It will recover from all other errors.
     pub async fn run(self, shutdown: impl Future) -> Result<()> {
         tokio::pin!(shutdown);
         let acceptor = self.cfg.build();
@@ -147,7 +154,10 @@ impl ClientNotifServer {
             let ssl = Ssl::new(acceptor.context())?;
             let stream = SslStream::new(ssl, stream)?;
             let mut stream = Box::pin(stream);
-            stream.as_mut().accept().await?;
+            if let Err(e) = stream.as_mut().accept().await {
+                log::error!("NotifServer: Failed to perform TLS handshake: {e}");
+                continue;
+            }
 
             // Bind connection to service
             let router = router.clone();
