@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use sep2_test_server::TestServer;
+use simple_logger::SimpleLogger;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -16,6 +17,7 @@ struct Args {
 }
 #[tokio::main]
 async fn main() -> Result<()> {
+    SimpleLogger::new().init().unwrap();
     let args = Args::parse();
     let addr = format!("127.0.0.1:{}", args.port);
     log::info!("Server listening on {addr}");
