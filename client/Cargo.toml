@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.72"
 async-trait = "0.1.72"
-sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["edev"] }
+sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["edev","time"] }
 hyper = { version = "0.14.26", features = ["http1","client","runtime","tcp","server"] }
 hyper-openssl = "0.9.2"
 log = "0.4.17"
@@ -34,7 +34,7 @@ messaging = ["sep2_common/messaging","event"]
 drlc = ["sep2_common/drlc","event"]
 flow_reservation = ["sep2_common/flow_reservation","event"]
 pubsub = ["sep2_common/pubsub"]
-all = ["event","der","pricing","messaging","drlc", "flow_reservation", "pubsub","sep2_common/all"]
+all = ["event","der","pricing","messaging","drlc", "flow_reservation", "pubsub"]
 
 [[example]]
 name = "der_client"

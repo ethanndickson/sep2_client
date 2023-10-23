@@ -22,16 +22,20 @@ use tokio::sync::RwLock;
 
 use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
 
-#[cfg(feature = "der")]
+#[cfg(feature = "event")]
 use sep2_common::{
     packages::{
-        der::DERControl,
         identification::{ResponseRequired, ResponseStatus},
-        primitives::{HexBinary160, Int64},
-        response::DERControlResponse,
+        primitives::Int64,
     },
     traits::SERespondableResource,
 };
+
+#[cfg(any(feature = "messaging", feature = "der", feature = "pricing"))]
+use sep2_common::packages::primitives::HexBinary160;
+
+#[cfg(feature = "der")]
+use sep2_common::packages::{der::DERControl, response::DERControlResponse};
 
 #[cfg(feature = "messaging")]
 use sep2_common::packages::{messaging::TextMessage, response::TextResponse};
@@ -146,7 +150,7 @@ async fn into_sepresponse(res: hyper::Response<Body>) -> Result<SEPResponse> {
                 .unwrap();
             Ok(SEPResponse::MethodNotAllowed(loc))
         }
-        _ => bail!("Unexpected HTTP response from server"),
+        _ => Err(anyhow!("Unexpected HTTP response from server")),
     }
 }
 
@@ -346,7 +350,7 @@ impl Client {
     {
         let client = self.clone();
         let path: String = path.into();
-        let rate = poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get();
+        let poll_rate = poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get();
         let new: PollHandler = Box::new(move || {
             let path = path.clone();
             let client = client.clone();
@@ -368,17 +372,16 @@ impl Client {
                             T::name(),
                             &path,
                             err,
-                            &rate
+                            &poll_rate
                         );
-                        return;
                     }
                 };
             })
         });
-        let interval = Duration::from_secs(rate as u64);
+        let interval = Duration::from_secs(poll_rate as u64);
         let poll = PollTask {
             handler: new,
-            interval: interval,
+            interval,
             next: Instant::now() + interval,
         };
         self.polls.write().await.push(poll);

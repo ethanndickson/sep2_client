@@ -386,7 +386,7 @@ where
             events: self.events.clone(),
             handler: self.handler.clone(),
             bc_sd: self.bc_sd.clone(),
-            tickrate: self.tickrate.clone(),
+            tickrate: self.tickrate,
             time_offset: Arc::new(AtomicI64::new(0)),
         }
     }
