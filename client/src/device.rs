@@ -2,13 +2,14 @@ use crate::{security::security_init, time::current_time};
 use anyhow::Result;
 use sep2_common::packages::{
     edev::EndDevice,
-    primitives::{HexBinary160, Uint16},
+    primitives::HexBinary160,
     types::{DeviceCategoryType, SFDIType},
 };
 
 #[cfg(feature = "drlc")]
 use sep2_common::packages::{
     drlc::{ApplianceLoadReduction, DutyCycle, Offset, SetPoint},
+    primitives::Uint16,
     response::AppliedTargetReduction,
 };
 
@@ -68,11 +69,17 @@ impl SEDevice {
                 subscribable: None,
                 href: None,
             },
+            #[cfg(feature = "drlc")]
             appliance_load_reduction: None,
+            #[cfg(feature = "drlc")]
             applied_target_reduction: None,
+            #[cfg(feature = "drlc")]
             duty_cycle: None,
+            #[cfg(feature = "drlc")]
             offset: None,
+            #[cfg(feature = "drlc")]
             override_duration: None,
+            #[cfg(feature = "drlc")]
             set_point: None,
         }
     }
