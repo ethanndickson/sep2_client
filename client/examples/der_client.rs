@@ -3,6 +3,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use sep2_client::{
     client::{Client, SEPResponse},
     device::SEDevice,
@@ -160,26 +161,43 @@ async fn incoming_dcap(notif: Notification<DeviceCapability>) -> SEPResponse {
     SEPResponse::Created(None)
 }
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// IP address of an IEEE 2030.5 server
+    target_addr: String,
+    /// IP address that the NotifServer should listen on
+    notif_addr: String,
+    /// Port that the NotifServer should listen on
+    notif_port: i32,
+    /// Path to an IEEE 2030.5 Device/Client Certificate
+    cert: String,
+    /// Path to the Client's TLS Private Key
+    key: String,
+    /// Path to the (SERCA) rootCA
+    ca: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     SimpleLogger::new().init().unwrap();
+    let args = Args::parse();
     // Initialise a typemap for storing Resources
     let state: Arc<RwLock<TypeMap>> = Arc::new(RwLock::new(TypeMap::new()));
 
     // Initialise an EndDevice resource representing this device
     // (or acquire multiple out of band EndDevices if aggregate client)
-    let edr =
-        SEDevice::new_from_cert("../../certs/client_cert.pem", DeviceCategoryType::all()).unwrap();
+    let edr = SEDevice::new_from_cert(&args.cert, DeviceCategoryType::all()).unwrap();
     let edr = Arc::new(RwLock::new(edr));
 
     // Create a Notificaton server listening on 1338
     // Make it listen for reading resources on "/reading"
     let notif_state = state.clone();
     let notifs = ClientNotifServer::new(
-        "127.0.0.1:1338",
-        "../../certs/client_cert.pem",
-        "../../certs/client_private_key.pem",
-        "../../certs/rootCA.pem",
+        &format!("{}:{}", &args.notif_addr, &args.notif_port),
+        &args.cert,
+        &args.key,
+        &args.ca,
     )?
     // Example route that adds to some thread-safe state
     .add("/reading", move |notif: Notification<Reading>| {
@@ -202,9 +220,9 @@ async fn main() -> Result<()> {
     // Create a HTTPS client for a specfific server
     let client = Client::new(
         "https://127.0.0.1:1337",
-        "../../certs/client_cert.pem",
-        "../../certs/client_private_key.pem",
-        "../../certs/rootCA.pem",
+        &args.cert,
+        &args.key,
+        &args.ca,
         // No KeepAlive
         None,
         // Default Poll Tick Rate (10 minutes)

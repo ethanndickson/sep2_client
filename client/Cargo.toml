@@ -24,6 +24,7 @@ sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["examples","d
 sep2_test_server = { path = "../test_server" }
 typemap_rev = "0.3.0"
 simple_logger = "4.2.0"
+clap = "4.4.7"
 
 [features]
 default = []
