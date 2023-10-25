@@ -17,7 +17,10 @@ struct Args {
 }
 #[tokio::main]
 async fn main() -> Result<()> {
-    SimpleLogger::new().init().unwrap();
+    SimpleLogger::new()
+        .with_level(log::LevelFilter::Debug)
+        .init()
+        .unwrap();
     let args = Args::parse();
     let addr = format!("127.0.0.1:{}", args.port);
     log::info!("Server listening on {addr}");

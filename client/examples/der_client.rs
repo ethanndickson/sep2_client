@@ -180,7 +180,10 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    SimpleLogger::new().init().unwrap();
+    SimpleLogger::new()
+        .with_level(log::LevelFilter::Debug)
+        .init()
+        .unwrap();
     let args = Args::parse();
     // Initialise a typemap for storing Resources
     let state: Arc<RwLock<TypeMap>> = Arc::new(RwLock::new(TypeMap::new()));
