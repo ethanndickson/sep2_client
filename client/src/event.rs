@@ -52,6 +52,8 @@ where
     last_updated: Instant,
     // The event(s) this supersedes, if any
     superseded_by: Vec<MRIDType>,
+    // Which server this event was sourced from, different values indicate a different server
+    server_id: u8,
 }
 
 pub(crate) type EIPair<'a, E> = (&'a mut EventInstance<E>, &'a MRIDType);
@@ -98,7 +100,12 @@ impl From<EventStatusType> for EIStatus {
 }
 
 impl<E: SEEvent> EventInstance<E> {
-    pub(crate) fn new(primacy: PrimacyType, event: E, program_mrid: MRIDType) -> Self {
+    pub(crate) fn new(
+        primacy: PrimacyType,
+        event: E,
+        program_mrid: MRIDType,
+        server_id: u8,
+    ) -> Self {
         let start: i64 = event.interval().start.get();
         let end: i64 = start + i64::from(event.interval().duration.get());
         EventInstance {
@@ -110,6 +117,7 @@ impl<E: SEEvent> EventInstance<E> {
             last_updated: Instant::now(),
             superseded_by: vec![],
             program_mrid,
+            server_id,
         }
     }
 
@@ -119,6 +127,7 @@ impl<E: SEEvent> EventInstance<E> {
         rand_start: Option<OneHourRangeType>,
         event: E,
         program_mrid: MRIDType,
+        server_id: u8,
     ) -> Self {
         let start: i64 = event.interval().start.get() + randomize(rand_duration);
         let end: i64 = start + i64::from(event.interval().duration.get()) + randomize(rand_start);
@@ -131,6 +140,7 @@ impl<E: SEEvent> EventInstance<E> {
             last_updated: Instant::now(),
             superseded_by: vec![],
             program_mrid,
+            server_id,
         }
     }
 
@@ -183,6 +193,11 @@ impl<E: SEEvent> EventInstance<E> {
     #[inline(always)]
     pub fn program_mrid(&self) -> &MRIDType {
         &self.program_mrid
+    }
+
+    #[inline(always)]
+    pub fn server_id(&self) -> u8 {
+        self.server_id
     }
 }
 
@@ -333,9 +348,7 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
         tickrate: Duration,
     ) -> Self;
 
-    // TODO: This needs to take into account a server ID,
-    // in order to determine when another server produces a superseding event
-    async fn add_event(&mut self, event: E, program: &Self::Program);
+    async fn add_event(&mut self, event: E, program: &Self::Program, server_id: u8);
 }
 
 /// Schedule for a given function set, and a specific server.

@@ -31,7 +31,7 @@ use crate::{
 };
 
 /// Given two EndDeviceControls, determine which is superseded, and which is superseding, or None if neither supersede one another
-fn drlc_mark_supersede<'a>(
+fn drlc_supersedes<'a>(
     a: EIPair<'a, EndDeviceControl>,
     b: EIPair<'a, EndDeviceControl>,
 ) -> Option<(EIPair<'a, EndDeviceControl>, EIPair<'a, EndDeviceControl>)> {
@@ -176,7 +176,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
         out
     }
 
-    async fn add_event(&mut self, event: EndDeviceControl, program: &Self::Program) {
+    async fn add_event(&mut self, event: EndDeviceControl, program: &Self::Program, server_id: u8) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
         if !event
@@ -247,6 +247,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                 event.randomize_start,
                 event,
                 program.mrid,
+                server_id,
             );
 
             // The event may have expired already
@@ -268,7 +269,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             let mut target = ei;
             for (o_mrid, other) in events.iter_mut() {
                 if let Some(((superseded, _), (superseding, superseding_mrid))) =
-                    drlc_mark_supersede((&mut target, &mrid), (other, o_mrid))
+                    drlc_supersedes((&mut target, &mrid), (other, o_mrid))
                 {
                     // Mark as superseded
                     let prev_status = superseded.status();
@@ -278,9 +279,12 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler).event_update(superseded).await;
-                        // If the two events come from different programs
                         if superseded.program_mrid() != superseding.program_mrid() {
+                            // If the two events come from different programs
                             ResponseStatus::EventAbortedProgram
+                        } else if superseded.server_id() != superseding.server_id() {
+                            // If the two events come from different servers
+                            ResponseStatus::EventAbortedServer
                         } else {
                             ResponseStatus::EventSuperseded
                         }

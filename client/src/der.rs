@@ -197,7 +197,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
     }
     /// Add a [`DERControl`] Event to the schedule.
     /// Subsequent retrievals/notifications of any and all [`DERControl`] resources should call this function.
-    async fn add_event(&mut self, event: DERControl, program: &Self::Program) {
+    async fn add_event(&mut self, event: DERControl, program: &Self::Program, server_id: u8) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
         // Devices SHOULD ignore events that do not indicate their device category.
@@ -268,6 +268,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
                 event.randomize_start,
                 event,
                 program.mrid,
+                server_id,
             );
 
             // The event may have expired already
@@ -300,9 +301,12 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler).event_update(superseded).await;
-                        // If the two events come from different programs
                         if superseded.program_mrid() != superseding.program_mrid() {
+                            // If the two events come from different programs
                             ResponseStatus::EventAbortedProgram
+                        } else if superseded.server_id() != superseding.server_id() {
+                            // If the two events come from different servers
+                            ResponseStatus::EventAbortedServer
                         } else {
                             ResponseStatus::EventSuperseded
                         }

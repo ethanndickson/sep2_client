@@ -112,9 +112,9 @@ async fn basic_drlc_scheduler() {
     // T7 -> T9
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
     // Schedule in a different order
-    schedule.add_event(second, &program).await;
-    schedule.add_event(third, &program).await;
-    schedule.add_event(first, &program).await;
+    schedule.add_event(second, &program, 0).await;
+    schedule.add_event(third, &program, 0).await;
+    schedule.add_event(first, &program, 0).await;
     // Wait until all events end
     tokio::time::sleep(Duration::from_secs(10)).await;
     assert_eq!(
@@ -144,12 +144,12 @@ async fn superseded_drlc_scheduler() {
     let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
     // T7 -> T9
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
-    schedule.add_event(first, &program).await;
-    schedule.add_event(superseded, &program).await;
+    schedule.add_event(first, &program, 0).await;
+    schedule.add_event(superseded, &program, 0).await;
     tokio::time::sleep(Duration::from_secs(3)).await;
     // T3
-    schedule.add_event(second, &program).await;
-    schedule.add_event(third, &program).await;
+    schedule.add_event(second, &program, 0).await;
+    schedule.add_event(third, &program, 0).await;
     tokio::time::sleep(Duration::from_secs(7)).await;
     // T11
     assert_eq!(
@@ -178,20 +178,20 @@ async fn cancelling_drlc_scheduler() {
     // T7 -> T9
     let mut third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
     // Schedule in a different order
-    schedule.add_event(second.clone(), &program).await;
-    schedule.add_event(third.clone(), &program).await;
-    schedule.add_event(first.clone(), &program).await;
+    schedule.add_event(second.clone(), &program, 0).await;
+    schedule.add_event(third.clone(), &program, 0).await;
+    schedule.add_event(first.clone(), &program, 0).await;
     // Cancel first event while it's running
     tokio::time::sleep(Duration::from_secs(3)).await;
     first.event_status.current_status = EventStatusType::Cancelled;
-    schedule.add_event(first, &program).await;
+    schedule.add_event(first, &program, 0).await;
     // Cancel second event while it's running
     tokio::time::sleep(Duration::from_secs(3)).await;
     second.event_status.current_status = EventStatusType::Cancelled;
-    schedule.add_event(second, &program).await;
+    schedule.add_event(second, &program, 0).await;
     // Cancel third event before it starts
     third.event_status.current_status = EventStatusType::Cancelled;
-    schedule.add_event(third, &program).await;
+    schedule.add_event(third, &program, 0).await;
     tokio::time::sleep(Duration::from_secs(4)).await;
     assert_eq!(
         logs.logs.read().await.as_ref(),
@@ -217,13 +217,13 @@ async fn unsupersede_drlc_scheduler() {
     let mut first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 4);
     // T7 -> T9
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
-    schedule.add_event(first.clone(), &program).await;
-    schedule.add_event(second, &program).await;
-    schedule.add_event(third, &program).await;
+    schedule.add_event(first.clone(), &program, 0).await;
+    schedule.add_event(second, &program, 0).await;
+    schedule.add_event(third, &program, 0).await;
     tokio::time::sleep(Duration::from_secs(3)).await;
     // Cancel the first event, allowing the second to run, since it was created first
     first.event_status.current_status = EventStatusType::Cancelled;
-    schedule.add_event(first.clone(), &program).await;
+    schedule.add_event(first.clone(), &program, 0).await;
     tokio::time::sleep(Duration::from_secs(7)).await;
     assert_eq!(
         logs.logs.read().await.as_ref(),
@@ -255,9 +255,9 @@ async fn schedule_drlc_differing_primacy() {
     let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 2, 2);
     // T3 -> T5
     let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 3, 2);
-    schedule.add_event(first, &program3).await;
-    schedule.add_event(second, &program1).await;
-    schedule.add_event(third, &program2).await;
+    schedule.add_event(first, &program3, 0).await;
+    schedule.add_event(second, &program1, 0).await;
+    schedule.add_event(third, &program2, 0).await;
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 

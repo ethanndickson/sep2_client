@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Given two TimeTariffIntervals, determine which is superseded, and which is superseding, or None if neither supersede one another
-fn pricing_mark_supersede<'a>(
+fn pricing_supersedes<'a>(
     a: EIPair<'a, TimeTariffInterval>,
     b: EIPair<'a, TimeTariffInterval>,
 ) -> Option<(
@@ -172,7 +172,12 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
         out
     }
 
-    async fn add_event(&mut self, event: TimeTariffInterval, program: &Self::Program) {
+    async fn add_event(
+        &mut self,
+        event: TimeTariffInterval,
+        program: &Self::Program,
+        server_id: u8,
+    ) {
         let tariff_profile = &program.0;
         let rate_component = &program.1;
         let mrid = event.mrid;
@@ -238,6 +243,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                 event.randomize_start,
                 event,
                 rate_component.mrid,
+                server_id,
             );
 
             // The event may have expired already
@@ -259,7 +265,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
             let mut target = ei;
             for (o_mrid, other) in events.iter_mut() {
                 if let Some(((superseded, _), (superseding, superseding_mrid))) =
-                    pricing_mark_supersede((&mut target, &mrid), (other, o_mrid))
+                    pricing_supersedes((&mut target, &mrid), (other, o_mrid))
                 {
                     // Mark as superseded
                     let prev_status = superseded.status();
@@ -270,9 +276,12 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         (self.handler).event_update(superseded).await;
-                        // If the two events come from different programs
                         if superseded.program_mrid() != superseding.program_mrid() {
+                            // If the two events come from different programs
                             ResponseStatus::EventAbortedProgram
+                        } else if superseded.server_id() != superseding.server_id() {
+                            // If the two events come from different servers
+                            ResponseStatus::EventAbortedServer
                         } else {
                             ResponseStatus::EventSuperseded
                         }

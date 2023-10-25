@@ -162,7 +162,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
         out
     }
 
-    async fn add_event(&mut self, event: TextMessage, program: &Self::Program) {
+    async fn add_event(&mut self, event: TextMessage, program: &Self::Program, server_id: u8) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;
 
@@ -214,7 +214,7 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
                 return;
             }
 
-            let ei = EventInstance::new(program.primacy, event, program.mrid);
+            let ei = EventInstance::new(program.primacy, event, program.mrid, server_id);
             // The event may have expired already
             if ei.end_time() <= self.schedule_time().get() {
                 log::warn!("TextMessageSchedule: Told to schedule TextMessage ({mrid}) which has already ended, ignoring.");

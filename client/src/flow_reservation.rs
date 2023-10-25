@@ -49,5 +49,11 @@ impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse
         }
     }
     #[allow(unused_variables)]
-    async fn add_event(&mut self, event: FlowReservationResponse, program: &Self::Program) {}
+    async fn add_event(
+        &mut self,
+        event: FlowReservationResponse,
+        program: &Self::Program,
+        server_id: u8,
+    ) {
+    }
 }

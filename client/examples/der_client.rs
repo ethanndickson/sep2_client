@@ -93,7 +93,8 @@ async fn process_derpl_task(
                 let dercl: DERControlList = client.get(&dercll.href).await?;
                 for der in dercl.der_control {
                     // Add event to schedule
-                    schedule.add_event(der, &derp).await;
+                    // We only have one server, so they all use the same server ID
+                    schedule.add_event(der, &derp, 0).await;
                 }
             }
             (_, Some(ddercl)) => {
