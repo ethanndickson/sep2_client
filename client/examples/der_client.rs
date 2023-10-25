@@ -1,6 +1,6 @@
 //! Sample DER Client Binary for the IEEE 2030.5 Client Library
 
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration, env};
 
 use anyhow::{anyhow, Result};
 use sep2_client::{
@@ -163,13 +163,28 @@ async fn incoming_dcap(notif: Notification<DeviceCapability>) -> SEPResponse {
 #[tokio::main]
 async fn main() -> Result<()> {
     SimpleLogger::new().init().unwrap();
+
+    // Get the path to the project root
+    let current_exe_path = env::current_exe()?;
+    let project_root_path = current_exe_path.ancestors().nth(4).unwrap_or_else(|| {
+        panic!("Failed to get path to the project root");
+    });
+    
+    // Construct paths to certs
+    let client_cert_path = project_root_path.join("certs/client_cert.pem");
+    let client_private_key_path = project_root_path.join("certs/client_private_key.pem");
+    let root_ca_path = project_root_path.join("certs/rootCA.pem");
+    let client_cert_path_str = client_cert_path.to_str().expect("Invalid path for client cert");
+    let client_private_key_path_str = client_private_key_path.to_str().expect("Invalid path for client private key");
+    let root_ca_path_str = root_ca_path.to_str().expect("Invalid path for root CA");
+
     // Initialise a typemap for storing Resources
     let state: Arc<RwLock<TypeMap>> = Arc::new(RwLock::new(TypeMap::new()));
 
     // Initialise an EndDevice resource representing this device
     // (or acquire multiple out of band EndDevices if aggregate client)
     let edr =
-        SEDevice::new_from_cert("../../certs/client_cert.pem", DeviceCategoryType::all()).unwrap();
+        SEDevice::new_from_cert("./certs/client_cert.pem", DeviceCategoryType::all()).unwrap();
     let edr = Arc::new(RwLock::new(edr));
 
     // Create a Notificaton server listening on 1338
@@ -177,9 +192,9 @@ async fn main() -> Result<()> {
     let notif_state = state.clone();
     let notifs = ClientNotifServer::new(
         "127.0.0.1:1338",
-        "../../certs/client_cert.pem",
-        "../../certs/client_private_key.pem",
-        "../../certs/rootCA.pem",
+        client_cert_path_str,
+        client_private_key_path_str,
+        root_ca_path_str,
     )?
     // Example route that adds to some thread-safe state
     .add("/reading", move |notif: Notification<Reading>| {
@@ -202,9 +217,9 @@ async fn main() -> Result<()> {
     // Create a HTTPS client for a specfific server
     let client = Client::new(
         "https://127.0.0.1:1337",
-        "../../certs/client_cert.pem",
-        "../../certs/client_private_key.pem",
-        "../../certs/rootCA.pem",
+        client_cert_path_str,
+        client_private_key_path_str,
+        root_ca_path_str,
         // No KeepAlive
         None,
         // Default Poll Tick Rate (10 minutes)
