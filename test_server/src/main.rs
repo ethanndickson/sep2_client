@@ -23,6 +23,6 @@ async fn main() -> Result<()> {
         .unwrap();
     let args = Args::parse();
     let server =
-        TestServer::new(("127.0.0.1", *&args.port), &args.cert, &args.key, &args.ca).unwrap();
+        TestServer::new(("127.0.0.1", args.port), &args.cert, &args.key, &args.ca).unwrap();
     server.run(tokio::signal::ctrl_c()).await
 }

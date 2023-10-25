@@ -171,7 +171,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 #[async_trait::async_trait]
 impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERControl, H> {
     type Program = DERProgram;
-    /// Create a schedule for the given [`Client`] & it's [`EndDevice`] representation.
+    /// Create a schedule for the given [`Client`] & it's [`SEDevice`] representation.
     ///
     /// Any instance of [`Client`] can be used, as responses are made in accordance to the hostnames within the provided events.
     fn new(

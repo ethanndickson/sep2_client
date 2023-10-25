@@ -36,10 +36,13 @@ pub struct SEDevice {
 }
 
 impl SEDevice {
+    /// Create a new SEDevice representation, using a certificate at the given path to generate the SFDI & LFDI and a bitmap representation of the device's category
     pub fn new_from_cert(cert_path: &str, device_category: DeviceCategoryType) -> Result<Self> {
         let (lfdi, sfdi) = security_init(cert_path)?;
         Ok(Self::new(lfdi, sfdi, device_category))
     }
+
+    /// Create a new SEDevice representation with the given LFDI, SFDI and category
     pub fn new(lfdi: HexBinary160, sfdi: SFDIType, device_category: DeviceCategoryType) -> Self {
         SEDevice {
             lfdi,

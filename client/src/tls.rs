@@ -1,7 +1,7 @@
 //! TLS Configuration for a IEEE 2030.5 Client & Notification Server
 //!
 //! Missing from this section is a verification callback that checks the presence of critical & non-critical extensions required by IEEE 2030.5 section 6.11
-//! The `rust-openssl` crate we use for openssl bindings currently does not expose an interface necessary to check these extensions: https://github.com/sfackler/rust-openssl/issues/373
+//! The `rust-openssl` crate we use for openssl bindings currently does not expose an interface necessary to check these extensions: <https://github.com/sfackler/rust-openssl/issues/373>
 //! In the meantime, we use `x509_parser` to parse and verify that the required extensions are present, for both self-signed Client Certificates and device certificates, as per the specification.
 //!
 //! TODO: Should this module also check the supplied CA is valid as per the spec? Awaiting SunSpec Cert package.

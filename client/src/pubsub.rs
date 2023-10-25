@@ -84,6 +84,7 @@ pub struct ClientNotifServer {
 }
 
 impl ClientNotifServer {
+    /// Create a new Notification server that listens on the given address
     pub fn new(
         addr: impl net::ToSocketAddrs,
         cert_path: &str,
@@ -108,7 +109,6 @@ impl ClientNotifServer {
     ///
     /// The `RouteCallback` trait can be implemented on any threadsafe type,
     /// however it is automatically implemented for any applicable 'Fn'
-    /// [`SEResource`]: sep2_common::traits::SEResource
     pub fn add<T>(self, path: impl Into<String>, callback: impl RouteCallback<T>) -> Self
     where
         T: SEResource,
