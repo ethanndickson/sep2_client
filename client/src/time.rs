@@ -1,3 +1,5 @@
+//! Time Function Set
+
 use std::{
     sync::atomic::AtomicI64,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},

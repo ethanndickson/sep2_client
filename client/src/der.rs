@@ -2,6 +2,8 @@
 //!
 //! This module is primarily an implementation of a Schedule for DERControl events.
 //!
+//! The interface for a DERControl Schedule can be found in [`Schedule`]
+//!
 //!
 
 use std::{

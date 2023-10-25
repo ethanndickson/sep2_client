@@ -1,3 +1,5 @@
+//! End Device Function Set
+
 use crate::{security::security_init, time::current_time};
 use anyhow::Result;
 use sep2_common::packages::{

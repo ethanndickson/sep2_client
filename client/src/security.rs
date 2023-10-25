@@ -1,3 +1,5 @@
+//! Security Function Set
+
 use anyhow::Result;
 use openssl::sha::Sha256;
 use sep2_common::packages::{primitives::HexBinary160, types::SFDIType};

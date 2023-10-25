@@ -1,3 +1,5 @@
+//! Pricing Function Set
+
 use std::{
     sync::{atomic::AtomicI64, Arc},
     time::Duration,

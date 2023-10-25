@@ -90,6 +90,9 @@ pub(crate) fn create_server_tls_config(
 /// device certificate whereby the server presents its device certificate as part of the TLS handshake"
 ///
 /// See section 6.11.8.3.3 for more.
+///
+/// [`Client`]: crate::client::Client
+/// [`ClientNotifServer`]: crate::pubsub::ClientNotifServer
 pub fn check_device_cert(cert_path: &str) -> Result<()> {
     let contents = std::fs::read(cert_path)?;
     let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;
@@ -160,9 +163,9 @@ pub fn check_device_cert(cert_path: &str) -> Result<()> {
     Ok(())
 }
 
-// Verify that the PEM encoded certificate at the given path meets IEEE 2030.5 "Self Signed Client Certificate" requirements.
-//
-// See Section 6.11.8.4.3 for more
+/// Verify that the PEM encoded certificate at the given path meets IEEE 2030.5 "Self Signed Client Certificate" requirements.
+///
+/// See Section 6.11.8.4.3 for more
 pub fn check_self_signed_client_cert(cert_path: &str) -> Result<()> {
     let contents = std::fs::read(cert_path)?;
     let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;

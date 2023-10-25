@@ -1,3 +1,5 @@
+//! IEEE 2030.5 Client Core Functionality
+
 use anyhow::{anyhow, bail, Context, Result};
 use hyper::{
     header::{ACCEPT, ALLOW, CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
@@ -51,15 +53,15 @@ use sep2_common::packages::{pricing::TimeTariffInterval, response::PriceResponse
 
 /// Possible HTTP Responses for a IEE 2030.5 Client to both send & receive.
 pub enum SEPResponse {
-    // HTTP 201 w/ Location header value, if it exists - 2030.5-2018 - 5.5.2.4
+    /// HTTP 201 w/ Location header value, if it exists - 2030.5-2018 - 5.5.2.4
     Created(Option<String>),
-    // HTTP 204 - 2030.5-2018 - 5.5.2.5
+    /// HTTP 204 - 2030.5-2018 - 5.5.2.5
     NoContent,
-    // HTTP 400 - 2030.5-2018 - 5.5.2.9
+    /// HTTP 400 - 2030.5-2018 - 5.5.2.9
     BadRequest(Option<Error>),
-    // HTTP 404 - 2030.5-2018 - 5.5.2.11
+    /// HTTP 404 - 2030.5-2018 - 5.5.2.11
     NotFound,
-    // HTTP 405 w/ Allow header value - 2030.5-2018 - 5.5.2.12
+    /// HTTP 405 w/ Allow header value - 2030.5-2018 - 5.5.2.12
     MethodNotAllowed(String),
 }
 

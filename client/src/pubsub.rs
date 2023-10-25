@@ -1,3 +1,5 @@
+//! Subscription/Notification Function Set
+
 use anyhow::{anyhow, Result};
 use dashmap::DashMap;
 use hyper::{server::conn::Http, service::service_fn, Body, Method, Request, Response};
@@ -11,7 +13,11 @@ use tokio_openssl::SslStream;
 use crate::client::SEPResponse;
 use crate::tls::{create_server_tls_config, TlsServerConfig};
 
-// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
+/// A trait implemented by types that can be used as a route callback in a [`ClientNotifServer`].
+///
+/// Automatically implemented for all [`Fn`] with a matching function signature.
+///  
+/// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 pub trait RouteCallback<T: SEResource>: Send + Sync + 'static {
     fn callback(
         &self,
@@ -19,7 +25,6 @@ pub trait RouteCallback<T: SEResource>: Send + Sync + 'static {
     ) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>>;
 }
 
-// Our RouteCallback trait is automatically implemented for all functions with a matching function signature
 impl<F, R, T: SEResource> RouteCallback<T> for F
 where
     F: Fn(Notification<T>) -> R + Send + Sync + 'static,
@@ -33,6 +38,7 @@ where
     }
 }
 
+/// Internal Boxed future version of a RouteCallback
 type RouteHandler = Box<
     dyn Fn(&str) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>>
         + Send
@@ -75,8 +81,7 @@ impl Router {
     }
 }
 
-/// A lightweight IEEE 2030.5 Server accepting a generic HTTP router.
-/// For use in the system test server binary, and in the Client as the receiver for the subscription/notification mechanism
+/// A lightweight IEEE 2030.5 Server for receiving [`Notification<T>`] resources from a server for the subscription / notification mechanism.
 pub struct ClientNotifServer {
     addr: SocketAddr,
     cfg: TlsServerConfig,

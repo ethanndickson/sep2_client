@@ -349,7 +349,7 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
     ///
     /// Any Client instance with an appropriate certificate can be used, as automated Response POST requests will be made to the replyTo field in the event, which is an absolute URI.
     ///
-    /// An Arc<RwLock<SEDevice>> is supplied to allow the schedule to retrieve the latest information about the device when creating automated responses.
+    /// An [`Arc<RwLock<SEDevice>>`] is supplied to allow the schedule to retrieve the latest information about the device when creating automated responses.
     ///
     /// The specified Handler will be called whenever there is an event status update that requires a response from the client.
     ///
@@ -361,12 +361,12 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
         tickrate: Duration,
     ) -> Self;
 
-    /// Add a type implementing [`SEvent`] to the schedule. The concrete type depends on the type of schedule.
+    /// Add a type implementing [`SEEvent`] to the schedule. The concrete type depends on the type of schedule.
     /// The program the event belongs to is also required, to determine the primacy of the event, and to send the appropriate response for events that get superseded by other programs.
     ///
     /// Events from different servers should be added with different server ids, the ids chosen are irrelevant.
     ///
-    /// Subsequent retrievals/notifications of any and all [`DERControl`] resources should call this function.
+    /// Subsequent retrievals/notifications of any and all [`SEEvent`] resources should call this function.
     async fn add_event(&mut self, event: E, program: &Self::Program, server_id: u8);
 }
 
