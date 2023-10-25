@@ -195,8 +195,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
         tokio::spawn(out.clone().der_end_task(tx.subscribe()));
         out
     }
-    /// Add a [`DERControl`] Event to the schedule.
-    /// Subsequent retrievals/notifications of any and all [`DERControl`] resources should call this function.
+
     async fn add_event(&mut self, event: DERControl, program: &Self::Program, server_id: u8) {
         let mrid = event.mrid;
         let incoming_status = event.event_status.current_status;

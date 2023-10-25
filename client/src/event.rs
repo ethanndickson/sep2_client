@@ -337,10 +337,23 @@ where
     }
 }
 
-// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
+/// A Trait representing the common interface of all schedules.
+///
+/// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait::async_trait]
 pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
+    /// The type of the program the specific SEEvent belongs to, containing a primacy value and a unique program MRID.
     type Program;
+
+    /// Create a new Schedule for a particular function set.
+    ///
+    /// Any Client instance with an appropriate certificate can be used, as automated Response POST requests will be made to the replyTo field in the event, which is an absolute URI.
+    ///
+    /// An Arc<RwLock<SEDevice>> is supplied to allow the schedule to retrieve the latest information about the device when creating automated responses.
+    ///
+    /// The specified Handler will be called whenever there is an event status update that requires a response from the client.
+    ///
+    /// The given tickrate determines how often the Schedule should wake from sleep to check if an event has started or ended.
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
@@ -348,6 +361,12 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
         tickrate: Duration,
     ) -> Self;
 
+    /// Add a type implementing [`SEvent`] to the schedule. The concrete type depends on the type of schedule.
+    /// The program the event belongs to is also required, to determine the primacy of the event, and to send the appropriate response for events that get superseded by other programs.
+    ///
+    /// Events from different servers should be added with different server ids, the ids chosen are irrelevant.
+    ///
+    /// Subsequent retrievals/notifications of any and all [`DERControl`] resources should call this function.
     async fn add_event(&mut self, event: E, program: &Self::Program, server_id: u8);
 }
 

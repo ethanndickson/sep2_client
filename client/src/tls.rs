@@ -79,10 +79,18 @@ pub(crate) fn create_server_tls_config(
     Ok(builder)
 }
 
-// A valid 'device certificate' *must* be used by a [`ClientNotifServer`]
-// "The use of TLS (IETF RFC 5246) requires that all hosts implementing server functionality SHALL use a
-// device certificate whereby the server presents its device certificate as part of the TLS handshake"
-fn check_device_cert(cert_path: &str) -> Result<()> {
+/// Verify that the PEM encoded certificate at the given path meets IEEE 2030.5 "Device Certificate" requirements.
+/// Newly purchased or acquired certificates in an IEEE 2030.5 certificate chain will satisfy these requirements.
+///
+/// Currently this function isn't called when instantiating a [`Client`]` nor a [`ClientNotifServer`], but that may change in the future.
+///
+///
+/// A valid 'device certificate' *must* be used by a [`ClientNotifServer`], i.e. NOT a self signed certificate
+/// "The use of TLS (IETF RFC 5246) requires that all hosts implementing server functionality SHALL use a
+/// device certificate whereby the server presents its device certificate as part of the TLS handshake"
+///
+/// See section 6.11.8.3.3 for more.
+pub fn check_device_cert(cert_path: &str) -> Result<()> {
     let contents = std::fs::read(cert_path)?;
     let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;
     let cert = cert.parse_x509()?;
@@ -152,7 +160,10 @@ fn check_device_cert(cert_path: &str) -> Result<()> {
     Ok(())
 }
 
-fn check_self_signed_client_cert(cert_path: &str) -> Result<()> {
+// Verify that the PEM encoded certificate at the given path meets IEEE 2030.5 "Self Signed Client Certificate" requirements.
+//
+// See Section 6.11.8.4.3 for more
+pub fn check_self_signed_client_cert(cert_path: &str) -> Result<()> {
     let contents = std::fs::read(cert_path)?;
     let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;
     let cert = cert.parse_x509()?;

@@ -304,14 +304,24 @@ impl Client {
     ///
     /// Returns an error if the server does not respond with 204 No Content or 201 Created.
     pub async fn post<R: SEResource>(&self, path: &str, resource: &R) -> Result<SEPResponse> {
-        self.put_post(path, resource, Method::POST).await
+        self.put_post(
+            path.parse().context("Failed to parse address")?,
+            resource,
+            Method::POST,
+        )
+        .await
     }
 
     /// Create a [`SEResource`] at the given path.
     ///
     /// Returns an error if the server does not respond with 204 No Content or 201 Created.
     pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<SEPResponse> {
-        self.put_post(path, resource, Method::PUT).await
+        self.put_post(
+            path.parse().context("Failed to parse address")?,
+            resource,
+            Method::PUT,
+        )
+        .await
     }
 
     /// Delete the [`SEResource`] at the given path.
@@ -405,21 +415,18 @@ impl Client {
     // Create a PUT or POST request
     async fn put_post<R: SEResource>(
         &self,
-        path: &str,
+        abs_path: Uri,
         resource: &R,
         method: Method,
     ) -> Result<SEPResponse> {
-        let uri: Uri = format!("{}{}", self.addr, path)
-            .parse()
-            .context("Failed to parse address")?;
-        log::info!("POST {} to {}", R::name(), uri);
+        log::info!("POST {} to {}", R::name(), abs_path);
         let rsrce = serialize(resource)?;
         let rsrce_size = rsrce.as_bytes().len();
         let req = Request::builder()
             .method(method)
             .header(CONTENT_TYPE, "application/sep+xml")
             .header(CONTENT_LENGTH, rsrce_size)
-            .uri(uri)
+            .uri(abs_path)
             .body(Body::from(rsrce))?;
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
         let res = self.http.request(req).await?;
@@ -464,11 +471,13 @@ impl Client {
             subject: event.mrid,
             href: None,
         };
-        self.post(
+        self.put_post(
             event
                 .reply_to()
-                .ok_or(anyhow!("Event does not contain a ReplyToField"))?,
+                .ok_or(anyhow!("Event does not contain a ReplyToField"))?
+                .parse()?,
             &resp,
+            Method::POST,
         )
         .await
     }
@@ -501,11 +510,13 @@ impl Client {
             subject: event.mrid,
             href: None,
         };
-        self.post(
+        self.put_post(
             event
                 .reply_to()
-                .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
+                .ok_or(anyhow!("Event does not contain a ReplyToField"))?
+                .parse()?,
             &resp,
+            Method::POST,
         )
         .await
     }
@@ -545,11 +556,13 @@ impl Client {
             override_duration: device.override_duration,
             set_point: device.set_point.clone(),
         };
-        self.post(
+        self.put_post(
             event
                 .reply_to()
-                .ok_or(anyhow!("Event does not contain a ReplyTo field"))?,
+                .ok_or(anyhow!("Event does not contain a ReplyToField"))?
+                .parse()?,
             &resp,
+            Method::POST,
         )
         .await
     }
@@ -589,11 +602,13 @@ impl Client {
             subject: event.mrid,
             href: None,
         };
-        self.post(
+        self.put_post(
             event
                 .reply_to()
-                .ok_or(anyhow!("Event does not contain a ReplyToField"))?,
+                .ok_or(anyhow!("Event does not contain a ReplyToField"))?
+                .parse()?,
             &resp,
+            Method::POST,
         )
         .await
     }
