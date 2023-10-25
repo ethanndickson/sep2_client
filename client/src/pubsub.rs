@@ -1,8 +1,9 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use dashmap::DashMap;
 use hyper::{server::conn::Http, service::service_fn, Body, Method, Request, Response};
 use openssl::ssl::Ssl;
 use sep2_common::{deserialize, packages::pubsub::Notification, traits::SEResource};
+use std::net;
 use std::{future::Future, net::SocketAddr, pin::Pin, sync::Arc};
 use tokio::net::TcpListener;
 use tokio_openssl::SslStream;
@@ -83,10 +84,18 @@ pub struct ClientNotifServer {
 }
 
 impl ClientNotifServer {
-    pub fn new(addr: &str, cert_path: &str, pk_path: &str, rootca_path: &str) -> Result<Self> {
+    pub fn new(
+        addr: impl net::ToSocketAddrs,
+        cert_path: &str,
+        pk_path: &str,
+        rootca_path: &str,
+    ) -> Result<Self> {
         let cfg = create_server_tls_config(cert_path, pk_path, rootca_path)?;
         Ok(ClientNotifServer {
-            addr: addr.parse()?,
+            addr: addr
+                .to_socket_addrs()?
+                .next()
+                .ok_or(anyhow!("Given server address did not yield a SocketAddr"))?,
             cfg,
             router: Router::new(),
         })

@@ -1,6 +1,9 @@
-use std::{future::Future, net::SocketAddr};
+use std::{
+    future::Future,
+    net::{self, SocketAddr},
+};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use hyper::{
     header::LOCATION, server::conn::Http, service::service_fn, Body, Method, Request, Response,
     StatusCode,
@@ -39,10 +42,18 @@ pub struct TestServer {
 }
 
 impl TestServer {
-    pub fn new(addr: &str, cert_path: &str, pk_path: &str, rootca_path: &str) -> Result<Self> {
+    pub fn new(
+        addr: impl net::ToSocketAddrs,
+        cert_path: &str,
+        pk_path: &str,
+        rootca_path: &str,
+    ) -> Result<Self> {
         let cfg = create_server_tls_config(cert_path, pk_path, rootca_path)?;
         Ok(TestServer {
-            addr: addr.parse()?,
+            addr: addr
+                .to_socket_addrs()?
+                .next()
+                .ok_or(anyhow!("Given server address did not yield a SocketAddr"))?,
             cfg,
         })
     }

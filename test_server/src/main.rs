@@ -7,7 +7,7 @@ use simple_logger::SimpleLogger;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Port that the server should listen on
-    port: i32,
+    port: u16,
     /// Path to a Server SSL Certificate
     cert: String,
     /// Path to the Server's SSL Private Key
@@ -22,8 +22,7 @@ async fn main() -> Result<()> {
         .init()
         .unwrap();
     let args = Args::parse();
-    let addr = format!("127.0.0.1:{}", args.port);
-    log::info!("Server listening on {addr}");
-    let server = TestServer::new(&addr, &args.cert, &args.key, &args.ca).unwrap();
+    let server =
+        TestServer::new(("127.0.0.1", *&args.port), &args.cert, &args.key, &args.ca).unwrap();
     server.run(tokio::signal::ctrl_c()).await
 }

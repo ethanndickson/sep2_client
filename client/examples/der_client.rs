@@ -169,7 +169,7 @@ struct Args {
     /// IP address that the NotifServer should listen on
     notif_addr: String,
     /// Port that the NotifServer should listen on
-    notif_port: i32,
+    notif_port: u16,
     /// Path to an IEEE 2030.5 Device/Client Certificate
     cert: String,
     /// Path to the Client's TLS Private Key
