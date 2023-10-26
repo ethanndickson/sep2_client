@@ -4,7 +4,6 @@
 //! The `rust-openssl` crate we use for openssl bindings currently does not expose an interface necessary to check these extensions: <https://github.com/sfackler/rust-openssl/issues/373>
 //! In the meantime, we use `x509_parser` to parse and verify that the required extensions are present, for both self-signed Client Certificates and device certificates, as per the specification.
 //!
-//! TODO: Should this module also check the supplied CA is valid as per the spec? Awaiting SunSpec Cert package.
 //!
 
 use std::time::Duration;

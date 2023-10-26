@@ -276,7 +276,7 @@ impl Client {
         }
     }
 
-    /// Retrieve the [`SEResource`] at the given path.
+    /// Retrieve the [`SEResource`] at the given relative path.
     ///
     /// Returns an error if the resource could not be retrieved or deserialized.
     pub async fn get<R: SEResource>(&self, path: &str) -> Result<R> {
@@ -302,10 +302,11 @@ impl Client {
         deserialize(&xml)
     }
 
-    /// Update a [`SEResource`] at the given path.
+    /// Update a [`SEResource`] at the given relative path.
     ///
     /// Returns an error if the server does not respond with 204 No Content or 201 Created.
     pub async fn post<R: SEResource>(&self, path: &str, resource: &R) -> Result<SEPResponse> {
+        let path = format!("{}{}", self.addr, path);
         self.put_post(
             path.parse().context("Failed to parse address")?,
             resource,
@@ -314,10 +315,11 @@ impl Client {
         .await
     }
 
-    /// Create a [`SEResource`] at the given path.
+    /// Create a [`SEResource`] at the given relative path.
     ///
     /// Returns an error if the server does not respond with 204 No Content or 201 Created.
     pub async fn put<R: SEResource>(&self, path: &str, resource: &R) -> Result<SEPResponse> {
+        let path = format!("{}{}", self.addr, path);
         self.put_post(
             path.parse().context("Failed to parse address")?,
             resource,
@@ -326,7 +328,7 @@ impl Client {
         .await
     }
 
-    /// Delete the [`SEResource`] at the given path.
+    /// Delete the [`SEResource`] at the given relative path.
     ///
     /// Returns an error if the server does not respond with 204 No Content.
     pub async fn delete(&self, path: &str) -> Result<SEPResponse> {
