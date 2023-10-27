@@ -1,5 +1,7 @@
 //! End Device Function Set
 
+use std::path::Path;
+
 use crate::{security::security_init, time::current_time};
 use anyhow::Result;
 use sep2_common::packages::{
@@ -39,7 +41,10 @@ pub struct SEDevice {
 
 impl SEDevice {
     /// Create a new SEDevice representation, using a certificate at the given path to generate the SFDI & LFDI and a bitmap representation of the device's category
-    pub fn new_from_cert(cert_path: &str, device_category: DeviceCategoryType) -> Result<Self> {
+    pub fn new_from_cert(
+        cert_path: impl AsRef<Path>,
+        device_category: DeviceCategoryType,
+    ) -> Result<Self> {
         let (lfdi, sfdi) = security_init(cert_path)?;
         Ok(Self::new(lfdi, sfdi, device_category))
     }

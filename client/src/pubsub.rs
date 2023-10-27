@@ -6,6 +6,7 @@ use hyper::{server::conn::Http, service::service_fn, Body, Method, Request, Resp
 use openssl::ssl::Ssl;
 use sep2_common::{deserialize, packages::pubsub::Notification, traits::SEResource};
 use std::net;
+use std::path::Path;
 use std::{future::Future, net::SocketAddr, pin::Pin, sync::Arc};
 use tokio::net::TcpListener;
 use tokio_openssl::SslStream;
@@ -92,9 +93,9 @@ impl ClientNotifServer {
     /// Create a new Notification server that listens on the given address
     pub fn new(
         addr: impl net::ToSocketAddrs,
-        cert_path: &str,
-        pk_path: &str,
-        rootca_path: &str,
+        cert_path: impl AsRef<Path>,
+        pk_path: impl AsRef<Path>,
+        rootca_path: impl AsRef<Path>,
     ) -> Result<Self> {
         let cfg = create_server_tls_config(cert_path, pk_path, rootca_path)?;
         Ok(ClientNotifServer {

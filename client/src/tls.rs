@@ -14,18 +14,21 @@ use hyper::{Body, Client};
 use hyper_openssl::HttpsConnector;
 use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod, SslVerifyMode};
 
-#[cfg(feature = "pubsub")]
-use openssl::ssl::{SslAcceptor, SslAcceptorBuilder};
 use x509_parser::prelude::ParsedExtension;
+#[cfg(feature = "pubsub")]
+use {
+    openssl::ssl::{SslAcceptor, SslAcceptorBuilder},
+    std::path::Path,
+};
 
 pub(crate) type Connector = HttpsConnector<HttpConnector>;
 pub(crate) type HTTPSClient = Client<Connector, Body>;
 pub(crate) type TlsClientConfig = SslConnectorBuilder;
 
 pub(crate) fn create_client_tls_cfg(
-    cert_path: &str,
-    pk_path: &str,
-    rootca_path: &str,
+    cert_path: impl AsRef<Path>,
+    pk_path: impl AsRef<Path>,
+    rootca_path: impl AsRef<Path>,
 ) -> Result<TlsClientConfig> {
     let mut builder = SslConnector::builder(SslMethod::tls_client())?;
     log::debug!("Setting CipherSuite");
@@ -57,13 +60,14 @@ pub(crate) type TlsServerConfig = SslAcceptorBuilder;
 
 #[cfg(feature = "pubsub")]
 pub(crate) fn create_server_tls_config(
-    cert_path: &str,
-    pk_path: &str,
-    rootca_path: &str,
+    cert_path: impl AsRef<Path>,
+    pk_path: impl AsRef<Path>,
+    rootca_path: impl AsRef<Path>,
 ) -> Result<TlsServerConfig> {
     // rust-openssl forces us to create this default config that we immediately overwrite
     // If they gave us a way to cosntruct Acceptors and Connectors from Contexts,
     // we wouldn't need to double up on configs here
+
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server())?;
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
@@ -92,7 +96,7 @@ pub(crate) fn create_server_tls_config(
 ///
 /// [`Client`]: crate::client::Client
 /// [`ClientNotifServer`]: crate::pubsub::ClientNotifServer
-pub fn check_device_cert(cert_path: &str) -> Result<()> {
+pub fn check_device_cert(cert_path: impl AsRef<Path>) -> Result<()> {
     let contents = std::fs::read(cert_path)?;
     let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;
     let cert = cert.parse_x509()?;
@@ -165,7 +169,7 @@ pub fn check_device_cert(cert_path: &str) -> Result<()> {
 /// Verify that the PEM encoded certificate at the given path meets IEEE 2030.5 "Self Signed Client Certificate" requirements.
 ///
 /// See Section 6.11.8.4.3 for more
-pub fn check_self_signed_client_cert(cert_path: &str) -> Result<()> {
+pub fn check_self_signed_client_cert(cert_path: impl AsRef<Path>) -> Result<()> {
     let contents = std::fs::read(cert_path)?;
     let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;
     let cert = cert.parse_x509()?;

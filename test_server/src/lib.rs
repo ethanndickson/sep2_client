@@ -1,6 +1,7 @@
 use std::{
     future::Future,
     net::{self, SocketAddr},
+    path::Path,
 };
 
 use anyhow::{anyhow, Result};
@@ -18,9 +19,9 @@ use tokio_openssl::SslStream;
 
 type TlsServerConfig = SslAcceptorBuilder;
 fn create_server_tls_config(
-    cert_path: &str,
-    pk_path: &str,
-    rootca_path: &str,
+    cert_path: impl AsRef<Path>,
+    pk_path: impl AsRef<Path>,
+    rootca_path: impl AsRef<Path>,
 ) -> Result<TlsServerConfig> {
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
     log::debug!("Setting CipherSuite");
@@ -44,9 +45,9 @@ pub struct TestServer {
 impl TestServer {
     pub fn new(
         addr: impl net::ToSocketAddrs,
-        cert_path: &str,
-        pk_path: &str,
-        rootca_path: &str,
+        cert_path: impl AsRef<Path>,
+        pk_path: impl AsRef<Path>,
+        rootca_path: impl AsRef<Path>,
     ) -> Result<Self> {
         let cfg = create_server_tls_config(cert_path, pk_path, rootca_path)?;
         Ok(TestServer {

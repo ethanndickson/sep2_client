@@ -1,11 +1,13 @@
 //! Security Function Set
 
+use std::path::Path;
+
 use anyhow::Result;
 use openssl::sha::Sha256;
 use sep2_common::packages::{primitives::HexBinary160, types::SFDIType};
 
 /// Generate a LFDI hash value from a certificate file
-pub fn lfdi_gen(cert_path: &str) -> Result<HexBinary160> {
+pub fn lfdi_gen(cert_path: impl AsRef<Path>) -> Result<HexBinary160> {
     let cert = std::fs::read(cert_path)?;
     let mut hasher = Sha256::new();
     hasher.update(&cert);
@@ -25,7 +27,7 @@ pub fn sfdi_gen(lfdi: &HexBinary160) -> SFDIType {
 }
 
 /// Given the path to a client certificate, generate a LFDI Hash value, and the corresponding SFDI value.
-pub fn security_init(cert_path: &str) -> Result<(HexBinary160, SFDIType)> {
+pub fn security_init(cert_path: impl AsRef<Path>) -> Result<(HexBinary160, SFDIType)> {
     let lfdi = lfdi_gen(cert_path)?;
     let sfdi = sfdi_gen(&lfdi);
     Ok((lfdi, sfdi))

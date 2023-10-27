@@ -16,6 +16,7 @@ use std::{
     collections::BinaryHeap,
     fmt::Display,
     future::Future,
+    path::Path,
     pin::Pin,
     sync::Arc,
     time::{Duration, Instant},
@@ -241,9 +242,9 @@ impl Client {
     /// If [`Client::start_poll`] is never called, this setting has no effect.
     pub fn new(
         server_addr: &str,
-        cert_path: &str,
-        pk_path: &str,
-        rootca_path: &str,
+        cert_path: impl AsRef<Path>,
+        pk_path: impl AsRef<Path>,
+        rootca_path: impl AsRef<Path>,
         tcp_keepalive: Option<Duration>,
         tickrate: Option<Duration>,
     ) -> Result<Self> {
