@@ -6,6 +6,7 @@
 //!
 //!
 
+use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{bail, Result};
@@ -14,12 +15,9 @@ use hyper::{Body, Client};
 use hyper_openssl::HttpsConnector;
 use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod, SslVerifyMode};
 
-use x509_parser::prelude::ParsedExtension;
 #[cfg(feature = "pubsub")]
-use {
-    openssl::ssl::{SslAcceptor, SslAcceptorBuilder},
-    std::path::Path,
-};
+use openssl::ssl::{SslAcceptor, SslAcceptorBuilder};
+use x509_parser::prelude::ParsedExtension;
 
 pub(crate) type Connector = HttpsConnector<HttpConnector>;
 pub(crate) type HTTPSClient = Client<Connector, Body>;
