@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use sep2_client::{
     client::{Client, SEPResponse},
@@ -122,13 +122,13 @@ async fn setup_schedule(
         let edr: EndDevice = client
             .get(&loc)
             .await
-            .map_err(|_| anyhow!("Failed to retrieve EndDevice resource"))?;
+            .context("Failed to retrieve EndDevice resource")?;
         // Get FSAL
         let fsal = edr.function_set_assignments_list_link.unwrap();
         let fsal: FunctionSetAssignmentsList = client
             .get(&format!("{}?l={}", fsal.href, fsal.all.unwrap()))
             .await
-            .map_err(|_| anyhow!("Failed to retrieve FunctionSetAssignmentsList resource"))?;
+            .context("Failed to retrieve FunctionSetAssignmentsList resource")?;
         // Find FSA with DER Program List Link
         let fsa = fsal
             .function_set_assignments
@@ -143,7 +143,7 @@ async fn setup_schedule(
             &format!("{}?l={}", derpll.href, derpll.all.unwrap()),
         )
         .await
-        .map_err(|_| anyhow!("Failed to retrieve an initial instance of a DERProgramList"))?;
+        .context("Failed to retrieve an initial instance of a DERProgramList")?;
         let schedule = schedule.clone();
         let client = client.clone();
         tokio::task::spawn(async move {

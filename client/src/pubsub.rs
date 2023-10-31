@@ -72,12 +72,14 @@ impl Router {
                         let bytes = hyper::body::to_bytes(body).await?;
                         let xml = String::from_utf8(bytes.to_vec())?;
                         let func = func.value_mut();
-                        Ok(func(&xml).await.into())
+                        Ok(hyper::Response::try_from(func(&xml).await)?)
                     }
-                    _ => Ok(SEPResponse::MethodNotAllowed("POST".to_owned()).into()),
+                    _ => {
+                        hyper::Response::try_from(SEPResponse::MethodNotAllowed("POST".to_owned()))
+                    }
                 }
             }
-            None => Ok(SEPResponse::NotFound.into()),
+            None => hyper::Response::try_from(SEPResponse::NotFound),
         }
     }
 }

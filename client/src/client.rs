@@ -1,8 +1,9 @@
 //! IEEE 2030.5 Client Core Functionality
 
 use anyhow::{anyhow, bail, Context, Result};
+use httpdate::fmt_http_date;
 use hyper::{
-    header::{ACCEPT, ALLOW, CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
+    header::{ACCEPT, ALLOW, CONTENT_LENGTH, CONTENT_TYPE, DATE, LOCATION},
     http::HeaderValue,
     Body, Method, Request, StatusCode, Uri,
 };
@@ -23,14 +24,14 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-use crate::tls::{create_client, create_client_tls_cfg, HTTPSClient};
+use crate::{
+    time::{current_time, current_time_with_offset, SEPTime},
+    tls::{create_client, create_client_tls_cfg, HTTPSClient},
+};
 
 #[cfg(feature = "event")]
 use sep2_common::{
-    packages::{
-        identification::{ResponseRequired, ResponseStatus},
-        primitives::Int64,
-    },
+    packages::identification::{ResponseRequired, ResponseStatus},
     traits::SERespondableResource,
 };
 
@@ -92,14 +93,25 @@ impl Display for SEPResponse {
     }
 }
 
-impl From<SEPResponse> for hyper::Response<Body> {
-    fn from(value: SEPResponse) -> Self {
+impl TryFrom<SEPResponse> for hyper::Response<Body> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SEPResponse) -> Result<Self, Self::Error> {
         let mut res = hyper::Response::new(Body::empty());
+        res.headers_mut().insert(
+            DATE,
+            fmt_http_date(current_time_with_offset().into())
+                .parse()
+                .unwrap(),
+        );
         match value {
             SEPResponse::Created(loc) => {
                 *res.status_mut() = StatusCode::CREATED;
                 if let Some(loc) = loc {
-                    res.headers_mut().insert(LOCATION, loc.parse().unwrap());
+                    res.headers_mut().insert(
+                        LOCATION,
+                        loc.parse().context("Failed to set LOCATION header")?,
+                    );
                 }
             }
             SEPResponse::NoContent => {
@@ -113,11 +125,13 @@ impl From<SEPResponse> for hyper::Response<Body> {
             }
             SEPResponse::MethodNotAllowed(methods) => {
                 *res.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
-                res.headers_mut()
-                    .insert(ALLOW, HeaderValue::try_from(methods).unwrap());
+                res.headers_mut().insert(
+                    ALLOW,
+                    HeaderValue::try_from(methods).context("Failed to set ALLOW header")?,
+                );
             }
         };
-        res
+        Ok(res)
     }
 }
 
@@ -288,6 +302,7 @@ impl Client {
         let req = Request::builder()
             .method(Method::GET)
             .header(ACCEPT, "application/sep+xml")
+            .header(DATE, fmt_http_date(current_time_with_offset().into()))
             .uri(uri)
             .body(Body::default())?;
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
@@ -312,6 +327,7 @@ impl Client {
             path.parse().context("Failed to parse address")?,
             resource,
             Method::POST,
+            current_time(),
         )
         .await
     }
@@ -325,6 +341,7 @@ impl Client {
             path.parse().context("Failed to parse address")?,
             resource,
             Method::PUT,
+            current_time(),
         )
         .await
     }
@@ -339,6 +356,7 @@ impl Client {
         log::info!("Client: DELETE at {}", uri);
         let req = Request::builder()
             .method(Method::DELETE)
+            .header(DATE, fmt_http_date(current_time_with_offset().into()))
             .uri(uri)
             .body(Body::empty())?;
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
@@ -423,6 +441,7 @@ impl Client {
         abs_path: Uri,
         resource: &R,
         method: Method,
+        time: SEPTime,
     ) -> Result<SEPResponse> {
         log::info!("POST {} to {}", R::name(), abs_path);
         let rsrce = serialize(resource)?;
@@ -431,6 +450,7 @@ impl Client {
             .method(method)
             .header(CONTENT_TYPE, "application/sep+xml")
             .header(CONTENT_LENGTH, rsrce_size)
+            .header(DATE, fmt_http_date(time.into()))
             .uri(abs_path)
             .body(Body::from(rsrce))?;
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
@@ -445,7 +465,7 @@ impl Client {
         lfdi: HexBinary160,
         event: &TextMessage,
         status: ResponseStatus,
-        time: Int64,
+        time: SEPTime,
     ) -> Result<SEPResponse> {
         // As per Messaging in Table 27
         match (status, event.response_required) {
@@ -470,7 +490,7 @@ impl Client {
             _ => bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field.")
         };
         let resp = TextResponse {
-            created_date_time: Some(time),
+            created_date_time: Some(time.into()),
             end_device_lfdi: lfdi,
             status: Some(status),
             subject: event.mrid,
@@ -483,6 +503,7 @@ impl Client {
                 .parse()?,
             &resp,
             Method::POST,
+            time.into(),
         )
         .await
     }
@@ -493,9 +514,10 @@ impl Client {
         lfdi: HexBinary160,
         event: &DERControl,
         status: ResponseStatus,
-        time: Int64,
+        time: SEPTime,
     ) -> Result<SEPResponse> {
         // As per Table 27 - DER Column
+
         match (status, event.response_required) {
             (ResponseStatus::EventReceived, Some(rr))
                 if rr.contains(ResponseRequired::MessageReceived) => {}
@@ -509,7 +531,7 @@ impl Client {
         };
 
         let resp = DERControlResponse {
-            created_date_time: Some(time),
+            created_date_time: Some(time.into()),
             end_device_lfdi: lfdi,
             status: Some(status),
             subject: event.mrid,
@@ -522,6 +544,7 @@ impl Client {
                 .parse()?,
             &resp,
             Method::POST,
+            time.into(),
         )
         .await
     }
@@ -532,7 +555,7 @@ impl Client {
         device: &SEDevice,
         event: &EndDeviceControl,
         status: ResponseStatus,
-        time: Int64,
+        time: SEPTime,
     ) -> Result<SEPResponse> {
         // As per Table 27 - DRLC Column
 
@@ -549,7 +572,7 @@ impl Client {
         };
 
         let resp = DrResponse {
-            created_date_time: Some(time),
+            created_date_time: Some(time.into()),
             end_device_lfdi: device.lfdi,
             status: Some(status),
             subject: event.mrid,
@@ -568,6 +591,7 @@ impl Client {
                 .parse()?,
             &resp,
             Method::POST,
+            time.into(),
         )
         .await
     }
@@ -578,7 +602,7 @@ impl Client {
         lfdi: HexBinary160,
         event: &TimeTariffInterval,
         status: ResponseStatus,
-        time: Int64,
+        time: SEPTime,
     ) -> Result<SEPResponse> {
         // As per Pricing in Table 27
         match (status, event.response_required) {
@@ -601,7 +625,7 @@ impl Client {
             _ => bail!("Attempted to send a response for an event where one was not required, either due to it's status or the event's responseRequired field.")
         };
         let resp = PriceResponse {
-            created_date_time: Some(time),
+            created_date_time: Some(time.into()),
             end_device_lfdi: lfdi,
             status: Some(status),
             subject: event.mrid,
@@ -614,6 +638,7 @@ impl Client {
                 .parse()?,
             &resp,
             Method::POST,
+            time.into(),
         )
         .await
     }

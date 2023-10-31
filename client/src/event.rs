@@ -11,12 +11,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{client::Client, device::SEDevice, time::current_time};
+use crate::{
+    client::Client,
+    device::SEDevice,
+    time::{current_time, SEPTime},
+};
 use rand::Rng;
 use sep2_common::packages::{
     identification::ResponseStatus,
     objects::EventStatusType,
-    primitives::Int64,
     time::Time,
     types::{MRIDType, OneHourRangeType, PrimacyType},
 };
@@ -434,7 +437,7 @@ where
     /// Time resource, then devices SHALL use the Time resource from the same FunctionSetAssignments when
     /// executing the events from the associated Event-based function set."
     pub async fn update_time(&mut self, time: Time) {
-        let offset = time.current_time.get() - current_time().get();
+        let offset = time.current_time.get() - i64::from(current_time());
         self.time_offset
             .store(offset, std::sync::atomic::Ordering::Relaxed);
     }
@@ -443,8 +446,8 @@ where
         let _ = self.bc_sd.send(());
     }
 
-    pub(crate) fn schedule_time(&self) -> Int64 {
-        Int64(current_time().get() + self.time_offset.load(std::sync::atomic::Ordering::Relaxed))
+    pub(crate) fn schedule_time(&self) -> SEPTime {
+        current_time() + self.time_offset.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     pub(crate) async fn clean_events(self, mut rx: Receiver<()>) {

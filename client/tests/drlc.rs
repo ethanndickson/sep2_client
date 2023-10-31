@@ -106,11 +106,26 @@ async fn basic_drlc_scheduler() {
     // T0
     let (mut schedule, logs) = test_setup();
     // T1 -> T3
-    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 2);
+    let first = create_event(
+        EventStatusType::Scheduled,
+        1,
+        i64::from(current_time()) + 1,
+        2,
+    );
     // T4 -> T6
-    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
+    let second = create_event(
+        EventStatusType::Scheduled,
+        2,
+        i64::from(current_time()) + 4,
+        2,
+    );
     // T7 -> T9
-    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    let third = create_event(
+        EventStatusType::Scheduled,
+        3,
+        i64::from(current_time()) + 7,
+        2,
+    );
     // Schedule in a different order
     schedule.add_event(second, &program, 0).await;
     schedule.add_event(third, &program, 0).await;
@@ -137,13 +152,33 @@ async fn superseded_drlc_scheduler() {
     // T0
     let (mut schedule, logs) = test_setup();
     // T2 -> T3 - Never gets run
-    let superseded = create_event(EventStatusType::Scheduled, 0, current_time().get() + 2, 1);
+    let superseded = create_event(
+        EventStatusType::Scheduled,
+        0,
+        i64::from(current_time()) + 2,
+        1,
+    );
     // T1 -> T5
-    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 4);
+    let first = create_event(
+        EventStatusType::Scheduled,
+        1,
+        i64::from(current_time()) + 1,
+        4,
+    );
     // T4 -> T6
-    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
+    let second = create_event(
+        EventStatusType::Scheduled,
+        2,
+        i64::from(current_time()) + 4,
+        2,
+    );
     // T7 -> T9
-    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    let third = create_event(
+        EventStatusType::Scheduled,
+        3,
+        i64::from(current_time()) + 7,
+        2,
+    );
     schedule.add_event(first, &program, 0).await;
     schedule.add_event(superseded, &program, 0).await;
     tokio::time::sleep(Duration::from_secs(3)).await;
@@ -172,11 +207,26 @@ async fn cancelling_drlc_scheduler() {
     // T0
     let (mut schedule, logs) = test_setup();
     // T1 -> T3
-    let mut first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 2);
+    let mut first = create_event(
+        EventStatusType::Scheduled,
+        1,
+        i64::from(current_time()) + 1,
+        2,
+    );
     // T4 -> T6
-    let mut second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 4, 2);
+    let mut second = create_event(
+        EventStatusType::Scheduled,
+        2,
+        i64::from(current_time()) + 4,
+        2,
+    );
     // T7 -> T9
-    let mut third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    let mut third = create_event(
+        EventStatusType::Scheduled,
+        3,
+        i64::from(current_time()) + 7,
+        2,
+    );
     // Schedule in a different order
     schedule.add_event(second.clone(), &program, 0).await;
     schedule.add_event(third.clone(), &program, 0).await;
@@ -212,11 +262,26 @@ async fn unsupersede_drlc_scheduler() {
     // T0
     let (mut schedule, logs) = test_setup();
     // T4 -> T6 (Tentatively superseded)
-    let second = create_event(EventStatusType::Scheduled, 0, current_time().get() + 4, 2);
+    let second = create_event(
+        EventStatusType::Scheduled,
+        0,
+        i64::from(current_time()) + 4,
+        2,
+    );
     // T1 -> T5
-    let mut first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 4);
+    let mut first = create_event(
+        EventStatusType::Scheduled,
+        1,
+        i64::from(current_time()) + 1,
+        4,
+    );
     // T7 -> T9
-    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 7, 2);
+    let third = create_event(
+        EventStatusType::Scheduled,
+        3,
+        i64::from(current_time()) + 7,
+        2,
+    );
     schedule.add_event(first.clone(), &program, 0).await;
     schedule.add_event(second, &program, 0).await;
     schedule.add_event(third, &program, 0).await;
@@ -250,11 +315,26 @@ async fn schedule_drlc_differing_primacy() {
     program3.primacy = PrimacyType::NonContractualServiceProvider;
     let (mut schedule, logs) = test_setup();
     // T1 -> T4
-    let first = create_event(EventStatusType::Scheduled, 1, current_time().get() + 1, 3);
+    let first = create_event(
+        EventStatusType::Scheduled,
+        1,
+        i64::from(current_time()) + 1,
+        3,
+    );
     // T2 -> T4
-    let second = create_event(EventStatusType::Scheduled, 2, current_time().get() + 2, 2);
+    let second = create_event(
+        EventStatusType::Scheduled,
+        2,
+        i64::from(current_time()) + 2,
+        2,
+    );
     // T3 -> T5
-    let third = create_event(EventStatusType::Scheduled, 3, current_time().get() + 3, 2);
+    let third = create_event(
+        EventStatusType::Scheduled,
+        3,
+        i64::from(current_time()) + 3,
+        2,
+    );
     schedule.add_event(first, &program3, 0).await;
     schedule.add_event(second, &program1, 0).await;
     schedule.add_event(third, &program2, 0).await;

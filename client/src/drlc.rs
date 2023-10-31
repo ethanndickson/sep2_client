@@ -57,7 +57,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             }
             let mut events = self.events.write().await;
             let mrid = match events.next_start() {
-                Some((time, mrid)) if time < self.schedule_time().get() => mrid,
+                Some((time, mrid)) if time < self.schedule_time().into() => mrid,
                 _ => continue,
             };
 
@@ -81,7 +81,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             }
             let mut events = self.events.write().await;
             let mrid = match events.next_end() {
-                Some((time, mrid)) if time < self.schedule_time().get() => mrid,
+                Some((time, mrid)) if time < self.schedule_time().into() => mrid,
                 _ => continue,
             };
 
@@ -103,7 +103,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
         cancel_reason: EIStatus,
     ) {
         let mut events = self.events.write().await;
-        events.cancel_event(target_mrid, cancel_reason, self.schedule_time().get());
+        events.cancel_event(target_mrid, cancel_reason, self.schedule_time().into());
         let events = events.downgrade();
         let ei = events.get(target_mrid).unwrap();
         let resp = if current_status == EIStatus::Active {
@@ -251,7 +251,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             );
 
             // The event may have expired already
-            if ei.end_time() <= self.schedule_time().get() {
+            if ei.end_time() <= self.schedule_time().into() {
                 log::warn!("DRLCSchedule: Told to schedule EndDeviceControl ({mrid}) which has already ended, sending server response and not scheduling.");
                 // Do not add event to schedule
                 // For function sets with direct control ... Do this response

@@ -18,6 +18,7 @@ tokio = {version = "1.28.1", features = ["rt","net","macros"] }
 tokio-openssl = "0.6.3"
 dashmap = "5.5.3"
 x509-parser = "0.15.1"
+httpdate = "1.0.3"
 
 [dev-dependencies]
 sep2_common = { path = "../IEEE-2030.5-Common/common", features = ["examples","der","edev","fsa","metering","pubsub","dcap"]  }

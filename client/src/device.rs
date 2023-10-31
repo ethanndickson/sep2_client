@@ -56,7 +56,7 @@ impl SEDevice {
             sfdi,
             device_categories: device_category,
             edev: EndDevice {
-                changed_time: current_time(),
+                changed_time: current_time().into(),
                 enabled: Some(false),
                 flow_reservation_request_list_link: None,
                 flow_reservation_response_list_link: None,
