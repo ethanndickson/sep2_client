@@ -10,9 +10,17 @@ use sep2_common::packages::{primitives::Int64, time::Time};
 static TIME_OFFSET: AtomicI64 = AtomicI64::new(0);
 
 /// IEEE 2030.5 Representation of SystemTime
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct SEPTime {
     inner: SystemTime,
+}
+
+impl SEPTime {
+    fn now() -> SEPTime {
+        SEPTime {
+            inner: SystemTime::now(),
+        }
+    }
 }
 
 impl From<SEPTime> for SystemTime {
@@ -38,6 +46,7 @@ impl From<SEPTime> for u64 {
         value
             .inner
             .duration_since(UNIX_EPOCH)
+            // TODO: Can this reasonably happen?? Do we need to return a Result?
             .expect("Time went backwards")
             .as_secs()
     }
@@ -49,6 +58,7 @@ impl std::ops::Add<i64> for SEPTime {
     fn add(mut self, rhs: i64) -> Self::Output {
         let sign = rhs.signum();
         let duration = Duration::from_secs(rhs.abs() as u64);
+        // Duration does not support negatives
         if sign.is_positive() {
             self.inner += duration;
         } else {
@@ -60,9 +70,7 @@ impl std::ops::Add<i64> for SEPTime {
 
 /// Return the current time, as an Int64
 pub fn current_time() -> SEPTime {
-    SEPTime {
-        inner: SystemTime::now(),
-    }
+    SEPTime::now()
 }
 
 /// Return the current time, as an Int64, with the global time offset supplied.
@@ -88,4 +96,20 @@ pub async fn sleep_until(timestamp: Instant, tickrate: Duration) {
             break;
         }
     }
+}
+
+#[test]
+fn septime_add() {
+    let earlier = current_time() + -100i64;
+    assert!(earlier < current_time());
+    let later = current_time() + 100i64;
+    assert!(later > current_time());
+}
+
+#[test]
+fn septime_offset() {
+    let mut some_time = Time::default();
+    some_time.current_time = (current_time() + 100).into();
+    update_time_offset(some_time);
+    assert!(current_time_with_offset() > current_time());
 }
