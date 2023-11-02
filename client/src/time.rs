@@ -57,6 +57,7 @@ impl std::ops::Add<i64> for SEPTime {
 
     fn add(mut self, rhs: i64) -> Self::Output {
         let sign = rhs.signum();
+        // Duration cannot be negative, this branching is required
         let duration = Duration::from_secs(rhs.unsigned_abs());
         if sign.is_positive() {
             self.inner += duration;
