@@ -25,7 +25,7 @@ use std::{
 use tokio::sync::RwLock;
 
 use crate::{
-    time::{current_time, current_time_with_offset, SEPTime},
+    time::{current_time_with_offset, SEPTime},
     tls::{create_client, create_client_tls_cfg, HTTPSClient},
 };
 
@@ -327,7 +327,7 @@ impl Client {
             path.parse().context("Failed to parse address")?,
             resource,
             Method::POST,
-            current_time(),
+            current_time_with_offset(),
         )
         .await
     }
@@ -341,7 +341,7 @@ impl Client {
             path.parse().context("Failed to parse address")?,
             resource,
             Method::PUT,
-            current_time(),
+            current_time_with_offset(),
         )
         .await
     }
@@ -503,7 +503,7 @@ impl Client {
                 .parse()?,
             &resp,
             Method::POST,
-            time.into(),
+            time,
         )
         .await
     }
@@ -544,7 +544,7 @@ impl Client {
                 .parse()?,
             &resp,
             Method::POST,
-            time.into(),
+            time,
         )
         .await
     }
@@ -591,7 +591,7 @@ impl Client {
                 .parse()?,
             &resp,
             Method::POST,
-            time.into(),
+            time,
         )
         .await
     }
@@ -638,7 +638,7 @@ impl Client {
                 .parse()?,
             &resp,
             Method::POST,
-            time.into(),
+            time,
         )
         .await
     }

@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::{security::security_init, time::current_time};
+use crate::{security::security_init, time::current_time_with_offset};
 use anyhow::Result;
 use sep2_common::packages::{
     edev::EndDevice,
@@ -56,7 +56,7 @@ impl SEDevice {
             sfdi,
             device_categories: device_category,
             edev: EndDevice {
-                changed_time: current_time().into(),
+                changed_time: current_time_with_offset().into(),
                 enabled: Some(false),
                 flow_reservation_request_list_link: None,
                 flow_reservation_response_list_link: None,
