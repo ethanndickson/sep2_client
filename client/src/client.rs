@@ -102,7 +102,7 @@ impl TryFrom<SEPResponse> for hyper::Response<Body> {
             DATE,
             fmt_http_date(current_time_with_offset().into())
                 .parse()
-                .unwrap(),
+                .context("Guaranteed parse somehow failed")?,
         );
         match value {
             SEPResponse::Created(loc) => {
@@ -164,7 +164,7 @@ async fn into_sepresponse(res: hyper::Response<Body>) -> Result<SEPResponse> {
                 .get(ALLOW)
                 .and_then(|h| h.to_str().ok())
                 .map(|r| r.to_string())
-                .unwrap();
+                .context("Failed to extract expected ALLOW header from Response")?;
             Ok(SEPResponse::MethodNotAllowed(loc))
         }
         _ => Err(anyhow!("Unexpected HTTP response from server")),
@@ -281,7 +281,7 @@ impl Client {
             let mut polls = self.polls.write().await;
             while let Some(task) = polls.peek() {
                 if task.next < Instant::now() {
-                    let mut cur = polls.pop().unwrap();
+                    let mut cur = polls.pop().expect("trivially cannot occur");
                     cur.execute().await;
                     polls.push(cur);
                 } else {
@@ -424,7 +424,7 @@ impl Client {
     pub async fn force_poll(&self) {
         let mut polls = self.polls.write().await;
         while polls.peek().is_some() {
-            let mut cur = polls.pop().unwrap();
+            let mut cur = polls.pop().expect("trivially cannot occur");
             cur.execute().await;
             polls.push(cur);
         }
