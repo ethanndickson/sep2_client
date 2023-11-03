@@ -49,6 +49,9 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
     async fn drlc_start_task(self, mut rx: Receiver<()>) {
         loop {
             tokio::select! {
+                // This and end task should ideally be redesigned to sleep until the next event start/end
+                // And then provide a way to signal to this to re-evaluate the next event start/end whenever it changes,
+                // but still sleeping intermittently.
                 _ = tokio::time::sleep(self.tickrate) => (),
                 _ = rx.recv() => {
                     log::info!("DRLCSchedule: Shutting down event start task...");

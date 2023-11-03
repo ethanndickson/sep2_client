@@ -217,7 +217,7 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait::async_trait]
 pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
-    /// Called whenever the state of an event is updated such that a response to the server is required.
+    /// Called whenever the state of an event is updated such that a response cannot be automatically determined, and the client device must be made aware.
     /// Type is bound by an [`SEEvent`] pertaining to a specific function set.
     ///
     /// Allows the client to apply the event at the device-level, and determine the correct response code.
@@ -229,6 +229,7 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus;
 }
 
+// Currently useless as Schedule is generic bound and we can't give these functions a type, might be useful in the future
 #[async_trait::async_trait]
 impl<F, R, E: SEEvent> EventHandler<E> for F
 where
