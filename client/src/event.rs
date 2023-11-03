@@ -221,8 +221,16 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     /// Type is bound by an [`SEEvent`] pertaining to a specific function set.
     ///
     /// Allows the client to apply the event at the device-level, and determine the correct response code.
+    /// In some cases, the correct response code can be determined by the scheduler, in which case the return value of this function will be ignored.
+    /// The specific cases depend on the function set.
     ///
     /// When determining the ResponseStatus to return, refer to Table 27 of IEEE 2030.5-2018
+    ///
+    /// If the provided ResponseStatus for a newly Active event is one of:
+    ///
+    /// `EventOptOut ||EventNotApplicable || EventInvalid`
+    ///
+    /// The event will internally be marked as cancelled, and the client will no longer receive updates on it.
     ///
     /// Currently, calling this function acquires a global lock on the scheduler, stopping it from making progress.
     /// This may be changed in the future.

@@ -71,10 +71,16 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             events.update_event(&mrid, EIStatus::Active);
 
             // Notify client and server
-            let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.auto_der_response(target.event(), resp).await;
+            // If the device opts-out or if the event cannot be active, we update it's internal status.
+            match resp {
+                ResponseStatus::EventOptOut
+                | ResponseStatus::EventNotApplicable
+                | ResponseStatus::EventInvalid => events.update_event(&mrid, EIStatus::Cancelled),
+                _ => (),
+            }
         }
     }
 
@@ -301,6 +307,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
                     // Determine appropriate status
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
+                        // We override whatever response the client provides to the more correct one
                         (self.handler).event_update(superseded).await;
                         if superseded.program_mrid() != superseding.program_mrid() {
                             // If the two events come from different programs
