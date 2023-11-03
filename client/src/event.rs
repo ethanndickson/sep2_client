@@ -7,6 +7,7 @@
 
 use std::{
     collections::{hash_map, HashMap},
+    future::Future,
     sync::{atomic::AtomicI64, Arc},
     time::{Duration, Instant},
 };
@@ -226,6 +227,17 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     /// Currently, calling this function acquires a global lock on the scheduler, stopping it from making progress.
     /// This may be changed in the future.
     async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus;
+}
+
+#[async_trait::async_trait]
+impl<F, R, E: SEEvent> EventHandler<E> for F
+where
+    F: Fn(&EventInstance<E>) -> R + Send + Sync + 'static,
+    R: Future<Output = ResponseStatus> + Send + 'static,
+{
+    async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus {
+        Box::pin(self(event)).await
+    }
 }
 
 type EventsMap<E> = HashMap<MRIDType, EventInstance<E>>;

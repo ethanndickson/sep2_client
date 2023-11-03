@@ -46,8 +46,7 @@ impl From<SEPTime> for u64 {
         value
             .inner
             .duration_since(UNIX_EPOCH)
-            // TODO: Can this reasonably happen?? Do we need to return a Result?
-            .expect("Time went backwards")
+            .expect("Current time earlier than unix epoch")
             .as_secs()
     }
 }
