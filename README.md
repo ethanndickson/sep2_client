@@ -34,7 +34,7 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
   - [x] Event Scheduler Tests
   - [x] Subscription/Notification Tests
   - [x] DER Non-Aggregate Client Sample Impl.
+- [x] Australian CSIP Extensions
 ### Future
 - [ ] DNS-SD
-- [ ] Australian CSIP Extensions
 - [ ] [rustls ECDHE-ECDSA-AES128-CCM8 Support](https://github.com/rustls/rustls/issues/1034)
