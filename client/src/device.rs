@@ -78,7 +78,7 @@ impl SEDevice {
                 power_status_link: None,
                 subscribable: None,
                 href: None,
-                #[cfg(feature = "conn_point")]
+                #[cfg(feature = "csip_aus")]
                 connection_point_link: None,
             },
             #[cfg(feature = "drlc")]
