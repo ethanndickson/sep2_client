@@ -58,6 +58,8 @@ impl SEDevice {
             edev: EndDevice {
                 changed_time: current_time_with_offset().into(),
                 enabled: Some(false),
+                lfdi: Some(lfdi),
+                sfdi,
                 flow_reservation_request_list_link: None,
                 flow_reservation_response_list_link: None,
                 function_set_assignments_list_link: None,
@@ -74,10 +76,10 @@ impl SEDevice {
                 load_shed_availability_list_link: None,
                 log_event_list_link: None,
                 power_status_link: None,
-                lfdi: Some(lfdi),
-                sfdi,
                 subscribable: None,
                 href: None,
+                #[cfg(feature = "conn_point")]
+                connection_point_link: None,
             },
             #[cfg(feature = "drlc")]
             appliance_load_reduction: None,

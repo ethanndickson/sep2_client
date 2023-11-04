@@ -36,7 +36,9 @@ messaging = ["sep2_common/messaging","event"]
 drlc = ["sep2_common/drlc","event"]
 flow_reservation = ["sep2_common/flow_reservation","event"]
 pubsub = ["sep2_common/pubsub"]
-all = ["event","der","pricing","messaging","drlc", "flow_reservation", "pubsub"]
+conn_point = ["sep2_common/conn_point"]
+aus_csip = ["conn_point"]
+all = ["event","der","pricing","messaging","drlc", "flow_reservation", "pubsub","aus_csip"]
 
 [[example]]
 name = "der_client"
