@@ -22,7 +22,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 
 use crate::{
     time::{current_time_with_offset, SEPTime},
@@ -227,7 +227,7 @@ impl Ord for PollTask {
     }
 }
 
-type PollQueue = Arc<RwLock<BinaryHeap<PollTask>>>;
+type PollQueue = Arc<Mutex<BinaryHeap<PollTask>>>;
 
 /// Represents an IEEE 2030.5 Client connection to a single server
 ///
@@ -266,7 +266,7 @@ impl Client {
         let out = Client {
             addr: server_addr.to_owned().into(),
             http: create_client(cfg, tcp_keepalive),
-            polls: Arc::new(RwLock::new(BinaryHeap::new())),
+            polls: Arc::new(Mutex::new(BinaryHeap::new())),
         };
         tokio::spawn(
             out.clone()
@@ -278,7 +278,7 @@ impl Client {
     async fn poll_task(self, tickrate: Duration) {
         loop {
             tokio::time::sleep(tickrate).await;
-            let mut polls = self.polls.write().await;
+            let mut polls = self.polls.lock().await;
             while let Some(task) = polls.peek() {
                 if task.next < Instant::now() {
                     // unwrap trivially safe
@@ -418,12 +418,12 @@ impl Client {
             interval,
             next: Instant::now() + interval,
         };
-        self.polls.write().await.push(poll);
+        self.polls.lock().await.push(poll);
     }
 
     /// Forcibly poll & run the callbacks of all routes polled using [`Client::start_poll`]
     pub async fn force_poll(&self) {
-        let mut polls = self.polls.write().await;
+        let mut polls = self.polls.lock().await;
         while polls.peek().is_some() {
             // unwrap trivially safe
             let mut cur = polls.pop().unwrap();
@@ -434,7 +434,7 @@ impl Client {
 
     /// Cancel all poll tasks created using [`Client::start_poll`]
     pub async fn cancel_polls(&self) {
-        self.polls.write().await.clear();
+        self.polls.lock().await.clear();
     }
 
     // Create a PUT or POST request
