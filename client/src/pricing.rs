@@ -186,9 +186,9 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
         let incoming_status = event.event_status.current_status;
 
         // If the event already exists in the schedule
-        if self.events.read().await.contains(&mrid) {
-            // "Editing events shall NOT be allowed, except for updating status"
-            let current_status = self.events.read().await.get(&mrid).unwrap().status();
+        // "Editing events shall NOT be allowed, except for updating status"
+        let cur = { self.events.read().await.get(&mrid).map(|e| e.status()) };
+        if let Some(current_status) = cur {
             match (current_status, incoming_status) {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {

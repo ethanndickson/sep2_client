@@ -1,6 +1,6 @@
 //! Subscription/Notification Function Set
 
-use anyhow::{anyhow, Result};
+use anyhow::{Context, Result};
 use dashmap::DashMap;
 use hyper::{server::conn::Http, service::service_fn, Body, Method, Request, Response};
 use openssl::ssl::Ssl;
@@ -104,7 +104,7 @@ impl ClientNotifServer {
             addr: addr
                 .to_socket_addrs()?
                 .next()
-                .ok_or(anyhow!("Given server address did not yield a SocketAddr"))?,
+                .context("Given server address did not yield a SocketAddr")?,
             cfg,
             router: Router::new(),
         })

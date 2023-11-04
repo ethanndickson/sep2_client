@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use clap::Parser;
 use sep2_client::{
     client::{Client, SEPResponse},
@@ -116,7 +116,7 @@ async fn setup_schedule(
     // Add our device to the server
     let res = client.post("/edev", &edr.read().await.edev).await.unwrap();
     if let SEPResponse::Created(loc) = res {
-        let loc = loc.ok_or(anyhow!("No location header provided."))?;
+        let loc = loc.context("No location header provided.")?;
         // EndDevice resource is now populated,
         // use the returned location header to determine where it is
         let edr: EndDevice = client
@@ -134,7 +134,7 @@ async fn setup_schedule(
             .function_set_assignments
             .iter()
             .find(|e| e.der_program_list_link.is_some())
-            .ok_or(anyhow!("FSA List did not contain a DER Program List Link"))?;
+            .context("FSA List did not contain a DER Program List Link")?;
         // Get all the DER Programs
         let derpll = fsa.der_program_list_link.as_ref().unwrap();
         // Set a poll task on these DER Programs

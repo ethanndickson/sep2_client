@@ -312,11 +312,6 @@ where
         self.map.get(mrid)
     }
 
-    #[inline(always)]
-    pub(crate) fn contains(&self, mrid: &MRIDType) -> bool {
-        self.map.contains_key(mrid)
-    }
-
     pub(crate) fn update_event(&mut self, event: &MRIDType, status: EIStatus) {
         let event = self.map.get_mut(event).unwrap();
         event.update_status(status);

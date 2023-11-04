@@ -281,7 +281,8 @@ impl Client {
             let mut polls = self.polls.write().await;
             while let Some(task) = polls.peek() {
                 if task.next < Instant::now() {
-                    let mut cur = polls.pop().expect("trivially cannot occur");
+                    // unwrap trivially safe
+                    let mut cur = polls.pop().unwrap();
                     cur.execute().await;
                     polls.push(cur);
                 } else {
@@ -424,7 +425,8 @@ impl Client {
     pub async fn force_poll(&self) {
         let mut polls = self.polls.write().await;
         while polls.peek().is_some() {
-            let mut cur = polls.pop().expect("trivially cannot occur");
+            // unwrap trivially safe
+            let mut cur = polls.pop().unwrap();
             cur.execute().await;
             polls.push(cur);
         }
@@ -499,8 +501,9 @@ impl Client {
         self.put_post(
             event
                 .reply_to()
-                .ok_or(anyhow!("Event does not contain a ReplyToField"))?
-                .parse()?,
+                .context("Event does not contain a ReplyTo Field")?
+                .parse()
+                .context("Failed to parse ReplyTo Field")?,
             &resp,
             Method::POST,
             time,
@@ -540,8 +543,9 @@ impl Client {
         self.put_post(
             event
                 .reply_to()
-                .ok_or(anyhow!("Event does not contain a ReplyToField"))?
-                .parse()?,
+                .context("Event does not contain a ReplyTo Field")?
+                .parse()
+                .context("Failed to parse ReplyTo Field")?,
             &resp,
             Method::POST,
             time,
@@ -587,8 +591,9 @@ impl Client {
         self.put_post(
             event
                 .reply_to()
-                .ok_or(anyhow!("Event does not contain a ReplyToField"))?
-                .parse()?,
+                .context("Event does not contain a ReplyTo Field")?
+                .parse()
+                .context("Failed to parse ReplyTo Field")?,
             &resp,
             Method::POST,
             time,
@@ -634,8 +639,9 @@ impl Client {
         self.put_post(
             event
                 .reply_to()
-                .ok_or(anyhow!("Event does not contain a ReplyToField"))?
-                .parse()?,
+                .context("Event does not contain a ReplyTo Field")?
+                .parse()
+                .context("Failed to parse ReplyTo Field")?,
             &resp,
             Method::POST,
             time,

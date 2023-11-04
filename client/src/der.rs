@@ -71,7 +71,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             events.update_event(&mrid, EIStatus::Active);
 
             // Notify client and server
-            let target = events.get(&mrid).expect("guaranteed to exist");
+            let target = events.get(&mrid).unwrap();
             let resp = self.handler.event_update(target).await;
             self.auto_der_response(target.event(), resp).await;
             // If the device opts-out or if the event cannot be active, we update it's internal status.
@@ -128,7 +128,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         let mut events = self.events.write().await;
         events.cancel_event(target_mrid, cancel_reason, self.schedule_time().into());
         let events = events.downgrade();
-        let ei = events.get(target_mrid).expect("guaranteed to exist");
+        let ei = events.get(target_mrid).unwrap();
         let resp = if current_status == EIStatus::Active {
             // If the event was active, let the client know it is over
             (self.handler).event_update(ei).await
@@ -217,9 +217,9 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
         }
 
         // If the event already exists in the schedule
-        if self.events.read().await.contains(&mrid) {
-            // "Editing events shall NOT be allowed, except for updating status"
-            let current_status = self.events.read().await.get(&mrid).unwrap().status();
+        // "Editing events shall NOT be allowed, except for updating status"
+        let cur = { self.events.read().await.get(&mrid).map(|e| e.status()) };
+        if let Some(current_status) = cur {
             match (current_status, incoming_status) {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
