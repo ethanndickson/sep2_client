@@ -202,7 +202,7 @@ struct PollTask {
 impl PollTask {
     /// Run the stored handler, and increment the `next` Instant
     async fn execute(&mut self) {
-        (self.handler)().await;
+        tokio::spawn((self.handler)());
         self.next = Instant::now() + self.interval;
     }
 }
