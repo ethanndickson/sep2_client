@@ -146,7 +146,7 @@ async fn setup_schedule(
         .context("Failed to retrieve an initial instance of a DERProgramList")?;
         let schedule = schedule.clone();
         let client = client.clone();
-        tokio::task::spawn(async move {
+        tokio::spawn(async move {
             while let Some(derpl) = rx.recv().await {
                 let _ = process_derpl_task(&client, schedule.clone(), derpl)
                     .await
@@ -220,7 +220,7 @@ async fn main() -> Result<()> {
     .add("/dcap", incoming_dcap);
 
     // Spawn an async task to run our notif server
-    let notif_handle = tokio::task::spawn(notifs.run(tokio::signal::ctrl_c()));
+    let notif_handle = tokio::spawn(notifs.run(tokio::signal::ctrl_c()));
     // Create a HTTPS client for a specfific server
     let client = Client::new(
         &args.target_addr,
