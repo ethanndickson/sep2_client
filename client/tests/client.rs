@@ -6,7 +6,7 @@ use sep2_test_server::TestServer;
 use tokio::sync::RwLock;
 
 fn test_setup() -> Client {
-    Client::new(
+    Client::new_https(
         "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",

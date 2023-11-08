@@ -222,7 +222,7 @@ async fn main() -> Result<()> {
     // Spawn an async task to run our notif server
     let notif_handle = tokio::spawn(notifs.run(tokio::signal::ctrl_c()));
     // Create a HTTPS client for a specfific server
-    let client = Client::new(
+    let client = Client::new_https(
         &args.target_addr,
         &args.cert,
         &args.key,

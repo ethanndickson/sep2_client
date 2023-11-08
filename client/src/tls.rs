@@ -10,8 +10,8 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{bail, Result};
-use hyper::client::HttpConnector;
-use hyper::{Body, Client};
+use hyper::client::{HttpConnector, ResponseFuture};
+use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod, SslVerifyMode};
 
@@ -19,9 +19,25 @@ use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod, Ss
 use openssl::ssl::{SslAcceptor, SslAcceptorBuilder};
 use x509_parser::prelude::ParsedExtension;
 
-pub(crate) type Connector = HttpsConnector<HttpConnector>;
-pub(crate) type HTTPSClient = Client<Connector, Body>;
+pub(crate) type HTTPSConnector = HttpsConnector<HttpConnector>;
+pub(crate) type HTTPSClient = Client<HTTPSConnector, Body>;
+pub(crate) type HTTPClient = Client<HttpConnector, Body>;
 pub(crate) type TlsClientConfig = SslConnectorBuilder;
+
+#[derive(Clone, Debug)]
+pub(crate) enum ClientInner {
+    HTTPS(HTTPSClient),
+    HTTP(HTTPClient),
+}
+
+impl ClientInner {
+    pub(crate) fn request(&self, req: Request<Body>) -> ResponseFuture {
+        match self {
+            ClientInner::HTTPS(c) => c.request(req),
+            ClientInner::HTTP(c) => c.request(req),
+        }
+    }
+}
 
 pub(crate) fn create_client_tls_cfg(
     cert_path: impl AsRef<Path>,
@@ -45,12 +61,19 @@ pub(crate) fn create_client_tls_cfg(
 pub(crate) fn create_client(
     tls_config: TlsClientConfig,
     tcp_keepalive: Option<Duration>,
-) -> Client<Connector, Body> {
+) -> Client<HTTPSConnector, Body> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
     http.set_keepalive(tcp_keepalive);
     let https = HttpsConnector::with_connector(http, tls_config).unwrap();
-    Client::builder().build::<Connector, hyper::Body>(https)
+    Client::builder().build::<HTTPSConnector, hyper::Body>(https)
+}
+
+pub(crate) fn create_http_client(tcp_keepalive: Option<Duration>) -> Client<HttpConnector, Body> {
+    let mut http = HttpConnector::new();
+    http.enforce_http(false);
+    http.set_keepalive(tcp_keepalive);
+    Client::builder().build::<HttpConnector, hyper::Body>(http)
 }
 
 #[cfg(feature = "pubsub")]

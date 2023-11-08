@@ -7,7 +7,7 @@ use sep2_common::packages::{dcap::DeviceCapability, edev::EndDevice, pubsub::Not
 use std::{future, time::Duration};
 
 fn test_setup() -> Client {
-    Client::new(
+    Client::new_https(
         // Point to Notif Server
         "https://127.0.0.1:1338",
         "../certs/client_cert.pem",

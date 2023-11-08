@@ -24,7 +24,7 @@ fn test_setup() -> (
     Schedule<EndDeviceControl, EndDeviceControlhandler>,
     Arc<EndDeviceControlhandler>,
 ) {
-    let client = Client::new(
+    let client = Client::new_https(
         "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",

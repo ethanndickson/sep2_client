@@ -29,7 +29,7 @@ fn test_setup() -> (EndDevice, Registration, Client) {
     reg.date_time_registered = Int64(1364774400);
     reg.pin = PINType::new(123455).unwrap();
     // Create client
-    let client = Client::new(
+    let client = Client::new_https(
         "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
         "../certs/client_private_key.pem",

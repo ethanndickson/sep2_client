@@ -26,7 +26,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     time::{current_time_with_offset, SEPTime},
-    tls::{create_client, create_client_tls_cfg, HTTPSClient},
+    tls::{create_client, create_client_tls_cfg, create_http_client, ClientInner},
 };
 
 #[cfg(feature = "event")]
@@ -235,7 +235,7 @@ type PollQueue = Arc<Mutex<BinaryHeap<PollTask>>>;
 #[derive(Clone)]
 pub struct Client {
     addr: Arc<String>,
-    http: HTTPSClient,
+    inner: ClientInner,
     polls: PollQueue,
 }
 
@@ -243,6 +243,7 @@ impl Client {
     const DEFAULT_POLLRATE: Uint32 = Uint32(900);
     const DEFAULT_TICKRATE: Duration = Duration::from_secs(600);
 
+    /// Construct an IEEE 2030.5 Client instance that uses HTTP
     /// **TCP KeepAlive**:
     ///
     /// Pass the given value to `SO_KEEPALIVE`.
@@ -256,6 +257,24 @@ impl Client {
     /// If [`Client::start_poll`] is never called, this setting has no effect.
     pub fn new(
         server_addr: &str,
+        tcp_keepalive: Option<Duration>,
+        tickrate: Option<Duration>,
+    ) -> Result<Self> {
+        let out = Client {
+            addr: server_addr.to_owned().into(),
+            inner: ClientInner::HTTP(create_http_client(tcp_keepalive)),
+            polls: Arc::new(Mutex::new(BinaryHeap::new())),
+        };
+        tokio::spawn(
+            out.clone()
+                .poll_task(tickrate.unwrap_or(Self::DEFAULT_TICKRATE)),
+        );
+        Ok(out)
+    }
+
+    /// Construct an IEEE 2030.5 Client instance that uses HTTPS
+    pub fn new_https(
+        server_addr: &str,
         cert_path: impl AsRef<Path>,
         pk_path: impl AsRef<Path>,
         rootca_path: impl AsRef<Path>,
@@ -265,7 +284,7 @@ impl Client {
         let cfg = create_client_tls_cfg(cert_path, pk_path, rootca_path)?;
         let out = Client {
             addr: server_addr.to_owned().into(),
-            http: create_client(cfg, tcp_keepalive),
+            inner: ClientInner::HTTPS(create_client(cfg, tcp_keepalive)),
             polls: Arc::new(Mutex::new(BinaryHeap::new())),
         };
         tokio::spawn(
@@ -307,7 +326,7 @@ impl Client {
             .uri(uri)
             .body(Body::default())?;
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
-        let res = self.http.request(req).await?;
+        let res = self.inner.request(req).await?;
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
         // TODO: Handle moved resources - implement HTTP redirects
         match res.status() {
@@ -361,7 +380,7 @@ impl Client {
             .uri(uri)
             .body(Body::empty())?;
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
-        let res = self.http.request(req).await?;
+        let res = self.inner.request(req).await?;
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
         into_sepresponse(res).await
     }
@@ -456,7 +475,7 @@ impl Client {
             .uri(abs_path)
             .body(Body::from(rsrce))?;
         log::debug!("Client: Outgoing HTTP Request: {:?}", req);
-        let res = self.http.request(req).await?;
+        let res = self.inner.request(req).await?;
         log::debug!("Client: Incoming HTTP Response: {:?}", res);
         into_sepresponse(res).await
     }

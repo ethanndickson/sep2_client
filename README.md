@@ -51,7 +51,7 @@ use sep2_common::packages::{dcap::DeviceCapability, time::Time};
 #[tokio::main]
 async fn main() {
     // Create a HTTPS client for a specfific server
-    let client = Client::new(
+    let client = Client::new_https(
         "https://127.0.0.1:1337",
         "client_cert.pem",
         "client_private_key.pem",
