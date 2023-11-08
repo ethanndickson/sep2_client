@@ -1,9 +1,7 @@
 //! Common Application Functionality: Events
 //!
-//!
-//! Since we are required to compare real-world timestamps
-//! to determine when events start and end, we cannot use the [`Instant`] type.
-//! Instead, we compare an `i64` of the number of seconds since the Unix Epoch.
+//! The [`Scheduler`] trait is implemented manually for all possible variants of [`Schedule`],
+//! providing a black box for working with [`SEEvent`] resources.
 
 use std::{
     collections::{hash_map, HashMap},
@@ -63,7 +61,9 @@ where
 pub(crate) type EIPair<'a, E> = (&'a mut EventInstance<E>, &'a MRIDType);
 
 /// The current state of an [`EventInstance`] in the schedule.
+///
 /// Can be created from a [`EventStatusType`] for the purpose of reading [`SEEvent`] resources.
+///
 /// Can be converted to a [`ResponseStatus`] for the purpose of creating [`SEResponse`] resources.
 ///
 /// [`SEResponse`]: sep2_common::traits::SEResponse
@@ -216,19 +216,22 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
 
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait::async_trait]
+/// A Trait specifying a callback for a [`Schedule`]
 pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     /// Called whenever the state of an event is updated such that a response cannot be automatically determined, and the client device must be made aware.
-    /// Type is bound by an [`SEEvent`] pertaining to a specific function set.
     ///
     /// Allows the client to apply the event at the device-level, and determine the correct response code.
+    ///
     /// In some cases, the correct response code can be determined by the scheduler, in which case the return value of this function will be ignored.
     /// The specific cases depend on the function set.
     ///
+    /// The event's [`EventInstance::status`] is guaranteed to NOT be [`EIStatus::Scheduled`]
+    ///
     /// When determining the ResponseStatus to return, refer to Table 27 of IEEE 2030.5-2018
     ///
-    /// If the provided ResponseStatus for a newly Active event is one of:
+    /// If the returned ResponseStatus for a newly Active event is one of:
     ///
-    /// `EventOptOut ||EventNotApplicable || EventInvalid`
+    /// [`ResponseStatus::EventOptOut`] ||  [`ResponseStatus::EventNotApplicable`] ||  [`ResponseStatus::EventInvalid`]
     ///
     /// The event will internally be marked as cancelled, and the client will no longer receive updates on it.
     ///
@@ -237,7 +240,7 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
     async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus;
 }
 
-// Currently useless as Schedule is generic bound and we can't give these functions a type, might be useful in the future
+/// Currently useless.
 #[async_trait::async_trait]
 impl<F, R, E: SEEvent> EventHandler<E> for F
 where
@@ -358,7 +361,7 @@ where
 
 /// A Trait representing the common interface of all schedules.
 ///
-/// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
+// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait::async_trait]
 pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
     /// The type of the program the specific SEEvent belongs to, containing a primacy value and a unique program MRID.

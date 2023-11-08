@@ -30,6 +30,7 @@ impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse
     for Schedule<FlowReservationResponse, H>
 {
     type Program = ();
+
     #[allow(unused_variables)]
     fn new(
         client: Client,
@@ -48,6 +49,7 @@ impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse
             time_offset: Arc::new(AtomicI64::new(0)),
         }
     }
+
     #[allow(unused_variables)]
     async fn add_event(
         &mut self,

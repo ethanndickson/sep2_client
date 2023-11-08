@@ -9,7 +9,7 @@ use sep2_client::{
     time::current_time,
 };
 use sep2_common::{
-    object::mrid_gen,
+    mrid_gen,
     packages::{
         identification::ResponseStatus,
         objects::EventStatusType,

@@ -67,12 +67,12 @@ impl std::ops::Add<i64> for SEPTime {
     }
 }
 
-/// Return the current time, as an Int64
+/// Return the current time
 pub fn current_time() -> SEPTime {
     SEPTime::now()
 }
 
-/// Return the current time, as an Int64, with the global time offset supplied.
+/// Return the current time, with the global time offset supplied.
 pub fn current_time_with_offset() -> SEPTime {
     current_time() + TIME_OFFSET.load(std::sync::atomic::Ordering::Relaxed)
 }
@@ -86,6 +86,7 @@ pub fn update_time_offset(time: Time) {
 
 /// Intermittently sleep until the provided instant,
 /// waking at an interval defined by `rate`.
+///
 /// This uses `tokio::time:sleep`, which, like `thread::sleep` does not make progress while the device itself is asleep,
 /// hence the intermittent wakeups.
 pub async fn sleep_until(timestamp: Instant, tickrate: Duration) {

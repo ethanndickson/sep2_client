@@ -16,9 +16,8 @@ use crate::tls::{create_server_tls_config, TlsServerConfig};
 
 /// A trait implemented by types that can be used as a route callback in a [`ClientNotifServer`].
 ///
-/// Automatically implemented for all [`Fn`] with a matching function signature.
-///  
-/// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
+///
+// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 pub trait RouteCallback<T: SEResource>: Send + Sync + 'static {
     fn callback(
         &self,
@@ -26,6 +25,7 @@ pub trait RouteCallback<T: SEResource>: Send + Sync + 'static {
     ) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>>;
 }
 
+/// Automatically implemented for all [`Fn`] with a matching function signature.
 impl<F, R, T: SEResource> RouteCallback<T> for F
 where
     F: Fn(Notification<T>) -> R + Send + Sync + 'static,

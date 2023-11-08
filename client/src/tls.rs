@@ -1,9 +1,6 @@
-//! TLS Configuration for a IEEE 2030.5 Client & Notification Server
+//! TLS Configuration
 //!
-//! Missing from this section is a verification callback that checks the presence of critical & non-critical extensions required by IEEE 2030.5 section 6.11
-//! The `rust-openssl` crate we use for openssl bindings currently does not expose an interface necessary to check these extensions: <https://github.com/sfackler/rust-openssl/issues/373>
-//! In the meantime, we use `x509_parser` to parse and verify that the required extensions are present, for both self-signed Client Certificates and device certificates, as per the specification.
-//!
+//! Provides an interface for parsing & verifying 2030.5 certificates, as per IEEE 2030.5 section 6.11
 //!
 
 use std::path::Path;
@@ -26,15 +23,15 @@ pub(crate) type TlsClientConfig = SslConnectorBuilder;
 
 #[derive(Clone, Debug)]
 pub(crate) enum ClientInner {
-    HTTPS(HTTPSClient),
-    HTTP(HTTPClient),
+    Https(HTTPSClient),
+    Http(HTTPClient),
 }
 
 impl ClientInner {
     pub(crate) fn request(&self, req: Request<Body>) -> ResponseFuture {
         match self {
-            ClientInner::HTTPS(c) => c.request(req),
-            ClientInner::HTTP(c) => c.request(req),
+            ClientInner::Https(c) => c.request(req),
+            ClientInner::Http(c) => c.request(req),
         }
     }
 }
@@ -103,7 +100,12 @@ pub(crate) fn create_server_tls_config(
     Ok(builder)
 }
 
+// The `rust-openssl` crate we use for openssl bindings currently does not expose an interface necessary to check these extensions: <https://github.com/sfackler/rust-openssl/issues/373>
+//
+// In the meantime, we use `x509_parser` to parse and verify that the required extensions are present, for both self-signed Client Certificates and device certificates, as per the specification.
+
 /// Verify that the PEM encoded certificate at the given path meets IEEE 2030.5 "Device Certificate" requirements.
+///
 /// Newly purchased or acquired certificates in an IEEE 2030.5 certificate chain will satisfy these requirements.
 ///
 /// Currently this function isn't called when instantiating a [`Client`]` nor a [`ClientNotifServer`], but that may change in the future.

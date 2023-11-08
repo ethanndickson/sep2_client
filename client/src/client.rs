@@ -172,11 +172,13 @@ async fn into_sepresponse(res: hyper::Response<Body>) -> Result<SEPResponse> {
 }
 
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
+/// A trait implemented by types that can be used as a poll callback by [`Client::start_poll`].
 #[async_trait::async_trait]
 pub trait PollCallback<T: SEResource>: Clone + Send + Sync + 'static {
     async fn callback(&self, resource: T);
 }
 
+/// Automatically implemented for all [`Fn`] with a matching function signature.
 #[async_trait::async_trait]
 impl<F, R, T: SEResource> PollCallback<T> for F
 where
@@ -244,6 +246,7 @@ impl Client {
     const DEFAULT_TICKRATE: Duration = Duration::from_secs(600);
 
     /// Construct an IEEE 2030.5 Client instance that uses HTTP
+    ///
     /// **TCP KeepAlive**:
     ///
     /// Pass the given value to `SO_KEEPALIVE`.
@@ -262,7 +265,7 @@ impl Client {
     ) -> Result<Self> {
         let out = Client {
             addr: server_addr.to_owned().into(),
-            inner: ClientInner::HTTP(create_http_client(tcp_keepalive)),
+            inner: ClientInner::Http(create_http_client(tcp_keepalive)),
             polls: Arc::new(Mutex::new(BinaryHeap::new())),
         };
         tokio::spawn(
@@ -284,7 +287,7 @@ impl Client {
         let cfg = create_client_tls_cfg(cert_path, pk_path, rootca_path)?;
         let out = Client {
             addr: server_addr.to_owned().into(),
-            inner: ClientInner::HTTPS(create_client(cfg, tcp_keepalive)),
+            inner: ClientInner::Https(create_client(cfg, tcp_keepalive)),
             polls: Arc::new(Mutex::new(BinaryHeap::new())),
         };
         tokio::spawn(
@@ -392,14 +395,13 @@ impl Client {
     /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
     ///
     /// All poll events created can be forcibly run using [`Client::force_poll`], such as is required when reconnecting to the server after a period of connectivity loss.
-    pub async fn start_poll<F, T>(
+    pub async fn start_poll<T>(
         &self,
         path: impl Into<String>,
         poll_rate: Option<Uint32>,
-        callback: F,
+        callback: impl PollCallback<T>,
     ) where
         T: SEResource,
-        F: PollCallback<T>,
     {
         let client = self.clone();
         let path: String = path.into();

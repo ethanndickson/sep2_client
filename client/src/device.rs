@@ -1,4 +1,4 @@
-//! End Device Function Set
+//! Interface for representing End User Energy Devices
 
 use std::path::Path;
 
