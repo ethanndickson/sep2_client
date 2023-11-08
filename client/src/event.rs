@@ -459,7 +459,10 @@ where
     }
 
     pub fn shutdown(&mut self) {
-        let _ = self.bc_sd.send(());
+        match self.bc_sd.send(()) {
+            Ok(_) => log::info!("{}Schedule: Successfully shutdown gracefully", E::name()),
+            Err(_) => log::error!("{}Schedule: Failed to shutdown gracefully", E::name()),
+        };
     }
 
     pub(crate) fn schedule_time(&self) -> SEPTime {
@@ -475,7 +478,7 @@ where
             tokio::select! {
                 _ = crate::time::sleep_until(next,self.tickrate) => (),
                 _ = rx.recv() => {
-                    log::info!("DERControlSchedule: Shutting down clean event task...");
+                    log::info!("{}Schedule: Shutting down clean event task...", E::name());
                     break
                 },
             }

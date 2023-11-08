@@ -54,7 +54,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
                 // but still sleeping intermittently.
                 _ = tokio::time::sleep(self.tickrate) => (),
                 _ = rx.recv() => {
-                    log::info!("DRLCSchedule: Shutting down event start task...");
+                    log::info!("EndDeviceControlSchedule: Shutting down event start task...");
                     break
                 },
             }
@@ -78,7 +78,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             tokio::select! {
                 _ = tokio::time::sleep(self.tickrate) => (),
                 _ = rx.recv() => {
-                    log::info!("DRLCSchedule: Shutting down event end task...");
+                    log::info!("EndDeviceControlSchedule: Shutting down event end task...");
                     break
                 },
             }
@@ -186,7 +186,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             .device_category
             .intersects(self.device.read().await.device_categories)
         {
-            log::warn!("DRLCSchedule: EndDeviceControl ({mrid}) does not target this category of device. Not scheduling event.");
+            log::warn!("EndDeviceControlSchedule: EndDeviceControl ({mrid}) does not target this category of device. Not scheduling event.");
             return;
         }
 
@@ -197,24 +197,24 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             match (current_status, incoming_status) {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
-                    log::warn!("DRLCSchedule: EndDeviceControl ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
+                    log::warn!("EndDeviceControlSchedule: EndDeviceControl ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
                     self.cancel_enddevicecontrol(&mrid, current_status, incoming_status.into()).await;
                 },
                 // Scheduled -> (Cancelled || CancelledRandom)
                 (EIStatus::Scheduled, EventStatus::Cancelled | EventStatus::CancelledRandom) => {
-                    log::info!("DRLCSchedule: EndDeviceControl ({mrid} has been marked as cancelled by the server. It will not be started");
+                    log::info!("EndDeviceControlSchedule: EndDeviceControl ({mrid} has been marked as cancelled by the server. It will not be started");
                     self.cancel_enddevicecontrol(&mrid, current_status, incoming_status.into()).await;
                 },
                 // Scheduled -> Active
                 (EIStatus::Scheduled, EventStatus::Active) => {
-                    log::info!("DRLCSchedule: EndDeviceControl ({mrid}) has entered it's earliest effective start time.")
+                    log::info!("EndDeviceControlSchedule: EndDeviceControl ({mrid}) has entered it's earliest effective start time.")
                 }
                 // Scheduled -> Superseded
                 (EIStatus::Scheduled, EventStatus::Superseded) =>
-                    log::warn!("DRLCSchedule: EndDeviceControl ({mrid}) has been marked as superseded by the server, yet it is not locally."),
+                    log::warn!("EndDeviceControlSchedule: EndDeviceControl ({mrid}) has been marked as superseded by the server, yet it is not locally."),
                 // Active -> Scheduled
                 (EIStatus::Active, EventStatus::Scheduled) =>
-                    log::warn!("DRLCSchedule: EndDeviceControl ({mrid}) is active locally, and scheduled on the server. Is the client clock ahead?"),
+                    log::warn!("EndDeviceControlSchedule: EndDeviceControl ({mrid}) is active locally, and scheduled on the server. Is the client clock ahead?"),
                 // Active -> Active
                 (EIStatus::Active, EventStatus::Active) => (),
                 // Complete -> Any
@@ -236,7 +236,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                 incoming_status,
                 EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
             ) {
-                log::warn!("DRLCSchedule: Told to schedule EndDeviceControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
+                log::warn!("EndDeviceControlSchedule: Told to schedule EndDeviceControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
                 self.auto_drlc_response(&event, incoming_status.into())
                     .await;
                 return;
@@ -255,7 +255,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
 
             // The event may have expired already
             if ei.end_time() <= self.schedule_time().into() {
-                log::warn!("DRLCSchedule: Told to schedule EndDeviceControl ({mrid}) which has already ended, sending server response and not scheduling.");
+                log::warn!("EndDeviceControlSchedule: Told to schedule EndDeviceControl ({mrid}) which has already ended, sending server response and not scheduling.");
                 // Do not add event to schedule
                 // For function sets with direct control ... Do this response
                 self.auto_drlc_response(ei.event(), ResponseStatus::EventExpired)
