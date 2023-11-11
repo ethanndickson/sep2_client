@@ -1,0 +1,98 @@
+\chapter{Design}\label{ch:design}
+Given the context and background surrounding the IEEE 2030.5 protocol, we can begin examining the high-level considerations, constraints, and assumptions we make in designing our IEEE 2030.5 Client.
+
+\section{Considerations}
+
+\subsection{Modularity}
+IEEE 2030.5 is a specification with a relatively wide range of applications. It aims to provide functionality for coordinating virtually all types of end user energy devices, and under CSIP and CSIP-AUS, it can be deployed in different contexts (See Section 4.1), and requires software on both the side of the electric utility, and the end-user energy device.
+
+For this reason, instead of developing any single binary application, we've instead designed and implemented a series of Rust libraries (called 'Crates'), for use by developers to allow them to better develop IEEE 2030.5 compliant software.
+
+\subsubsection{XML Serialisation \& Deserialisation Library: \- sepserde}
+As we've established, resources are communicated between clients and servers as their XML, or EXI representations. This means we require the ability to serialize \& deserialize Rust data types to and from XML.
+Fortunately, there already exists a popular Rust crate for this purpose, built for use in embedded communication protocols, called \texttt{YaSerde} \cite[]{YaSerde}.
+
+However, this library does not perfectly fit our needs. To address this, we have forked YaSerde, and developed a crate \texttt{sepserde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to the IEEE 2030.5 specification.
+
+\subsubsection{Common Library: \- sep2\_common}
+IEEE 2030.5 resources are required for use in both clients and servers. For that reason, we've developed a common library with a Rust implementation of the IEEE 2030.5 XSD, whilst including our \texttt{sepserde} crate as to allow these resources to be serialized and deserialized to and from XML.
+
+This common library, \texttt{sep2\_common}, can then be easily integrated and implemented in a future 2030.5 server implementation, as to avoid resources being implemented and stored differently on either. 
+For the sake of modularity, and to avoid unnecessarily large binaries when compiled, this crate comes complete with compile-time flags (called Crate 'features') for each of the resource packages in IEEE 2030.5, where packages correspond to function sets.
+
+\subsubsection{Client Library: \- sep2\_client}
+The potential use cases for the IEEE 2030.5 specification are broad, as it's designed to be able to coordinate as many different types of end-user energy devices as possible.
+Every implementation of a IEEE 2030.5 Client will behave a differently to fit the the end-user energy devices it targets, and the model under which it is deployed. 
+If a IEEE 2030.5 Client is deployed under the "Aggregated Clients Model" it will need to communicate with the end-user energy devices themselves via some undefined protocol.
+If a IEEE 2030.5 Client is deployed under the "Individual/Direct Model" the very same client will be responsible for modifying the hardware of the device itself accordingly. 
+Clearly, it is impossible for us as developers to implement the resulting logic for directly interacting with the electric grid.
+For that reason, we have produced \texttt{sep2\_client}, a framework for developing IEEE 2030.5 Clients, regardless of the specific end-device, and regardless of the model under which it deployed.
+
+\subsection{Open-source Software}
+% TODO
+
+\subsection{Security}
+% TODO
+
+\subsection{Programming Language}
+The operating context of IEEE 2030.5 greatly influences the software development tools that are suitable for implementation.
+When choosing a programming language, we must consider:
+
+\begin{itemize}
+    \item \textbf{Device resource constraints} - Many existing IEEE 2030.5 compliant devices are constrained by the clockspeed of the onboard CPU, and the amount of onboard memory.
+    For example, the "Gen5 Riva" smart meter by Itron, possesses a 600Mhz processor, and 256Mb of RAM. \cite[]{Gen5Riva}
+    \hfill \break
+    Therefore, we desire a programming language with minimal runtime overhead, and low-cost abstractions.
+    \item \textbf{Cross-platform capabilities} - Given that our client may be deployed on embedded hardware, writing \item \textbf{Security} - In 2019, Microsoft attributed 70\% of all CVEs in software in the last 12 years to be caused by memory safety issues. \cite[]{SecurityMemorySafety}
+    As we've previously established, improving the security of end-user energy devices is part of the core rationale behind IEEE 2030.5. For that reason, developing our client in a language that is memory safe would better align our implementation with the goals of the specification.
+    \item \textbf{Concurrent programming support} - By nature of the protocol, an IEEE 2030.5 client is an I/O bound application. For that reason, we desire a programming language that provides us with abstractions for event-driven architecture, such that operations can be performed while waiting on I/O, even on a single threaded device.
+\end{itemize}
+
+
+\subsubsection{Rust}
+Rust is a high-level, general purpose programming language.
+Rust will be used to develop our IEEE 2030.5 client implementation as it addresses all the aforementioned considerations.
+
+\begin{itemize}
+    \item Rust provides us with high-level abstractions, but with a focus on performance, and only 'paying' (in terms of available computer resources) for what you use. For that reason, Rust has seen usage in both application and systems level programming.
+    \item Although Rust is by no means a universal programming language like C, it has a growing presence in embedded development, and as such has a reasonable degree of portability.
+    \item While writing a variation of Rust called 'safe' Rust, the programming language is, outside of compiler bugs, completely memory safe, accomplished without the runtime overhead of a garbage collector. When writing 'unsafe' rust, raw pointers may be dereferenced, where by the compiler is no longer able to guarantee memory safety. For that reason, our implementation will be done using purely safe Rust.
+    \item Through it's type system, Rust also eliminates the possibility of a data race when working with multiple threads of execution. Furthermore, Rust has native support for asynchronous programming, with concurrency-runtime agnostic await and async syntax.
+\end{itemize}
+
+Rust's high-level abstractions furthermore lend themselves to the imposed reliability of the client, in that all expected errors are to be handled at compile-time. The Rust algebraic sum types 'Option' and 'Result' force programmers to handle error cases in order to use the output of a process.
+This is contrasted to a language like C++, where runtime exceptions are used to denote errors in the standard library, of which the language does not force the programmer to handle at compile-time.
+
+\subsection{Operating System}
+Despite the desire to write code that is portable, our code requires a great deal of operating-system-specific functionality, and as such will need to target a single operating system. 
+
+Of great consideration when choosing an operating system is the aforementioned 'Aggregator' model for IEEE 2030.5, where by our client would be deployed on a dedicated server, or in the cloud. In this circumstance, it's very much likely an operating system running on the Linux kernel is to be used, due to it's prevalence in server operating-systems.
+Whilst there exist purpose built IOT-device operating systems, they are built and optimised for low-spec, low-power usage devices, and as such would not be appropriate at scale - such as under this model.
+
+Furthermore, there exist very lightweight Linux based operating systems for low-spec devices, making those Linux based operating systems the best candidate for our targeted operating system.
+
+Here, it's reasonable to draw inspiration from the EPRI implementation of an IEEE 2030.5 client, and still define a series of interfaces that call upon OS specific APIs, such that a device manufacturer need only re-implement those interfaces when porting our software to a different OS.
+code in a language that can be compiled to a wider range of CPU and hardware configurations is desirable. 
+    For this reason, we saw EPRI choose to implement their client in the C programming language.
+    
+\section{Assumptions}
+In designing our client, we've made a set of assumptions on library user expectations, and IEEE 2030.5 Client behaviour that is not present in the spec. These assumptions  have determined what functionality we have and have not implemented.
+
+\subsection{Notification Routes}
+% TODO
+
+\section{Constraints}
+
+\subsection{Generic Interface}
+As we develop an implementation of the IEEE 2030.5 specification as part of this thesis, we note that we are somewhat removed from the potential use cases of our software. We have no real measure, or way to determine how one might want to use our library. 
+
+Fortunately, we have the aforementioned existing open-source implementations to refer to. For example, the EPRI library interface was likely designed with better understanding of possible usecases, and as such, it has been appropriate to use it as a guide when designing our own interface.
+
+Furthermore, as a general rule, we prioritise designing a highly generic interface that minimises the restrictions placed on library users as much as possible, as to support incorporating our libraries into as many differently designed Rust programs as possible, and not force any one program structure.
+
+\subsection{EXI}
+Under IEEE 2030.5, resources can be communicated between clients \& servers as their EXI representations. EXI is a binary format for XML, aiming to be more efficient (by number of bytes sent for the same payload, and computations required to decode) by sacrificing human readability. As of present, there exists no Rust library for producing EXI from XML or from Rust data types, and vice-versa.
+Developing a Rust EXI library fit for use in IEEE 2030.5 is a large enough of an undertaking to warrant it's own thesis, and as such, is not included in our implementation.
+
+\subsection{DNS-SD}
+The IEEE 2030.5 specification states that a connection to a server can be established by specifying a specific IP address or hostname and port. In the event cannot be provided, the specification states that DNS-SD can be used to query a local network for servers, whilst providing clients with the ability to only query for servers advertising support for specific function sets. 
