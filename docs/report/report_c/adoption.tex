@@ -1,6 +1,6 @@
 \chapter{Adoption}\label{ch:adoption}
 
-Further proving that the IEEE 2030.5 protocol is worth implementing is it's adoption by electric utilities, as well as the tariffs and guidelines created by government energy bodies mandating it's use.
+Further proving that the IEEE 2030.5 protocol is worth implementing is it's adoption by electric utilities, as well as the tariffs and guidelines created by government energy regulars who mandate it's use.
 Consequently, many implementations of the protocol exist already, with the vast majority of them proprietary, or implementing proprietary extensions of the standard.
 In this section, we will examine both, and discuss how they may influence our open-source implementation. 
 
@@ -117,8 +117,10 @@ Given the circumstances of this model, the aggregator IEEE 2030.5 client is like
 "Common Smart Inverter Profile" (Common SIP) (CSIP-AUS) is an implementation guide developed by the "DER Integration API Technical Working Group" in order to "promote interoperability amongst DER and DNSPs in Australia".
 The implementation guide has DER adhere to the IEEE 2030.5 spec, whilst further leveraging the aforementioned CPUC California SIP, including support for use of the client aggregator model, and the mandated use of subscription/notification retrieval by those aggregator clients. \cite[]{CSIPAus}
 
-Most importantly, the Australian Common SIP extends upon existing IEEE 2030.5 resources to support \texttt{Dynamic Operating Envelopes}, and it does so whilst still adhering to the IEEE 2030.5 specification.
-As per the specification, resource extensions are to be made under a different XML namespace, in this case \texttt{https://csipaus.org/ns}, where extension specified fields are to be appropriately prefixed with \texttt{csipaus}. \cite[]{CSIPAus}
+Most importantly, the Australian Common SIP extends upon existing IEEE 2030.5 resources whilst still adhering to the IEEE 2030.5 specification.
+As per IEEE 2030.5, resource extensions are to be made under a different XML namespace, in this case \texttt{https://csipaus.org/ns}. Likewise, extension specified fields are to be appropriately prefixed with \texttt{csipaus}. 
+
+The additional fields and resources in CSIP-AUS work to provide DERs with support for \texttt{Dynamic Operating Envelopes}, bounds on the amount of power imported or exported over a period of time. \cite[]{CSIPAus}
 
 \section{SunSpec Alliance}
 
@@ -127,9 +129,9 @@ The primary motivation for implementing SunSpec Modbus is it's compliance with I
 
 \section{Open-source implementation}
 
-Despite the protocol's prevalence and wide-spread adoption, the vast majority of implementations of the standard are proprietary, and thus cannot be distributed, modified, used, or audited by those other than the rightsholder, with the rightsholder conditionally providing commercial licenses for a monetary fee. 
+Despite IEEE 2030.5's prevalence and wide-spread adoption, the vast majority of implementations of the standard are proprietary, and thus cannot be distributed, modified, used, or audited by those other than the rightsholder, with the rightsholder typically providing commercial licenses for a fee. 
 
-For that reason, any and all open-source contributions involving IEEE 2030.5 actively work to lower the cost of developing software in the smart grid ecosystem, and are all necessary in ensuring the protocol can be as widely adopted as possible, as to then incorporate as many end-user energy devices into the smart grid as possible.
+For that reason, any and all open-source contributions involving IEEE 2030.5 actively work to lower the cost of developing software in the smart grid ecosystem. These contributions are necessary in ensuring the protocol can be as widely adopted as possible, as to incorporate as many end-user energy devices into the smart grid as possible.
 
 In this section we will discuss existing open-source implementations of the standard, and identify the tradeoffs in each.
 
