@@ -3,6 +3,9 @@ Given the context and background surrounding the IEEE 2030.5 protocol, we can be
 
 \section{Considerations}
 
+\subsection{Client Aggregation Model}
+Of great importance to our work is that we are developing a client library that can be used to build client aggregators, the IEEE 2030.5 model preferred by electric utilities.
+
 \subsection{Modularity}
 IEEE 2030.5 is a specification with a wide range of applications. It aims to provide functionality for coordinating virtually all types of end user energy devices. Under CSIP and CSIP-AUS, it can be deployed in different contexts (See Section 4.1), and can require software on both the side of the electric utility, and the end-user energy device.
 
@@ -12,7 +15,8 @@ For this reason, instead of developing any single binary application, we've inst
 As we've established, resources can be communicated between clients and servers as their XML representations. This means we require the ability to serialize \& deserialize Rust data types to and from XML.
 Fortunately, there already exists a popular Rust crate for this purpose, built for use in embedded communication protocols, called \texttt{YaSerde} \cite[]{YaSerde}.
 
-However, this library does not perfectly fit IEEE 2030.5 requirements. To address this, we have forked YaSerde, and developed a crate \texttt{sepserde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to the IEEE 2030.5 specification.
+However, this library does not perfectly fit IEEE 2030.5 requirements. To address this, we have forked YaSerde, and developed a crate \texttt{sepserde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to IEEE 2030.5.
+Note that we are yet to complete the renaming of this library, in all code snippets the library will still be referred to as \texttt{YaSserde}.
 
 \subsubsection{Common Library: \- sep2\_common}
 IEEE 2030.5 resources are required for use in both clients and servers. For that reason, we've developed a common library with a Rust implementation of the IEEE 2030.5 XSD, whilst including our \texttt{sepserde} crate as to allow these resources to be serialized and deserialized to and from XML.
@@ -21,7 +25,7 @@ This common library, \texttt{sep2\_common}, can then be easily integrated and im
 For the sake of modularity, and to avoid unnecessarily large binaries when compiled, this crate comes complete with compile-time flags (called Crate 'features') for each of the resource packages in IEEE 2030.5, where packages correspond to function sets.
 
 \subsubsection{Client Library: \- sep2\_client}
-The potential use cases for the IEEE 2030.5 specification are broad, as it's designed to be able to coordinate as many different types of end-user energy devices as possible.
+The potential use cases for IEEE 2030.5 are broad, as it's designed to be able to coordinate as many different types of end-user energy devices as possible.
 Every implementation of a IEEE 2030.5 Client will behave differently to fit the the end-user energy devices it targets, and the model under which it is deployed. 
 If a IEEE 2030.5 Client is deployed under the "Aggregated Clients Model" it will need to communicate with the end-user energy devices themselves via some undefined protocol.
 If a IEEE 2030.5 Client is deployed under the "Individual/Direct Model" the very same client will be responsible for modifying the hardware of the device itself accordingly. 
@@ -47,12 +51,27 @@ Furthermore, in developing our implementation we must adhere to many other stand
 An exception to this is our usage of \texttt{openssl}, which in 2023 alone has had 19 reported CVEs \cite{OpensslCVE}. In section TODO we discuss an in-progress alternative to this.
 
 \subsection{I/O Bound Computation}
-When designing our implementation, we consider that IEEE 2030.5 clients are I/O bound applications. Furthermore, with the expectation that our client library will be used to primarily develop clients operating under the client aggregation model, it is necessary that our client is able to scale alongside a large proportion of I/O bound operations.
+When designing our implementation, we consider that IEEE 2030.5 clients are I/O bound applications. Furthermore, with the expectation that our client library will be used to primarily develop clients operating under the client aggregation model, it is necessary that our client is able to scale alongside a large proportion of I/O bound operations as it interacts with multiple end-user energy devices, and potentially multiple servers.
 
-For that reason, we require an abstraction for event-driven architecture, such that computations can be performed while waiting on I/O, without requiring any additional threads, but with the ability to leverage them as they available.
+For that reason, we require an abstraction for event-driven architecture, such that computations can be performed while waiting on I/O.
 
-For that reason, we implement our client library using async Rust, providing us with a zero cost abstraction for asynchronous programming. When attached to an runtime, async Rust can use operating system event notifications, such as \texttt{epoll} on Linux, in order to significantly reduce the overhead of polling for new events.
+Events a client instance are required to listen for include, but are not limited to:
 
+\begin{itemize}
+    \item Input from aggregated clients, or local hardware, requiring the creation or updating of resources locally.
+    \item Scheduled polling to update local resources.
+    \item Event resources, starting and ending, indicating that clients enagage in a specific behaviour over a given internal.
+    \item Network events, such as an updated resource being pushed to the client via the subscription / notification mechanism, or receiving the response from a sent HTTP request.
+\end{itemize}
+
+For that reason, we implement our client library using async Rust, providing us with a zero cost abstraction for asynchronous programming.
+
+Rust provides runtime-agnostic support for await and async syntax.
+When attached to an runtime, async Rust can use operating system event notifications, such as \texttt{epoll} on Linux, in order to significantly reduce the overhead of polling for new events.
+
+Furthermore, an async Rust Runtime allows us to take advantage of multiple OS threads, and therefore multiple CPU cores, as to best accommodate for the scale that's required by the client aggregator model.
+
+We are reassured this approach to be sensible,as it is the approach shared by the EPRI C Client implementation. EPRI claims their library to be performant as it leverages asynchronous events via \texttt{epoll} and state machines.
 
 
 \subsection{Reliability}
@@ -81,24 +100,26 @@ When developing our Subscription/Notification mechanism, as part of the \texttt{
 
 We make this assumption as the specification makes no mention of whether a single route must be used, yet the examples in the specification show all notifications forwarded to a single URI. Under a single route, each incoming HTTP request would first need to parse the body of the request to determine how to handle it. Using multiple routes simplifies this logic, requiring only the \texttt{Host} header be inspected. 
 
-We therefore conclude the single route usage is purely for the purpose of the example, and that in reality, client developers do not desire this functionality.
+We therefore assume the single route usage is purely for the purpose of the example, and that in reality, client developers do not desire this functionality.
+
+\subsection{DNS-SD}
+IEEE 2030.5 states that a connection to a server can be established by specifying a specific IP address or hostname and port. In the event cannot be provided, the specification states that DNS-SD can be used to query a local network for servers, whilst providing clients with the ability to only query for servers advertising support for specific function sets. 
+
+As it stands, there is little perceived value in this functionality. Our client library primarily targets the client aggregation model and as such client developers will almost certainly be capable of supplying the address and port of a server.
+The client manual for the EPRI IEEE 2030.5 Client Library shares the same belief. \cite{eprimanual}
+
+We therefore assume this feature is simply a nice-to-have for developers, and is therefore not included in our implementation as of this report. However, it will be required for full adherence to IEEE 2030.5.
 
 \section{Constraints}
 
 \subsection{Generic Interface}
-As we develop an implementation of the IEEE 2030.5 specification as part of this thesis, we note that we are somewhat removed from the potential use cases of our software. We have no real measure, or way to determine how one might want to use our library. 
+As we develop an implementation of IEEE 2030.5 as part of this thesis, we note that we are somewhat removed from the potential use cases of our software. We have no real measure, or way to determine how one might want to use our library. 
 
 Fortunately, we have the aforementioned existing open-source implementations to refer to. For example, the EPRI library interface was likely designed with better understanding of possible use cases, and as such, it has been appropriate to use it as a guide when designing our own interface.
 
 Furthermore, as a general rule, we prioritise designing a highly generic interface that minimises the restrictions placed on library users as much as possible, as to support incorporating our libraries into as many differently designed Rust programs as possible, and not force any one program structure.
 
-TODO - Rust abstractions
-
 \subsection{EXI}
-Under IEEE 2030.5, resources can be communicated between clients \& servers as their EXI representations. EXI is a binary format for XML, aiming to be more efficient (Measured by number of bytes sent for the same payload, and computation required to decode) by sacrificing human readability. As of present, there exists no Rust library for producing EXI from XML or from Rust data types, and vice-versa.
+IEEE 2030.5 Resources can be communicated between clients \& servers as their EXI representations. EXI is a binary format for XML, aiming to be more efficient (Measured by number of bytes sent for the same payload, and computation required to decode) by sacrificing human readability. As of present, there exists no Rust library for producing EXI from XML or from Rust data types, and vice-versa.
 Developing a Rust EXI library fit for use in IEEE 2030.5 is a large enough of an undertaking to warrant it's own thesis, and as such, is not included in our implementation.
 
-\subsection{DNS-SD}
-The IEEE 2030.5 specification states that a connection to a server can be established by specifying a specific IP address or hostname and port. In the event cannot be provided, the specification states that DNS-SD can be used to query a local network for servers, whilst providing clients with the ability to only query for servers advertising support for specific function sets. 
-
-TODO - Why no DNS-SD

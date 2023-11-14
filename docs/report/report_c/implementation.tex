@@ -1,22 +1,20 @@
 \chapter{Implementation}\label{ch:implementation}
-Given the context and background surrounding the IEEE 2030.5 protocol, we can begin examining the considerations taken when designing our implementation.
-
+Given the context and background of the IEEE 2030.5 protocol, and the high-level design decisions we've been required to make, we can discuss the technical design decisions present in our final implementation.
 \section{Common Library}
-As discussed, the IEEE 2030.5 specification makes no distinction between clients \& servers, aside from the fact that servers expose resources, and clients interact with resources. 
-For that reason, our client implementation will also produce a common library, that would be used by one developing a IEEE 2030.5 server implementation in Rust.
 
 \subsection{Resource Data Types}
-The largest aspect of this common library is the internal representation of resources, the data communicated between client \& server. These resources are described precisely in an XSD.
+The largest aspect of this common library is the internal representation of resources, the data communicated between clients \& servers. These resources are described precisely in an XSD.
 Resources range from data that may be used by the electric utility, such as the current load of the device, to resource metadata, such as the rate at which a client should poll a server for a given resource, or what URI endpoint can be used to access a given resource, in the case of a Link resource.
-In both specification and schema, these data structures are separated into packages, and sub-packages. 
+In both specification and schema, these data structures are separated into packages for each of the function sets.
 
 Whilst the 2030.5 specification makes no mention of the object oriented programming paradigm, OOP inheritance underpins the design of all resources, including both multi-level and hierarchial inheritance.
 As such, for the purpose of code reuse, many base types appear in the 'common' package; data structures extended by many others.
 
 \subsubsection{Representing Resources in Rust}
-Rust, despite being influenced by OOP, does not posses the notion of a class, like in languages like C++ or Java, and as such does not define shared behaviour of types through inheritance from a common parent type. 
-Rather, Rust defines shared behaviour through traits, where shared behaviour refers solely to the methods that we can call on that type, as per the traits a type implements.
-In this sense, Rust does not concern itself with what a type is or what that type stores, it concerns itself only with the traits a type possesses.
+Rust, despite being influenced by OOP, does not posses the notion of a class, like in languages like C++ or Java. As such, Rust does not define shared behaviour of types through inheritance from a common parent type. 
+Rather shared behaviour is defined through traits, where shared behaviour refers solely to the methods that we can call on that type, the traits a type implements.
+
+In this sense, Rust polymorphism does not concern itself with what a type is or what that type stores, it concerns itself only with the traits it possesses.
 
 Traits themselves do support inheritance. One can have traits that require other traits to be implemented for a given type. However, this does not change the fact that traits only represent behaviour. 
 There is no way to have a data structure inherit the internal members of another.
@@ -24,8 +22,8 @@ There is no way to have a data structure inherit the internal members of another
 \begin{figure}[H]
     \begin{center}
         \begin{lstlisting}
-            pub trait Resource {
-                fn get_href(&self) -> Option<&str>;
+            pub trait SEResource {
+                fn href(&self) -> Option<&str>;
             }
         \end{lstlisting}
         \caption{A Rust trait representing the IEEE 2030.5 "Resource" data type}
@@ -37,9 +35,9 @@ There is no way to have a data structure inherit the internal members of another
 \begin{figure}[H]
     \begin{center}
         \begin{lstlisting}
-            pub trait List : Resource {
-                fn all(&self) -> UInt32;
-                fn results(&self) -> UInt32;
+            pub trait SEList: SEResource {
+                fn all(&self) -> Uint32;
+                fn results(&self) -> Uint32;
             }
         \end{lstlisting}
         \caption{A Rust trait representing the IEEE 2030.5 \texttt{List} data type}
@@ -47,6 +45,8 @@ There is no way to have a data structure inherit the internal members of another
 \end{figure}
 
 In Figure 5.2, we have a Rust trait that describes the behaviour of the List base type. All lists are resources, and thus we have a trait restriction that all types implementing List must first implement the Resource trait.
+
+The prefix \texttt{SE} for 'Smart Energy' simply differentiates the trait from the concrete type with the same name.
 
 This is the extent of native inheritance in rust. We can specify the exact behaviour of types that belong to a trait in detail, but we cannot influence how that behaviour is achieved.
 
@@ -61,15 +61,11 @@ As a result, we're forced to emulate the inheritance of data structure members i
 
 Regardless of the approach, we still do not have have polymorphism using the base-types of resources.
 To allow for polymorphism a trait must be defined for each base-type, and then those trait functions need be implemented for every type that extends that base type. 
-This is unavoidable duplicate code, not ignoring the possibility of generating said code.
-The extent to which polymorphism is required in the final client implementation is yet to be determined. In this case, we can refer to the EPRI client implementation, 
-where they provide device manufacturers an interface for handling resources using polymorphism.
-Thus, when determining how we will emulate inheritance, we let the ease at which polymorphism can be allowed influence our decision
-
+This is unavoidable duplicate code, although Rust provides mechanisms for which it can be generated at compile-time.
 
 \subsubsection{Inheritance via Composition}
 
-If we were to implement the first of the two approaches, we can make use of an existing Rust library to reduce the amount of boilerplate required to implement polymorphism.
+If we had implemented the first of the two approaches, we could have made use of an existing Rust library to reduce the amount of boilerplate required to implement polymorphism.
 This library operates on the basis that inheritance can be replicated via composition. If a data type were to contain a member that implements a given trait, there is no reason for that outer struct to not be able to implement that trait by simply calling upon the underlying member.
 
 
@@ -113,13 +109,13 @@ This library operates on the basis that inheritance can be replicated via compos
 \end{figure}
 
 
-Figures 5.3 and 5.4 show how this library, 'inheritance-rs' \cite[]{inheritancers} is used to reduce the boilerplate necessary to inherit data members. 
-In Figure 5.3, we mark the Resource trait as 'inheritable' and then implement that trait on a type that holds the necessary members, our bare minimum 'base' type. 
-In Figure 5.3, we compose an instance of that base type into a type that would normally inherit from it. Then, we tell the library to generate the code, at compile time, that would allow List to implement the Resource trait.
+Figures 6.3 and 6.4 show how this library, 'inheritance-rs' \cite[]{inheritancers} is used to reduce the boilerplate necessary to inherit data members. 
+In Figure 6.3, we mark the Resource trait as 'inheritable' and then implement that trait on a type that holds the necessary members, our bare minimum 'base' type. 
+In Figure 6.4, we compose an instance of that base type into a type that would normally inherit from it. Then, we tell the library to generate the code, at compile time, that would allow List to implement the Resource trait.
 This generated code simply calls the underlying ResourceObj member when the href function would be called on a list.
 
 The major flaw in this approach is that for every single type that is used as a base type, a trait, and a base implementation of that trait needs to be written.
-Given that there are just under 700 data types in the IEEE 2030.5 specification schema, we must consider alternatives.
+Given that there are just under 700 data types in the IEEE 2030.5 schema, we had to consider alternatives.
 
 
 \subsubsection{XSD to Rust types}
@@ -160,7 +156,7 @@ Of the most complete parsers, one particular implementation stands out. This par
     \end{center}
 \end{figure}
 
-Figure 5.5 is what \texttt{xsd-parser-rs} currently produces for the List resource. In this figure, it's parsed that the List type inherits from the Resource type, and included the href data member accordingly. It's also included the documentation as found in the schema.
+Figure 6.5 is what \texttt{xsd-parser-rs} currently produces for the List resource. In this figure, it's parsed that the List type inherits from the Resource type, and included the href data member accordingly. It's also included the documentation as found in the schema.
 
 Compared to true OOP inheritance, this has types include their parent type data members in their own type definitions.
 Despite this, the type definitions are far more readable, and align more closely with the output of the client, in that inheritance is flattened out.
@@ -177,56 +173,177 @@ Despite this, the type definitions are far more readable, and align more closely
     \end{center}
 \end{figure}
 
-Figure 5.6 shows the List data type were it a concrete data type serialized into XML.
+Figure 6.6 shows the List data type were it a concrete data type serialized into XML.
 
 Further advocating for the use of an XSD parser is the fact that the 2030.5 XSD is updated more often than revisions of the specification itself, even if those updates are relatively infrequent.
-Using \texttt{xsd-parser-rs} will allow us to better maintain the client, by way of simply running updated schemas through the parser.
-Furthermore, as DER implementation guides choose to extend the available IEEE 2030.5 resources under new namespaces, 
-our \texttt{xsd-parser-rs} fork will be made available such that the XSD for those extensions be provided as input, and the corresponding Rust data types be generated.
+Using \texttt{xsd-parser-rs} will allow us to better maintain the client, by way of simply running updated schemas through the parser, should it change drastically as a result of a major revision (although this is unlikely).
 
-Regrettably, \texttt{xsd-parser-rs} does not perfectly fit our needs:
+Of course, \texttt{xsd-parser-rs} does not perfectly fit our needs. However, it is released under the MIT license, giving us the freedom to fork the library, and modify it to suit our needs. As part of our implementation we've:
+
 \begin{itemize}
-    \item It currently does not auto-generate Rust enums, since types where a rust enum would be best suited simply have their variants as comments in the XSD itself.
-    \item It currently doesn't create and implement traits for us using base types, therefore, no polymorphism.
+    \item Instructed it to use the Rust Option type where \texttt{minOccurs=0} and \texttt{maxOccurs=1}.
+    \item Instructed it to provide us with all types in a type's inheritance tree.
+    \item Manually implemented Rust enums for all types that are integer enumerations.
+    \item Manually implemented Rust \texttt{bitflags} for all integer bitmap types.
+    \item Modified the Derive output on all data types to automatically implement traits where useful.  
 \end{itemize}
 
-For that reason, as part of our client implementation, we'll be maintaining a git fork of the tool and will be implementing this functionality as required.
+\subsubsection{Integer Bitmaps}
+IEEE 2030.5, for the sake of efficiency, has many fields that encode many boolean values together in a single integer, a bitmap of booleans, or colloquially a 'bitflag'. Whilst we must still maintain how these integers are stored internally, we have the opportunity to provide them in a more ergonomic interface. Thus, we use the \texttt{bitflags} crate, a popular Rust crate that wraps integers and provides convenience functions for comparing them (intersections, unions), and constructing them using enum like syntax. \cite{bitflags}
+
+\subsubsection{Resource Polymorphism}
+As mentioned, we've used \texttt{xsd-parser-rs} to automate the process of resolving an inheritance tree in the XSD. This has enabled us to add polymorphism via Resource base types to our implementation.
+
+We add Resource polymorphism to our common library as it can be implemented relatively easily, and assists both ourselves in writing more generic code (such as the Event scheduler), and users of our library, such as by allowing them to store all "Subscribable" resources in a single container.
+
+Therefore, as part of the common library, we define a set of Rust traits that mirror common fields in resources. 
+
+Since IEEE 2030.5 does not use multiple inheritance (inheriting from more than one base type), if we were to mirror base types to traits exactly, we would be implementing a confusing level of redundancy into our traits.
+For example, \texttt{RespondableSubscribableIdentifiedObject} inherits from \texttt{RespondableSubscribableObject}, providing it with three new fields that allow it to be 'Identified'. Similarly, \texttt{RespondableIdentifiedObject} inherits from \texttt{RespondableObject}, also providing it with the Identified fields. In this example, Resources become 'identified' in two different ways. Rather than have two traits that provide the same behaviour, but with two different supertraits, we simplify and provide a single \texttt{SEIdentifiedObject} trait. 
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            /// Implemented by all types whose base type is [`IdentifiedObject`]
+            trait SEIdentifiedObject: SEResource {
+                fn mrid(&self) -> &MRIDType;
+                fn description(&self) -> Option<&String32>;
+                fn version(&self) -> Option<VersionType>;
+            }
+        \end{lstlisting}
+        \label{fig:identtrait}
+        \caption{Our implementation of the IdentifiedObject trait}
+    \end{center}
+\end{figure}
+
+To implement these traits for all relevant types we use Rust's procedural macros - Rust code that runs at compile time producing more code to be compiled. A straight forward implementation gives us the ability to derive any of these traits on a type that possesses all the required fields.
+
+Manually adding these Derive annotations to all our data types is unfeasible. Instead, we use our \texttt{xsd-parser-rs} fork to evaluate all the inheritance in the inheritance tree of a specific type, and use it to automate this process entirely. 
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            #[derive(
+                SERandomizableEvent,
+                SEEvent,
+                SERespondableSubscribableIdentifiedObject,
+                SEIdentifiedObject,
+                SESubscribableResource,
+                SERespondableResource,
+                SEResource,
+            )]
+            struct EndDeviceControl { ... }
+        \end{lstlisting}
+        \label{fig:edctraits}
+        \caption{The output of \texttt{xsd-parser-rs} for \texttt{EndDeviceControl}}
+    \end{center}
+\end{figure}
+
+The result is all IEEE 2030.5 resources include trait implementations defining behaviour shared between them. 
+
 
 
 \subsection{Resource Serialisation \& Deserialisation}
-As we've established, resources are sent as their XML, or EXI, representations over HTTP. This means our common library requires the ability to serialize and deserialize resources to and from the appropriate XML or EXI.
-For XML, this means we're sending HTTP requests with \texttt{Content-Type} set to \texttt{application/sep+xml}, and for EXI this means we're setting it to \texttt{application/sep-exi},
-
-\subsubsection{EXI}
-As of present, there exists no Rust library for producing EXI from XML or from Rust data types, or vice-versa. For that reason, one of the stretch goals of this thesis will be to develop the first EXI library for Rust, and use that in the common library.
-This EXI library could be developed from scratch, or could call C code from Rust; using the \texttt{Embeddable EXI Processor} implementation would be a sensible approach.
-
-\subsubsection{XML}
+IEEE 2030.5 resources can be sent as their XML representations over HTTP. This means our common library requires the ability to serialize and deserialize resources to and from the appropriate XML.
+This means HTTP requests containing resources are sent with \texttt{Content-Type} set to \texttt{application/sep+xml}.
 
 On the public Rust crates registry, there exists a popular XML serialisation and serialization library purpose built for use in embedded communication protocols called \texttt{YaSerde} \cite[]{YaSerde}.
 Despite being developed by different teams, the syntax to use \texttt{YaSerde} on Rust data types is auto-generated by \texttt{xsd-parser-rs}, and as such, is to be used in our client implementation.
 
-Referring again to Figure 5.5, we see \texttt{xsd-parser-rs} has qualified our struct with the appropriate namespace, such that YaSerde serializations will include it, and deserializations will expect it.
+Referring again to Figure 6.5, we see \texttt{xsd-parser-rs} has qualified our struct with the appropriate namespace, such that YaSerde serializations will include it, and deserializations will expect it.
 Furthermore, names of data members have been specified as attributes, rather than child elements in the resulting XML; determined by the parser as per the XSD.
-Figure 5.6 is an example of what the List type looks like when serialized to XML.
+Figure 6.6 is an example of what the List type looks like when serialized to XML.
 
-Once again, \texttt{YaSerde} does not perfectly fit our needs. Currently, the library serializes enums as a string representation of their variant. IEEE 2030.5 requires that the underlying integer representation be used, as the variants are but annotations in the schema.
+\texttt{YaSerde} does not perfectly fit our needs. Once again, it is released under the MIT license, giving us the freedom to fork it, and add our required functionality.
+As part of our work we've modified \texttt{YaSerde} (\texttt{sepserde}) in order to:
 
-Rather than go and manually implement XML serialization/deserialization for all enums, we can simply maintain a fork of YaSerde, and modify the library's behaviour there.
+\begin{itemize}
+    \item Serialize Rust enums as their underlying integer representations.
+    \item Allow for Rust trait objects (dynamic dispatch) to be created on the serialize and deserialize traits.
+    \item Serialize and deserialize IEEE 2030.5 \texttt{HexBinary} primitives as hexadecimal with an even number of digits. 
+    \item Allow \texttt{bitflags} generated bitmaps to be serialized and deserialized.
+    \item Allow for generic resources to be serialized and deserialized (Notification)
+\end{itemize}
+
+\subsubsection{Notification}
+The 'Notification' resource is a container for delivering resources to clients via the Subscription / Notification method. This means a Notification resource is generic, it contains some Resource as one of it's fields. To represent this as a type, we use Rust generics, where the generic type is bound by the 'SEResource' trait we've defined.
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            struct Notification<T: SEResource> {
+                resource: Option<T>,
+                ...
+            }
+        \end{lstlisting}
+        \label{fig:notifgeneric}
+        \caption{Notification resource implemented using Rust generics}
+    \end{center}
+\end{figure}
+
+This type representation uses Rust's monomorphization, and therefore has no runtime overhead in order to make the Resource type generic.
+
+However, this poses some challenges for \texttt{YaSerde} which was not written with this sort of use case in mind. Even more so, the XML representation of a Notification resource is unique, in terms of how it expresses the type of the inner resource.
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+        <Notification xmlns="urn:ieee:std:2030.5:ns" 
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <subscribedResource>/upt/0/mr/4/r</subscribedResource>
+            <Resource xsi:type="Reading">
+                <timePeriod>
+                    <duration>0</duration>
+                    <start>12987364</start>
+                </timePeriod>
+                <value>1001</value>
+            </Resource>
+            <status>0</status>
+            <subscriptionURI>/edev/8/sub/5</subscriptionURI>
+        </Notification>        
+        \end{lstlisting}
+        \label{fig:notifxml}
+        \caption{Example Notification<Reading> resource from IEEE 2030.5}
+    \end{center}
+\end{figure}
+
+Figure 6.10 shows a Notification resource that contains a Reading resource. Of interest is that the inner resource is always contained in an XML element with the name "Resource", and the type of the inner resource is instead given by the 'type' attribute, provided by the \texttt{XMLSchema-Instance} namespace. 
+
+The implication of this is not only do we need to modify \texttt{sepserde} to handle generic resources, but we also need a way to instruct it to add this  \texttt{xsi:type} attribute accordingly.
+
+When setting the \texttt{xsi:type} attribute, we note that we require the name of the resource as a String. This means for every Resource we also need to somehow bundle along with it a string literal of the name of the type. We do this by having the procedural macro responsible for generating the serialisation code also define a function that contains that string literal.
+
+Throughout our implementation, we've also found additional use for this function, using it to provide the name of the resource as additional context when creating logs in generic functions.
+
+In order to instruct \texttt{sepserde} to place this \texttt{xsi:type} attribute as required, we add a new procedural macro attribute to the library, \texttt{generic}.
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            #[derive(
+                YaSerialize, YaDeserialize, SESubscriptionBase, SEResource,
+            )]
+            #[yaserde(
+                namespace = "urn:ieee:std:2030.5:ns",
+                namespace = "xsi: http://www.w3.org/2001/XMLSchema-instance"
+            )]
+            pub struct Notification<T: SEResource> {
+                #[yaserde(rename = "Resource")]
+                #[yaserde(generic)]
+                pub resource: Option<T>,
+                ...
+            }    
+        \end{lstlisting}
+        \label{fig:notifimpl}
+        \caption{Our Notification resource implementation}
+    \end{center}
+\end{figure}
+
+Figure 6.11 this in use, we append the additional namespace as required, and include the \texttt{generic} annotation. The result is that an instance of a \texttt{Notification<T: SEResource>} serialises and deserialises successfully. 
 
 
-\subsection{Security}
-The security-focused portion of the common library includes certificate management, and an encryption interface for use in client networking.
-The specification requires that ECC, as defined in IETF RFC 7251, specifically elliptic curve \texttt{secp256r1}, be used to sign certificates and encrypt traffic over TLS.
-However, the specification does permit RSA-based cipher suites to be used as a fallback, for the purpose of backwards compatibility, on devices where ECC is not supported.
-
-For that reason, our common library will implement a security interface to be used throughout the client and server, such that it is comprehensive and can be replaced for portability.
-
-\subsection{Network}
-The network-focused portion of the common library includes creating and sending HTTP requests over TCP, whilst using the previously defined security interface for TLS.
-
-It's worth noting that the extent to which a server implementation would utilise this interface is yet to be determined.
-
+\subsubsection{NotificationList}
+% TODO
 
 \subsection{Testing}
 The goal for this thesis is to produce a IEEE 2030.5 client that is well-tested for correctness, and conformance to the IEEE 2030.5 specification.
@@ -282,12 +399,7 @@ The exact details of this client library interface are yet to be determined, but
     \item A mechanism to automate this process, using event-driven architecture, to handle timer events, such as for polling, or network events for resource subscription.
 \end{itemize}
 
-\subsection{Server Discovery \& Connection}
-The IEEE 2030.5 specification states that a connection to a server by a client can be established by specifying a specific IP address or hostname and port.
-In the event this is not provided, the specification states that DNS-SD can be used to query a local network for servers, whilst providing the ability to only query for servers advertising support for specific function sets.
-As of this report, there is little perceived value in this functionality, as electric utilities will almost certainly be capable or willing to supply the address and port of a server.
-The EPRI IEEE 2030.5 client manual indicates the same perception.\cite[]{eprimanual}
-As such, the implementation of this functionality will be left as a thesis stretch goal. Nonetheless, it will need to be implemented for conformance to IEEE 2030.5.
+\subsection{Server \& Connection}
 
 Connecting to a server is, otherwise, as expected. We use the cipher suite interface and the TCP interface, as built in the common library, to connect to the server using TCP/TLS.
 This of course requires certificates signed by a common library cipher suite. This certificate exchange will determine the parameters by which the cipher suite will be used to encrypt traffic.

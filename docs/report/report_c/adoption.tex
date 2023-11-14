@@ -115,9 +115,9 @@ Given the circumstances of this model, the aggregator IEEE 2030.5 client is like
 
 \section{Australian Renewable Energy Agency}
 "Common Smart Inverter Profile" (Common SIP) (CSIP-AUS) is an implementation guide developed by the "DER Integration API Technical Working Group" in order to "promote interoperability amongst DER and DNSPs in Australia".
-The implementation guide has DER adhere to the IEEE 2030.5 spec, whilst further leveraging the aforementioned CPUC California SIP, including support for use of the client aggregator model, and the mandated use of subscription/notification retrieval by those aggregator clients. \cite[]{CSIPAus}
+The implementation guide requires DER adhere to IEEE 2030.5, whilst also mandating the client aggregator model,model and use of subscription/notification retrieval. These are very similar requirements to that of American CSIP. \cite[]{CSIPAus}
 
-Most importantly, the Australian Common SIP extends upon existing IEEE 2030.5 resources whilst still adhering to the IEEE 2030.5 specification.
+Importantly, the Australian Common SIP extends upon existing IEEE 2030.5 resources whilst still adhering to IEEE 2030.5.
 As per IEEE 2030.5, resource extensions are to be made under a different XML namespace, in this case \texttt{https://csipaus.org/ns}. Likewise, extension specified fields are to be appropriately prefixed with \texttt{csipaus}. 
 
 The additional fields and resources in CSIP-AUS work to provide DERs with support for \texttt{Dynamic Operating Envelopes}, bounds on the amount of power imported or exported over a period of time. \cite[]{CSIPAus}
@@ -147,7 +147,7 @@ The implementation targets the Linux operating system, however, for the sake of 
 
 These replaceable interfaces include those for networking, TCP and UDP, and event-based architecture, using the Linux \texttt{epoll} \texttt{syscall}, among others.
 
-The IEEE 2030.5 Client implementation by EPRI states, in it's User's Manual, that it almost perfectly conforms to the IEEE 2030.5 specification according to tests written by QualityLogic.
+The IEEE 2030.5 Client implementation by EPRI states, in it's User's Manual, that it almost perfectly conforms to IEEE 2030.5 according to tests written by QualityLogic.
 The one exception to this is that the implementation does not support the subscription/notification mechanism for resource retrieval, as of this report.
 This is particularly unusual given that the California SIP mandates the use of subscription/notification under the client aggregator model, a model of which this implementation was targeted for use in.
 
