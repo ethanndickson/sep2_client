@@ -343,7 +343,18 @@ Figure 6.11 this in use, we append the additional namespace as required, and inc
 
 
 \subsubsection{NotificationList}
-% TODO
+Unlike the Notification resource, the NotificationList resource's purpose are more ambiguous. In IEEE 2030.5 a NotificationList resource is described as a "List of Notifications" and that it is a "List Resource that supports multiple types". This could be interpreted in a few ways:
+
+\begin{itemize}
+    \item Each Notification in a Notification List can contain a different inner resource
+    \item All Notifications in a NotificationList must contain the same resource
+    \item A NotificationList is a Notification of a List Resource, where that List resource is split up into multiple individual notifications.
+\end{itemize}
+
+The latter two interpretations would lead themselves to the most trivial implementation, a NotificationList need simply have a single generic type. The first interpretation would be, as a result of Rust's type-system, very much non-trivial, and would require each Notification to store a SEResource trait object (dynamic dispatch), as to force each Notification to have the same concrete type.
+Fortunately, as mentioned in 5.2.1 we assume developers would want to use different routes for different notifications, making the first interpretation irrelevant.
+
+However, that does not yet clarify which of the latter two are correct. In any case, this is merely the behaviour of the NotificationList after being deserialised, and not something we as library developers need to worry about. For that reason we implement NotificationList as simply a list of Notifications, all with the same inner resource.
 
 \subsection{Testing}
 The goal for this thesis is to produce a IEEE 2030.5 client that is well-tested for correctness, and conformance to the IEEE 2030.5 specification.

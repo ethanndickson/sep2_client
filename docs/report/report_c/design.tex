@@ -4,7 +4,18 @@ Given the context and background surrounding the IEEE 2030.5 protocol, we can be
 \section{Considerations}
 
 \subsection{Client Aggregation Model}
-Of great importance to our work is that we are developing a client library that can be used to build client aggregators, the IEEE 2030.5 model preferred by electric utilities.
+Of great importance to our design is that we have developed a client library primarily for building client aggregators, the IEEE 2030.5 model preferred by electric utilities.
+
+\subsection{Security}
+Improving the security of end-user energy devices was a major motivator behind the development of IEEE 2030 and 2030.5. 
+
+Parallel to that measure of improving security, when considering a programming language for our implementation, we want to ensure that we are upholding the security-prioritised design of the protocol. In 2019, Microsoft attributed 70\% of all CVEs in software in the last 12 years to be caused by memory safety issues \cite[]{SecurityMemorySafety}. 
+
+For that reason, we wish to develop our libraries in a programming language that is memory safe. A language where there are fewer attack vectors that target memory unsafety. For that reason, when implementing IEEE 2030.5 in Rust, we limit our development to the subset of Rust that provides memory safety via static analysis, 'Safe' Rust. This is opposed to using 'unsafe' Rust in our client, where raw pointers can be dereferenced, and as such the compiler is unable to provide guarantees on memory safety. When writing unsafe Rust, soundness and memory safety of unsafe code must be proven by hand.
+
+Furthermore, in developing our implementation we must adhere to many other standards. In in the interest of security, and also correctness, we neglect implementing these standards ourselves, and instead defer to more commonly used, publicly audited, and thoroughly tested implementations of HTTP, SSL, TLS, TCP. 
+
+An exception to this is our usage of \texttt{openssl}, which in 2023 alone has had 19 reported CVEs \cite{OpensslCVE}. In section TODO we discuss an in-progress alternative to this.
 
 \subsection{Modularity}
 IEEE 2030.5 is a specification with a wide range of applications. It aims to provide functionality for coordinating virtually all types of end user energy devices. Under CSIP and CSIP-AUS, it can be deployed in different contexts (See Section 4.1), and can require software on both the side of the electric utility, and the end-user energy device.
@@ -39,16 +50,13 @@ As it stands, our client and common library are reasonably well-tested, with cod
 
 Furthermore, included alongside our implementation are inline comments that are used to generate 'rustdoc' documentation from our source code. Once generated, they can be distributed as a stand-alone website documenting the features and interfaces of each crate.
 
-\subsection{Security}
-Improving the security of end-user energy devices was a major motivator behind the development of IEEE 2030 and 2030.5. 
+\subsubsection{Ergonomic Interface}
 
-Parallel to that measure of improving security, when considering a programming language for our implementation, we want to ensure that we are upholding the security-prioritised design of the protocol. In 2019, Microsoft attributed 70\% of all CVEs in software in the last 12 years to be caused by memory safety issues \cite[]{SecurityMemorySafety}. 
+In in the interest of creating a quality Rust crate that can be released publicly, our implementation strives to produce an ergonomic interface. 
 
-For that reason, we wish to develop our libraries in a programming language that is memory safe. A language where there are fewer attack vectors that target memory unsafety. For that reason, when implementing IEEE 2030.5 in Rust, we limit our development to the subset of Rust that provides memory safety via static analysis, 'Safe' Rust. This is opposed to using 'unsafe' Rust in our client, where raw pointers can be dereferenced, and as such the compiler is unable to provide guarantees on memory safety. When writing unsafe Rust, soundness and memory safety of unsafe code must be proven by hand.
+For example, despite being a strongly typed language, we could have made the decision to pass resource field and attribute validation onto the user by parsing all XML as generally as possible, however, that would force library users to write verbose error handling, as they might do in a dynamically typed programming language. Instead, we leverage the fact that all IEEE 2030.5 data types are specified in a standardised XSD, and therefore their attributes and fields are known ahead of time, and provide appropriate Rust data types for all valid XML inputs.
 
-Furthermore, in developing our implementation we must adhere to many other standards. In in the interest of security, and also correctness, we neglect implementing these standards ourselves, and instead defer to more commonly used, publicly audited, and thoroughly tested implementations of HTTP, SSL, TLS, TCP. 
-
-An exception to this is our usage of \texttt{openssl}, which in 2023 alone has had 19 reported CVEs \cite{OpensslCVE}. In section TODO we discuss an in-progress alternative to this.
+Similarly, as we'll discuss, we provide Rust enums \& bitflag implementations for integer enumerations and bitmaps once types are parsed, instead of raw integers.
 
 \subsection{I/O Bound Computation}
 When designing our implementation, we consider that IEEE 2030.5 clients are I/O bound applications. Furthermore, with the expectation that our client library will be used to primarily develop clients operating under the client aggregation model, it is necessary that our client is able to scale alongside a large proportion of I/O bound operations as it interacts with multiple end-user energy devices, and potentially multiple servers.
@@ -99,6 +107,8 @@ In designing our client, we've made a set of assumptions on library user expecta
 When developing our Subscription/Notification mechanism, as part of the \texttt{sep2\_client} crate, we've made the assumption that library users will not want to a single HTTP route on their notification server that handles all incoming notifications. Instead, each notification containing a different resource would be sent to a different route. Each subscription would have a different \texttt{notificationURI} field on each subscription made.
 
 We make this assumption as the specification makes no mention of whether a single route must be used, yet the examples in the specification show all notifications forwarded to a single URI. Under a single route, each incoming HTTP request would first need to parse the body of the request to determine how to handle it. Using multiple routes simplifies this logic, requiring only the \texttt{Host} header be inspected. 
+
+If the client was being developed in a dynamically typed programming language, or if XML parsing was done untyped, the single route would be a more reasonable approach. This is not the case.
 
 We therefore assume the single route usage is purely for the purpose of the example, and that in reality, client developers do not desire this functionality.
 
