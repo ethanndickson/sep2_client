@@ -15,7 +15,7 @@ For that reason, we wish to develop our libraries in a programming language that
 
 Furthermore, in developing our implementation we must adhere to many other standards. In in the interest of security, and also correctness, we neglect implementing these standards ourselves, and instead defer to more commonly used, publicly audited, and thoroughly tested implementations of HTTP, SSL, TLS, TCP. 
 
-An exception to this is our usage of \texttt{openssl}, which in 2023 alone has had 19 reported CVEs \cite{OpensslCVE}. In section TODO we discuss an in-progress alternative to this.
+An exception to this is our usage of \texttt{openssl}, which in 2023 alone has had 19 reported CVEs \cite{OpensslCVE}. In section TODO we discuss alternatives to this going forward.
 
 \subsection{Modularity}
 IEEE 2030.5 is a specification with a wide range of applications. It aims to provide functionality for coordinating virtually all types of end user energy devices. Under CSIP and CSIP-AUS, it can be deployed in different contexts (See Section 4.1), and can require software on both the side of the electric utility, and the end-user energy device.
@@ -42,6 +42,8 @@ If a IEEE 2030.5 Client is deployed under the "Aggregated Clients Model" it will
 If a IEEE 2030.5 Client is deployed under the "Individual/Direct Model" the very same client will be responsible for modifying the hardware of the device itself accordingly. 
 Clearly, it is impossible for us as developers to implement the resulting logic for directly interacting with the electric grid.
 For that reason, we have produced \texttt{sep2\_client}, a framework for developing IEEE 2030.5 Clients, regardless of the specific end-device, and regardless of the model under which it deployed.
+
+Much like \texttt{sep2\_common}, we provide compile-time flags for different function sets. For example, clients that don't run a Subscription / Notification server, need not compile it.
 
 \subsection{Open-source Software}
 Our implementation will be open-sourced as it aims to address the lack of open-source IEEE 2030.5 tooling. Consequently, it's crucial that our codebase is well documented, and well tested, as to encourage and enable users to contribute modifications and fixes, and to reassure potential users of it's correctness.

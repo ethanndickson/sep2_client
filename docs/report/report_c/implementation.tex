@@ -254,7 +254,7 @@ Referring again to Figure 6.5, we see \texttt{xsd-parser-rs} has qualified our s
 Furthermore, names of data members have been specified as attributes, rather than child elements in the resulting XML; determined by the parser as per the XSD.
 Figure 6.6 is an example of what the List type looks like when serialized to XML.
 
-\texttt{YaSerde} does not perfectly fit our needs. Once again, it is released under the MIT license, giving us the freedom to fork it, and add our required functionality.
+\texttt{YaSerde} does not perfectly fit our needs. However, it is also released under the MIT license, giving us the freedom to fork it, and add our required functionality.
 As part of our work we've modified \texttt{YaSerde} (\texttt{sepserde}) in order to:
 
 \begin{itemize}
@@ -355,6 +355,151 @@ The latter two interpretations would lead themselves to the most trivial impleme
 Fortunately, as mentioned in 5.2.1 we assume developers would want to use different routes for different notifications, making the first interpretation irrelevant.
 
 However, that does not yet clarify which of the latter two are correct. In any case, this is merely the behaviour of the NotificationList after being deserialised, and not something we as library developers need to worry about. For that reason we implement NotificationList as simply a list of Notifications, all with the same inner resource.
+
+\subsubsection{Exploring Dynamic Deserialisation}
+Dynamic deserialisation was a feature we explored implementing in our \texttt{YaSerde} fork; the ability to determine how a given XML string should be deserialised at runtime, instead of having to know at compile-time, as it is now.
+
+The protocol's WADL XML document outlines all the routes a IEEE 2030.5 server can provide, and what type of resource is expected on that route. Coupled with the assumption that library users implementing the Subscription / Notification will use different routes for different incoming resources, we can deduce that the type of all incoming XML resources can be determined at compile time, and thus the need to inspect Resources and determine how they should be deserialised isn't at all necessary. 
+
+Regardless, as part of this thesis we explored how this might be accomplished in Rust, in order to determine if it would work to improve the ergonomics of our common library interface.
+
+In order to have a Rust function that deserialise all valid resources, even if the type is not known, we require that the function returns a single concrete type. For this we could use trait objects, Rust dynamic dispatch, which has the function return a 'fat' pointer to the Resource's internal representation (usually on the heap) and a table containing function pointers for the corresponding trait, often called a 'vtable' or 'virtual method table'. 
+
+Implementing this function with a trait object return type would require a significant time investment, redesigning the existing \texttt{YaSerde} code, having it return a \texttt{Box<T>}, instead of \texttt{T}.
+
+An alternative to using trait objects would be to have a Rust tagged union (an enum) of all resource types, every resource would therefore have the same concrete type once wrapped in that enum.
+
+Regardless of the approach, we would also need to implement some form of lookup mapping the names of resources to code that deserialize based off the type of the resource - this would likely need to be auto-generated.
+
+If a trait object was used, the return type of the function doesn't provide users with anything immediately useful, in order to inspect the contents of the resource, they would need to downcast the trait object to a concrete type, which requires them to first know the concrete type at compile-time, bringing us back to the original problem.
+
+The Rust enum approach improves this situation. When combined with Rust match statements library users can filter to a concrete Resource as needed. However, with 141 different resources it's likely this filtering would be very verbose. Given that client developers should know the type of all incoming resources at compile time, implementing this functionality ourselves would force library users to handle this filtering themselves, even if they don't necessarily require it.
+
+For that reason, we won't be implementing any form of run-time deserialisation. If users require any of the approaches we've discussed, they have the ability to implement it themselves, or more reasonably, switch to a dynamically typed language where this model can be more easily supported, as we saw in the \texttt{envoy-client}.
+
+\subsection{List Ordering}
+IEEE 2030.5 defines list resources as simply a list of resources that can be retrieved in a single request. For each list resource, the specification defines how the list should be ordered, which values should be used as keys, and the precedence of those keys. \cite{IEEE2030.5}
+
+Therefore, for all resources that are used in a list we've implemented the Rust \texttt{Ord} trait, which defines a total order (as opposed to a partial order), that will be used when using default sort methods on the list itself.
+
+Unfortunately, this is not described in any standardised way, and was instead implemented manually.
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            impl Ord for DERControl {
+                fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                    // Primary Key - primacy (ascending)
+                    match self.interval.start.cmp(&other.interval.start) {
+                        core::cmp::Ordering::Equal => {}
+                        ord => return ord,
+                    }
+                    // Secondary Key - creationTime (descending)
+                    match self.creation_time.cmp(&other.creation_time).reverse() {
+                        core::cmp::Ordering::Equal => {}
+                        ord => return ord,
+                    }
+                    // Tertiary Key - mRID (descending)
+                    self.mrid.cmp(&other.mrid).reverse()
+                }
+            } 
+
+            impl PartialOrd for DERControl {
+                fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                    Some(self.cmp(other))
+                }
+            }
+        \end{lstlisting}
+        \label{fig:dercord}
+        \caption{Our ordering implementation for the DERControl trait}
+    \end{center}
+\end{figure}
+
+Figure 6.12 shows our implementation of this, where we first implement a total order, and then use that to implement the required partial order.
+
+To provide an ergonomic way for working with lists, and ensure lists are always sorted, we use our procedural macros to provide a common interface for working with list resources. List resources contain a Rust \texttt{Vec} internally, which can be pushed to directly, but does not retain the sortedness.
+
+Instead, we provide a \texttt{add} function on all lists that inserts and retains the intended order. This function also updates the 'all' field of the resource (the length of the list), to ensure it remains consistent with the actual contents of the list. Similarly, we provide a \texttt{remove} function. For all other, less common use cases, library users will be required to update the list invariants as necessary. 
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            pub trait SEList: SEResource {
+                type Inner: Ord;
+                fn all(&self) -> Uint32;
+                fn all_mut(&mut self) -> &mut Uint32;
+                fn results(&self) -> Uint32;
+                fn results_mut(&mut self) -> &mut Uint32;
+                fn list_as_slice(&self) -> &[Self::Inner];
+                fn list_mut(&mut self) -> &mut Vec<Self::Inner>;
+            
+                /// Add an item to the contained list, maintaining invariants
+                fn add(&mut self, item: Self::Inner) {
+                    self.list_mut().push(item);
+                    // 'very fast in cases where the slice is nearly sorted'
+                    self.list_mut().sort();
+                    *self.all_mut() = Uint32(self.all().get() + 1);
+                }
+                ///Remove an item from the contained list, maintaining invariants
+                fn remove(&mut self, idx: usize) -> Self::Inner {
+                    *self.all_mut() = Uint32(self.all().get() - 1);
+                    self.list_mut().remove(idx)
+                }
+        \end{lstlisting}
+        \label{fig:listtraitimpl}
+        \caption{Our SEList trait, with default add and remove methods.}
+    \end{center}
+\end{figure}
+
+\subsection{CSIP-AUS}
+Implemented in \texttt{sep2\_common} are the IEEE 2030.5 extensions required by CSIP-AUS. These take the form of two additional resources, and additional fields on existing resources. When extensions are used, IEEE 2030.5 requires that the XML namespace for the extension be included with the Resource, and that extension specific fields be prefixed accordingly. For CSIP-AUS this is the \texttt{https://csipaus.org/ns} namespace, and the \texttt{csipaus} prefix. \cite{CSIPAus}
+
+We make CSIP-AUS extensions available behind the \texttt{csip\_aus} crate feature (crate compile flag). When activated, the Rust compiler adds the namespace to existing IEEE 2030.5 resources, and adds the prefix to their respective fields. It also makes the new resources available for use, also with the correct namespace and prefix. Using existing functionality of \texttt{YaSerde}, adding these extensions is straight-forward.
+
+As per the Energy Queensland SEP2 Client Handbook, and the CSIP-AUS publication by ARENA, these resources, and our support for the client aggregation model, are the extent to which we as library developers can assist users in developing CSIP-AUS compliant clients. \cite{sep2clienthandbook} \cite{CSIPAus}
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            #[yaserde(namespace = "urn:ieee:std:2030.5:ns")]
+            #[cfg_attr(
+                feature = "csip_aus",
+                yaserde(namespace = "csipaus: https://csipaus.org/ns")
+            )]
+            pub struct DERCapability {
+                /// Bitmap indicating the CSIP-AUS controls implemented
+                #[cfg(feature = "csip_aus")]
+                #[yaserde(rename = "doeModesSupported")]
+                #[yaserde(
+                    prefix = "csipaus", 
+                    namespace = "csipaus: https://csipaus.org/ns"
+                )]
+                pub doe_modes_supported: DOEControlType,
+                ...
+            }
+        \end{lstlisting}
+        \label{fig:csipausimpl}
+        \caption{The DERCapability annotated with optional CSIP-AUS extensions.}
+    \end{center}
+\end{figure}
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            <EndDevice xmlns="urn:ieee:std:2030.5:ns" 
+                       xmlns:csipaus="https://csipaus.org/ns">
+                <changedTime>0</changedTime>
+                <csipaus:ConnectionPointLink  href="/edev/1/cp" />
+                <sFDI>0</sFDI>
+            </EndDevice>
+        \end{lstlisting}
+        \label{fig:enddeviceconnpointxml}
+        \caption{Example XML representation of a EndDevice Resource with a CSIP-AUS ConnectionPointLink.}
+    \end{center}
+\end{figure}
+
+Figure 6.15 shows the output of our common library when an EndDevice is constructed with a ConnectionPointLink resource, and when the \texttt{csip\_aus} compile flag is enabled.
+
 
 \subsection{Testing}
 The goal for this thesis is to produce a IEEE 2030.5 client that is well-tested for correctness, and conformance to the IEEE 2030.5 specification.
