@@ -1,9 +1,11 @@
 \chapter{Implementation}\label{ch:implementation}
 Given the context and background of the IEEE 2030.5 protocol, and the high-level design decisions we've been required to make, we can discuss the technical design decisions present in our final implementation.
+
 \section{Common Library}
+The common library, \texttt{sep2\_common}, contains all functionality that we have determined to be common to both IEEE 2030.5 clients and servers.
 
 \subsection{Resource Data Types}
-The largest aspect of this common library is the internal representation of resources, the data communicated between clients \& servers. These resources are described precisely in an XSD.
+The largest aspect of the common library is the internal representation of resources, the data communicated between clients \& servers. These resources are described precisely in an XSD.
 Resources range from data that may be used by the electric utility, such as the current load of the device, to resource metadata, such as the rate at which a client should poll a server for a given resource, or what URI endpoint can be used to access a given resource, in the case of a Link resource.
 In both specification and schema, these data structures are separated into packages for each of the function sets.
 
@@ -44,7 +46,7 @@ There is no way to have a data structure inherit the internal members of another
     \end{center}
 \end{figure}
 
-In Figure 5.2, we have a Rust trait that describes the behaviour of the List base type. All lists are resources, and thus we have a trait restriction that all types implementing List must first implement the Resource trait.
+In Figure 5.2, we have a Rust trait that describes the behaviour of the List base type. All lists are resources, and thus we have a trait restriction that all types implementing SEList must first implement the SEResource trait.
 
 The prefix \texttt{SE} for 'Smart Energy' simply differentiates the trait from the concrete type with the same name.
 
@@ -73,15 +75,15 @@ This library operates on the basis that inheritance can be replicated via compos
     \begin{center}
         \begin{lstlisting}
             #[inheritable]
-            pub trait Resource {
-                fn get_href(&self) -> Option<&str>;
+            pub trait SEResource {
+                fn href(&self) -> Option<&str>;
             }
 
-            pub struct ResourceObj {
+            pub struct SEResourceObj {
                 href: Option<String>
             }
 
-            impl Resource for ResourceObj {
+            impl SEResource for ResourceObj {
                 fn href(&self) -> Option<&str> {
                     self.href.as_str()
                 }
@@ -96,11 +98,11 @@ This library operates on the basis that inheritance can be replicated via compos
     \begin{center}
         \begin{lstlisting}
             #[derive(Inheritance)]
-            pub struct List {
-                #[inherits(Resource)]
-                res: ResourceObj,
-                all: UInt32,
-                results: UInt32,
+            pub struct SEList {
+                #[inherits(SEResource)]
+                res: SEResourceObj,
+                all: Uint32,
+                results: Uint32,
             }
         \end{lstlisting}
         \label{fig:listinher}
@@ -109,10 +111,10 @@ This library operates on the basis that inheritance can be replicated via compos
 \end{figure}
 
 
-Figures 6.3 and 6.4 show how this library, 'inheritance-rs' \cite[]{inheritancers} is used to reduce the boilerplate necessary to inherit data members. 
-In Figure 6.3, we mark the Resource trait as 'inheritable' and then implement that trait on a type that holds the necessary members, our bare minimum 'base' type. 
-In Figure 6.4, we compose an instance of that base type into a type that would normally inherit from it. Then, we tell the library to generate the code, at compile time, that would allow List to implement the Resource trait.
-This generated code simply calls the underlying ResourceObj member when the href function would be called on a list.
+Figures 6.3 and 6.4 show how this library, \texttt{inheritance-rs} \cite[]{inheritancers} is used to reduce the boilerplate necessary to inherit data members. 
+In Figure 6.3, we mark the SEResource trait as 'inheritable' and then implement that trait on a type that holds the necessary members, our bare minimum 'base' type. 
+In Figure 6.4, we compose an instance of that base type into a type that would normally inherit from it. Then, we tell the library to generate the code, at compile time, that would allow List to implement the SEResource trait.
+This generated code simply calls the underlying SEResourceObj member when the href function would be called on a list.
 
 The major flaw in this approach is that for every single type that is used as a base type, a trait, and a base implementation of that trait needs to be written.
 Given that there are just under 700 data types in the IEEE 2030.5 schema, we had to consider alternatives.
@@ -192,7 +194,7 @@ Of course, \texttt{xsd-parser-rs} does not perfectly fit our needs. However, it 
 IEEE 2030.5, for the sake of efficiency, has many fields that encode many boolean values together in a single integer, a bitmap of booleans, or colloquially a 'bitflag'. Whilst we must still maintain how these integers are stored internally, we have the opportunity to provide them in a more ergonomic interface. Thus, we use the \texttt{bitflags} crate, a popular Rust crate that wraps integers and provides convenience functions for comparing them (intersections, unions), and constructing them using enum like syntax. \cite{bitflags}
 
 \subsubsection{Resource Polymorphism}
-As mentioned, we've used \texttt{xsd-parser-rs} to automate the process of resolving an inheritance tree in the XSD. This has enabled us to add polymorphism via Resource base types to our implementation.
+As mentioned, we've used \texttt{xsd-parser-rs} to automate the process of resolving an inheritance tree in the XSD. This has enabled us to add polymorphism via base types to our implementation.
 
 We add Resource polymorphism to our common library as it can be implemented relatively easily, and assists both ourselves in writing more generic code (such as the Event scheduler), and users of our library, such as by allowing them to store all "Subscribable" resources in a single container.
 
@@ -204,7 +206,6 @@ For example, \texttt{RespondableSubscribableIdentifiedObject} inherits from \tex
 \begin{figure}[H]
     \begin{center}
         \begin{lstlisting}
-            /// Implemented by all types whose base type is [`IdentifiedObject`]
             trait SEIdentifiedObject: SEResource {
                 fn mrid(&self) -> &MRIDType;
                 fn description(&self) -> Option<&String32>;
@@ -255,7 +256,7 @@ Furthermore, names of data members have been specified as attributes, rather tha
 Figure 6.6 is an example of what the List type looks like when serialized to XML.
 
 \texttt{YaSerde} does not perfectly fit our needs. However, it is also released under the MIT license, giving us the freedom to fork it, and add our required functionality.
-As part of our work we've modified \texttt{YaSerde} (\texttt{sepserde}) in order to:
+As part of our work we've modified \texttt{YaSerde} (\texttt{SEPSerde}) in order to:
 
 \begin{itemize}
     \item Serialize Rust enums as their underlying integer representations.
@@ -266,7 +267,7 @@ As part of our work we've modified \texttt{YaSerde} (\texttt{sepserde}) in order
 \end{itemize}
 
 \subsubsection{Notification}
-The 'Notification' resource is a container for delivering resources to clients via the Subscription / Notification method. This means a Notification resource is generic, it contains some Resource as one of it's fields. To represent this as a type, we use Rust generics, where the generic type is bound by the 'SEResource' trait we've defined.
+The 'Notification' resource is a container for delivering resources to clients via the Subscription / Notification method. This means a Notification resource is generic, it contains some other resource as one of it's fields. To represent this as a type, we use Rust generics, where the generic type is bound by the 'SEResource' trait we've defined.
 
 \begin{figure}[H]
     \begin{center}
@@ -309,13 +310,13 @@ However, this poses some challenges for \texttt{YaSerde} which was not written w
 
 Figure 6.10 shows a Notification resource that contains a Reading resource. Of interest is that the inner resource is always contained in an XML element with the name "Resource", and the type of the inner resource is instead given by the 'type' attribute, provided by the \texttt{XMLSchema-Instance} namespace. 
 
-The implication of this is not only do we need to modify \texttt{sepserde} to handle generic resources, but we also need a way to instruct it to add this  \texttt{xsi:type} attribute accordingly.
+The implication of this is not only do we need to modify \texttt{SEPSerde} to handle generic resources, but we also need a way to instruct it to add this  \texttt{xsi:type} attribute accordingly.
 
-When setting the \texttt{xsi:type} attribute, we note that we require the name of the resource as a String. This means for every Resource we also need to somehow bundle along with it a string literal of the name of the type. We do this by having the procedural macro responsible for generating the serialisation code also define a function that contains that string literal.
+When setting the \texttt{xsi:type} attribute, we note that we require the name of the resource as a String. This means for every resource we also need to somehow bundle along with it a string literal of the name of the type. We do this by having the procedural macro responsible for generating the serialisation code also define a function that contains that string literal.
 
 Throughout our implementation, we've also found additional use for this function, using it to provide the name of the resource as additional context when creating logs in generic functions.
 
-In order to instruct \texttt{sepserde} to place this \texttt{xsi:type} attribute as required, we add a new procedural macro attribute to the library, \texttt{generic}.
+In order to instruct \texttt{SEPSerde} to place this \texttt{xsi:type} attribute as required, we add a new procedural macro attribute to the library, \texttt{generic}.
 
 \begin{figure}[H]
     \begin{center}
@@ -348,7 +349,7 @@ Unlike the Notification resource, the NotificationList resource's purpose are mo
 \begin{itemize}
     \item Each Notification in a Notification List can contain a different inner resource
     \item All Notifications in a NotificationList must contain the same resource
-    \item A NotificationList is a Notification of a List Resource, where that List resource is split up into multiple individual notifications.
+    \item A NotificationList is a Notification of a List resource, where that List resource is split up into multiple individual notifications.
 \end{itemize}
 
 The latter two interpretations would lead themselves to the most trivial implementation, a NotificationList need simply have a single generic type. The first interpretation would be, as a result of Rust's type-system, very much non-trivial, and would require each Notification to store a SEResource trait object (dynamic dispatch), as to force each Notification to have the same concrete type.
@@ -363,17 +364,17 @@ The protocol's WADL XML document outlines all the routes a IEEE 2030.5 server ca
 
 Regardless, as part of this thesis we explored how this might be accomplished in Rust, in order to determine if it would work to improve the ergonomics of our common library interface.
 
-In order to have a Rust function that deserialise all valid resources, even if the type is not known, we require that the function returns a single concrete type. For this we could use trait objects, Rust dynamic dispatch, which has the function return a 'fat' pointer to the Resource's internal representation (usually on the heap) and a table containing function pointers for the corresponding trait, often called a 'vtable' or 'virtual method table'. 
+In order to have a Rust function that deserialise all valid resources, even if the type is not known, we require that the function returns a single concrete type. For this we could use trait objects, Rust dynamic dispatch, which has the function return a 'fat' pointer, which contains a pointer to the resource (usually on the heap) and pointer to the table containing function pointers for the corresponding trait, often called a 'vtable' or 'virtual method table'. 
 
-Implementing this function with a trait object return type would require a significant time investment, redesigning the existing \texttt{YaSerde} code, having it return a \texttt{Box<T>}, instead of \texttt{T}.
+Implementing this function with a trait object return type would require a significant time investment, adjusting the existing \texttt{YaSerde} code to have it it return a \texttt{Box<T>} (heap allocated), instead of \texttt{T} (stack allocated).
 
-An alternative to using trait objects would be to have a Rust tagged union (an enum) of all resource types, every resource would therefore have the same concrete type once wrapped in that enum.
+An alternative to using trait objects would be to have a Rust tagged union (an enum) of all (141) top-level resource typess. Every resource would therefore have the same concrete type once wrapped in that enum.
 
-Regardless of the approach, we would also need to implement some form of lookup mapping the names of resources to code that deserialize based off the type of the resource - this would likely need to be auto-generated.
+Regardless of the approach, we would also need to implement some form of lookup mapping the names of resources to code that deserialize based off the type of the resource - which we could likely auto-generate.
 
 If a trait object was used, the return type of the function doesn't provide users with anything immediately useful, in order to inspect the contents of the resource, they would need to downcast the trait object to a concrete type, which requires them to first know the concrete type at compile-time, bringing us back to the original problem.
 
-The Rust enum approach improves this situation. When combined with Rust match statements library users can filter to a concrete Resource as needed. However, with 141 different resources it's likely this filtering would be very verbose. Given that client developers should know the type of all incoming resources at compile time, implementing this functionality ourselves would force library users to handle this filtering themselves, even if they don't necessarily require it.
+The Rust enum approach improves this situation. When combined with Rust match statements library users can filter to a concrete resource as needed. However, with 141 different resources it's likely this filtering would be very verbose. Given that client developers should know the type of all incoming resources at compile time, implementing this functionality ourselves would force library users to handle this filtering themselves, even if they don't necessarily require it.
 
 For that reason, we won't be implementing any form of run-time deserialisation. If users require any of the approaches we've discussed, they have the ability to implement it themselves, or more reasonably, switch to a dynamically typed language where this model can be more easily supported, as we saw in the \texttt{envoy-client}.
 
@@ -440,6 +441,7 @@ Instead, we provide a \texttt{add} function on all lists that inserts and retain
                     self.list_mut().sort();
                     *self.all_mut() = Uint32(self.all().get() + 1);
                 }
+                
                 ///Remove an item from the contained list, maintaining invariants
                 fn remove(&mut self, idx: usize) -> Self::Inner {
                     *self.all_mut() = Uint32(self.all().get() - 1);
@@ -452,7 +454,7 @@ Instead, we provide a \texttt{add} function on all lists that inserts and retain
 \end{figure}
 
 \subsection{CSIP-AUS}
-Implemented in \texttt{sep2\_common} are the IEEE 2030.5 extensions required by CSIP-AUS. These take the form of two additional resources, and additional fields on existing resources. When extensions are used, IEEE 2030.5 requires that the XML namespace for the extension be included with the Resource, and that extension specific fields be prefixed accordingly. For CSIP-AUS this is the \texttt{https://csipaus.org/ns} namespace, and the \texttt{csipaus} prefix. \cite{CSIPAus}
+Implemented in \texttt{sep2\_common} are the IEEE 2030.5 extensions required by CSIP-AUS. These take the form of two additional resources, and additional fields on existing resources. When extensions are used, IEEE 2030.5 requires that the XML namespace for the extension be included with the resource, and that extension specific fields be prefixed accordingly. For CSIP-AUS this is the \texttt{https://csipaus.org/ns} namespace, and the \texttt{csipaus} prefix. \cite{CSIPAus}
 
 We make CSIP-AUS extensions available behind the \texttt{csip\_aus} crate feature (crate compile flag). When activated, the Rust compiler adds the namespace to existing IEEE 2030.5 resources, and adds the prefix to their respective fields. It also makes the new resources available for use, also with the correct namespace and prefix. Using existing functionality of \texttt{YaSerde}, adding these extensions is straight-forward.
 
@@ -494,7 +496,7 @@ As per the Energy Queensland SEP2 Client Handbook, and the CSIP-AUS publication 
             </EndDevice>
         \end{lstlisting}
         \label{fig:enddeviceconnpointxml}
-        \caption{Example XML representation of a EndDevice Resource with a CSIP-AUS ConnectionPointLink.}
+        \caption{Example XML representation of an EndDevice resource with a CSIP-AUS ConnectionPointLink.}
     \end{center}
 \end{figure}
 
@@ -531,10 +533,11 @@ IEEE 2030.5 provides the requirement that MRIDs are sufficiently cryptographical
 
 Going forward, it would be ideal to calculate the possibility of a global collision with this algorithm, as to verify that is is sufficiently cryptographically unique, however, this is out of scope of this thesis.
 
-Regardless, we do of course provide unit tests for this functionality. We provide a test verifying that the PEN ID can be obtained from a given MRID, and that there are no collisions when generating several million MRIDs on a single instance of the program. This is to be expected, as we use include a global, mutable counter in the final value.
-
 \subsection{Testing}
 \texttt{sep2\_common} is developed alongside a suite of tests, ensuring all resources can be serialised and deserialised, and that their XML representations adhere to IEEE 2030.5.
+
+\subsubsection{MRID Generation}
+We provide a test verifying that the PEN ID can be obtained from a given MRID, and that there are no collisions when generating several million MRIDs on a single instance of the program. This is to be expected, as we use include a global, mutable counter in the final value.
 
 \subsubsection{Testing SEPSerde}
 As expected, by the nature of serialisation and deserialisation, we have no compile time guarantees either will succeed for a given data type.
@@ -545,8 +548,8 @@ Therefore, our first test suite for the common library is to test that all data 
         \begin{lstlisting}
             #[test]
             fn default_List() {
-                let orig = List::default();
-                let new: List = deserialize(&serialize(&orig).unwrap()).unwrap();
+                let og = List::default();
+                let new: List = deserialize(serialize(orig).unwrap()).unwrap();
                 assert_eq!(orig, new);
             }
         \end{lstlisting}
@@ -561,83 +564,120 @@ This test takes advantage of the fact that all our resources are able to automat
 In Figure 5.7, we first perform this default instantiation, convert the resource to an XML string, and then convert the XML string back into our internal List representation. 
 Finally, we check if the newly deserialized resource is equal to it's default.
 
-For each resource, the only part of this test that differs is the name of the type. As such, we auto-generate it and include it in the common library.
+For each resource, the only part of this test that differs is the name of the type. As such, we auto-generate this test for each resource, and include it in \texttt{sep2\_common}.
 
 \subsubsection{XML Correctness}
-The remainder of the common library will be tested using manually written unit tests that test whether our XML representations of resources are correct with respect to IEEE 2030.5
-These unit tests use the example XML resources provided as part of IEEE 2030.5, as they are more likely to be correct than resources we would write by hand.
+The remainder of the common library will be tested by ensuring representations of resources are correct with respect to those defined in IEEE 2030.5.
+These tests use the example XML resources provided as part of IEEE 2030.5 as a starting point, as they are more likely to be correct than resources we would write by hand. However, the scope of these examples is narrow, and we are required to write more going forward.
 
 \section{Client Library}
-Despite the claim that we are developing an IEEE 2030.5 client, in reality, the goal of this thesis is to produce a client library, such that manufacturers of IEEE 2030.5 complaint devices will extend upon our client.
-These device manufacturers would simply, in Rust or otherwise, call upon the documented interface of the client library to communicate with a IEEE 2030.5 server.
+The client library, \texttt{sep2\_client}, contains the remainder of our implementation, and provides an interface for interacting with IEEE 2030.5 servers, as well as interfaces for handling Event resources, the Time function set, and an implementation of the Subscription / Notification mechanism. 
 
-The exact details of this client library interface are yet to be determined, but what a developer should be able to achieve with that interface is fairly straight forward. They'll require:
+\subsection{Application Support}
+In IEEE 2030.5, the Application Support function set is defined to include: \cite{2030}
 
 \begin{itemize}
-    \item A mechanism for discovering or connecting to a specific server.
-    \item The ability to retrieve resources from a specific URI, and have it deserialized into a local data type.
-    \item The ability to create or update a resource, and have it included as a PUT or POST request to a connected server.
-    \item A mechanism to automate this process, using event-driven architecture, to handle timer events, such as for polling, or network events for resource subscription.
+    \item "RESTful HTTP/1.1 application data exchange semantics"
+    \item 'XML and/or EXI encoding as the data payload of RESTful operations'
+    \item "Authentication and encryption as HTTP over TLS " (Security Function Set)
 \end{itemize}
 
-\subsection{Server \& Connection}
+As such, this function set relies on a correct implementation of other standardised functionality. We choose to implement these standards by leveraging well-tested \& open-source implementations of HTTP, XML, and TCP.
 
-Connecting to a server is, otherwise, as expected. We use the cipher suite interface and the TCP interface, as built in the common library, to connect to the server using TCP/TLS.
-This of course requires certificates signed by a common library cipher suite. This certificate exchange will determine the parameters by which the cipher suite will be used to encrypt traffic.
+\subsubsection{XML}
+IEEE 2030.5 resources are serialised to XML via our \texttt{sep2\_common} crate, which depends on our \texttt{YaSerde} fork, \texttt{SEPSerde}. Internally, this uses the \texttt{xml-rs} crate, an XML parser \& writer \cite{xmlrs}. This library was chosen to due it's emphasis on specification adherence. In our research we found many competing libraries sacrifice correctness and completeness for performance, or are built for a specific usecase, and then no longer maintained. \cite{xmlrsperformance}
 
-\subsection{Event-driven Architecture}
-With the IEEE 2030.5 Client being an I/O bound application, we are to implement concurrency using an event-driven architecture, such that many operations can performed concurrently on a single threaded machine when waiting on I/O.
+Going forward, it may be worthwhile to explore alternative XML libraries that can be substituted into \texttt{SEPSerde} with the goal of improving XML parsing and writing performance. 
 
-Although the client does not connect to multiple servers, we require event-based architecture to handle:
+\subsubsection{HTTP}
+To communicate with IEEE 2030.5 servers using HTTP we use the Rust \texttt{hyper} library, as it currently integrates best with our Security function set requirements, and provides us with adherence to HTTP/1.1. \cite{hyper}
+
+\subsubsection{TCP}
+Clients and servers using HTTP/1.1 must use TCP. The most sensible approach to implementing TCP is to wrap the target operating system's sockets library. This is done for us by the Rust standard library.
+
+\subsection{Security}
+The security function set of IEEE 20305 involves "securing transactions between clients and servers" via HTTP over TLS, or more commonly referred to as HTTPS. IEEE 2030.5 mandates a variation of TLS, mTLS, be used. mTLS provides a mechanism for mutually authenticating clients and servers. 
+
+The major constraint implementing the security function set is that "All devices SHALL support \texttt{TLS\_ECDHE\_ECDSA\_WITH\_AES\_128\_CCM\_8} cipher suite", and that the "ECC cipher suite SHALL use elliptic curve secp256r1".\cite{IEEE2030.5}
+
+IEEE 2030.5 does allow for additional cipher suites to be used, provided they "provide a cryptographic strength at least equivalent to the mandatory cipher suite". \cite{IEEE2030.5} As it stands, users wishing to add additional cipher suites are required to modify the source code of our library, though we do not rule out the possibility of providing an interface for setting additional cipher suites in the future.
+
+Additionally, IEEE 2030.5 defines six classes of X509 certificates, each with different restrictions on how they are to be signed, and what  X509 certificate extensions they contain, and how they are to be set.
+
+Our client library provides developers with a generic interface for meeting the requirements of the Security function set.
+
+\subsubsection{TLS via OpenSSL}
+To implement TLS, we use the publicly audited, and commonly used library \texttt{OpenSSL}. \texttt{OpenSSL} is a C library, for which there exist popular Rust bindings that provide an (approximately) safe foreign function interface to the C library. \cite{openssl}
+
+Our HTTP library \texttt{hyper} doesn't natively support OpenSSL, but accepts a generic connector interface for use with any conforming external TLS configuration. To accommodate for this, we have \texttt{OpenSSL} generate a TLS config and use the \texttt{hyper\_openssl} library to wrap that configuration in a connector that can be understood by \texttt{hyper}. \cite{hyperopenssl}
+
+An \texttt{OpenSSL} TLS configuration is generated when a IEEE 2030.5 Client, capable of making HTTPS requests, is instantiated. To create an IEEE 2030.5 TLS configuration for use in a Client device, library users must provide:
+
 \begin{itemize}
-    \item Input from the client device, such as the creating or updating of resources.
-    \item Timed events, such as to poll for a resource update on a given schedule.
-    \item Network events, such as an updated resource being pushed to the client via the subscription/notification mechanism, or receiving the response from a sent HTTP request.
+    \item The IP address of the target IEEE 2030.5 server for this client instance.
+    \item Path to a IEEE 2030.5 "Device Certificate" or "Self-Signed Client Certificate" \texttt{.pem} file.
+    \item Path to the certificate's corresponding private key \texttt{.pem} file.
+    \item Path to a IEEE 2030.5 "Root certificate" \texttt{.pem} file. 
 \end{itemize}
 
-An event-based architecture furthermore enables us to take advantage of multiple OS threads, and therefore multiple CPU cores, as to best accommodate the scale required by the client aggregator model.
-As mentioned previously, Rust supports asynchronous programming, with runtime-agnostic support for await and async syntax, of which there are multiple Rust async runtime available.
+The relevant details on these certificate types are in IEEE 2030.5 \texttt{6.11.8.3.3}, \texttt{6.11.8.4.3} and \texttt{6.11.8.2}. We require the path to the CA to be supplied as to not require developers to install the CA on the system.
 
-The specifics of this asynchronous programming architecture are yet to be learned, and as such we can look to the EPRI client implementation, where they've chosen to use the Linux native \texttt{epoll} \texttt{syscall}.
-Fortunately, \texttt{epoll} is the driver behind the two most popular async runtimes for Rust, \texttt{Tokio} and \texttt{std-async}. As such, we'll need to determine which is most suitable for our client.
+Client instances restricted to performing requests via HTTP can be instantiated with just a server address.
 
-\subsection{Function Sets}
-As established, function sets are logical groupings of IEEE 2030.5 resources by their functionality, of which there are twenty-five.
-A subset of these function sets are for general or 'Common' use, such as the time function set, for synchronizing a device clock, whilst others have a very specific scope, such as the Electric Vehicle function set. 
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            let client = Client::new_https(
+                "https://127.0.0.1:1337",
+                "client_cert.pem",
+                "client_private_key.pem",
+                "serca.pem",
+                /* Additional configuration ... */
+            )
+        \end{lstlisting}
+        \label{fig:httpsclientexample}
+        \vspace{-10pt}
+        \caption{Example IEEE 2030.5 Client instantiation}
+    \end{center}
+\end{figure}
 
-QualityLogic, a quality assurance company specialising in testing standardised software, has grouped these function sets further than the specification itself.
+\subsubsection{X509 Parsing \& Validation}
+Additionally, we provide an interface for library users to verify that the provided X509 certificates adhere to the specification, that they contain specific extensions and fields. \texttt{OpenSSL} provides this functionality, however the Rust FFI bindings we use do not expose the corresponding API. Rather than write unsafe Rust FFI, and possibly introduce undefined behaviour to our library, we simply defer to the \texttt{X509-Parser} library, which lets us check these conditions efficiently. \cite{x509parser}
 
-Figure 5.8 shows these groupings, and which of these function sets are required for California SIP.
-These groupings provide us with a starting point for determining the priority of function sets, where by those required for California SIP will be implemented first.
-An exception to this is the Demand Response and Load Control function set, which has been deemed relevant for DER in Australia by electric utilities in Queensland, and as such it's implementation will be prioritised. \cite[]{QueenslandDER}
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            fn check_device_cert(cert: impl AsRef<Path>) -> Result<()>;
+            fn check_self_signed_cert(cert: impl AsRef<Path>) -> Result<()>;
+            fn check_ca(cert_path: impl AsRef<Path>) -> Result<()>;
+        \end{lstlisting}
+        \label{fig:certvalidinterface}
+        \vspace{-10pt}
+        \caption{Our IEEE 2030.5 certificate validation interface}
+    \end{center}
+\end{figure}
 
-Regardless, the groupings in Figure 5.8 further indicate the dependencies between function sets. For example the Device Capabilities function set describes the function sets available on a server, and is therefore used to discover the URI of resources for other function sets.
+We distinguish between IEEE 2030.5 'device certificates', and 'self signed client certificates', as they have different requirements. Furthermore, the Subscription / Notification mechanism forbids the use of the latter.
 
-The conclusion to draw from this is that function sets on the left side of Figure 5.8 are very much depended upon by function sets on the right side, as they describe the core functionality on the client.
-Our development will begin on the Security, Certificate Management, and Application Support function sets as part of the common library, where the Application Support function set refers to the use of prescribed technologies, such as TCP, HTTP/1.1 and XML.
+\subsection{Core Client Functionality}
 
+\subsection{Resource Polling}
+
+\subsection{Subscription / Notification}
+
+\subsection{Time}
+
+\subsection{Event Schedules}
+
+\subsection{Logging}
 
 \subsection{Testing}
-As expected, our client library will be developed alongside a suite of tests. Unlike the common library, these tests will be comprised of both unit and system tests.
-System tests will primarily be used to check for conformance to the IEEE 2030.5 specification, using the example system outputs in the specification.
-The actual software framework to be used for conducting system tests is yet to be determined, but the requirements to use such a framework are relatively straightforward, obviously requiring both a test client binary, and a mock server.
 
+\subsubsection{Security}
+During development, we maintained a local certificate authority via the tool \texttt{mkcert}. However, this tool is not capable of producing certificates that match those required by IEEE 2030.5
+In order to properly test our Security function set, we required TLS certificates as close as possible to those used in the real world; certificates that include all the relevant X509 extensions, and are generated using the specified elliptic curve, and are compatible with the mandatory cipher suite. For this reason, we consult the SunSpec Alliance, who provide free IEE 2030.5 test certificates upon request. As part of this thesis we have requested certificate packages for both our client, and test server, and have tested them when communicating resources, and our interface for parsing and validating X509 certificates.
 
-\subsubsection{Test Client Binary}
-In order to perform system tests we will need to wrap our client library and produce a binary that will connect to a server, simulating a potential use case.
-This binary client will be a demonstration of all implemented functionality.
-Furthermore, this client binary will act as documentation for device manufacturers using our library.
-Likewise, EPRI produced a test client binary for demonstration purposes in their IEEE 2030.5 client implementation.
-
-\subsubsection{Mock Server}
-
-When it comes to writing system tests, our testing philosophy is hindered by a lack of open-source IEEE 2030.5 implementations, in-development or otherwise.
-As such, we'll need to create our own mock IEEE 2030.5 server to test both the sending and receiving of resources from our client.
-Neel Bhaskar, as part of UNSW CSE, developed a portion of a working IEEE 2030.5 Server in 2022, and with changes to support hardcoded resources and routes, will be used as the starting point for this mock server.
-We will also need to make changes to this server in order for it to use our common library, where we will therefore gain a better idea of what functionality is common to both client \& server.
-
-Specific client functionality, such as the subscription/notification method of resource retrieval, may require extensive work on this mock server. 
-As a result, we won't rule out the possibility of writing code that could be reused in a future server implementation.
+However, these certificates do not provide us a way with interacting with any publicly accessible IEEE 2030.5 test servers. For that, we'll require test certificates from Energy Queensland, as discussed in TODO.
 
 
 
