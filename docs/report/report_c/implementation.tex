@@ -501,12 +501,42 @@ As per the Energy Queensland SEP2 Client Handbook, and the CSIP-AUS publication 
 Figure 6.15 shows the output of our common library when an EndDevice is constructed with a ConnectionPointLink resource, and when the \texttt{csip\_aus} compile flag is enabled.
 
 
-\subsection{Testing}
-The goal for this thesis is to produce a IEEE 2030.5 client that is well-tested for correctness, and conformance to the IEEE 2030.5 specification.
-As such, our common library will be developed alongside a suite of tests, written with the goal to maximise code coverage, measured by lines of code.
-All testing for the Common Library will be done via unit testing.
+\subsection{MRID Generation}
+IEEE 2030.5 Servers and Clients are both capable of creating resources. Resources where multiple instances can exist contain a "Master Resource Identifier" or an "MRID", a 128 bit integer that is globally unique.
+As such, library users will require a way of reliably creating cryptographically unique MRIDs. One requirement of the MRIDs is that they contain a IANA Private Enterprise Number (PEN) in the least significant 32 bits of the MRID.
 
-\subsubsection{Testing YaSerde}
+For that reason, we provide users of our library with a function with the signature \texttt{fn mrid\_gen(pen\_id: u32) -> MRIDType} that produces a new MRID each time it's called.
+
+IEEE 2030.5 provides the requirement that MRIDs are sufficiently cryptographically unique, where the risk of an MRID collision is minimised. The EPRI C implementation defines an algorithm for generating MRIDs that ensures, at the very minimum, that two MRIDs produced by a single instance of the program will never collide, by use of a global, mutable, atomic integer that increments each ID. Since EPRI was able to release their MRID generation algorithm as part of their library, we assume it's sufficient, and implement a very similar algorithm in Rust.
+
+\begin{figure}[H]
+    \begin{center}
+        \begin{lstlisting}
+            static MRID_COUNT: AtomicU32 = AtomicU32::new(0);
+
+            fn mrid_gen(pen_id: u32) -> MRIDType {
+                let id: u128 = /* Generate Random u128 */
+                let time: u128 = /* Get Unix Timestamp */
+                let count: u128 = /* Fetch and increment MRID_COUNT */
+                HexBinary128((time << 32) 
+                            | (id << 32) | (count << 32) 
+                            | pen_id as u128)
+            }
+        \end{lstlisting}
+        \label{fig:mridgenalgo}
+        \caption{Our implementation of an MRID generator, inspired by EPRI's.}
+    \end{center}
+\end{figure}
+
+
+Going forward, it would be ideal to calculate the possibility of a global collision with this algorithm, as to verify that is is sufficiently cryptographically unique, however, this is out of scope of this thesis.
+
+Regardless, we do of course provide unit tests for this functionality. We provide a test verifying that the PEN ID can be obtained from a given MRID, and that there are no collisions when generating several million MRIDs on a single instance of the program. This is to be expected, as we use include a global, mutable counter in the final value.
+
+\subsection{Testing}
+\texttt{sep2\_common} is developed alongside a suite of tests, ensuring all resources can be serialised and deserialised, and that their XML representations adhere to IEEE 2030.5.
+
+\subsubsection{Testing SEPSerde}
 As expected, by the nature of serialisation and deserialisation, we have no compile time guarantees either will succeed for a given data type.
 Therefore, our first test suite for the common library is to test that all data types can be serialized \& deserialized successfully, and that it can be done without any data loss.
 
@@ -514,10 +544,10 @@ Therefore, our first test suite for the common library is to test that all data 
     \begin{center}
         \begin{lstlisting}
             #[test]
-            fn list_serde() {
+            fn default_List() {
                 let orig = List::default();
-                let new: List = from_str(&to_string_with_config(&orig, &YASERDE_CFG).unwrap()).unwrap();
-                assert_eq!(orig,new)
+                let new: List = deserialize(&serialize(&orig).unwrap()).unwrap();
+                assert_eq!(orig, new);
             }
         \end{lstlisting}
         \label{fig:yaserdetest}
@@ -531,16 +561,11 @@ This test takes advantage of the fact that all our resources are able to automat
 In Figure 5.7, we first perform this default instantiation, convert the resource to an XML string, and then convert the XML string back into our internal List representation. 
 Finally, we check if the newly deserialized resource is equal to it's default.
 
-For each resource, the only part of this test that differs is the name of the type, making this test suite a very reasonable automation.
-Not only will this inform of us any bugs or issues in YaSerde that lead to data loss, it will also inform us of any limitations of YaSerde, in terms of things it can and cannot serialize/deserialize.
-Furthermore, as we make changes to our YaSerde fork, this test suite will inform us of any regressions.
+For each resource, the only part of this test that differs is the name of the type. As such, we auto-generate it and include it in the common library.
 
-However, this test suite is not capable of testing for resource serialization correctness; whether or not the outputted XML conforms to the specification. 
-
-\subsubsection{Unit Tests}
-The remainder of the common library will be tested using manually written unit tests.
-A set of these unit tests will test whether resource serialization matches that of the specification using the provided example outputs, whilst others will ensure the network and security interfaces are correct.
-These unit tests are paramount when working with our Rust crate dependencies, as they can be used to test for regressions if and when we choose to update them.
+\subsubsection{XML Correctness}
+The remainder of the common library will be tested using manually written unit tests that test whether our XML representations of resources are correct with respect to IEEE 2030.5
+These unit tests use the example XML resources provided as part of IEEE 2030.5, as they are more likely to be correct than resources we would write by hand.
 
 \section{Client Library}
 Despite the claim that we are developing an IEEE 2030.5 client, in reality, the goal of this thesis is to produce a client library, such that manufacturers of IEEE 2030.5 complaint devices will extend upon our client.
