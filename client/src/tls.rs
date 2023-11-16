@@ -169,6 +169,11 @@ pub fn check_device_cert(cert_path: impl AsRef<Path>) -> Result<()> {
                     aki = true;
                 }
             }
+            ParsedExtension::SubjectKeyIdentifier(_) => {
+                if critical {
+                    bail!("SubjectKeyIdentifier cannot be critical")
+                }
+            }
             // All other extensions constitute an invalid certificate
             // TODO: This might need to be relaxed to allow for modifications
             _ => bail!("Unexpected extension or unparsed extension encountered."),
@@ -225,6 +230,11 @@ pub fn check_self_signed_client_cert(cert_path: impl AsRef<Path>) -> Result<()> 
                     bail!("KeyUsage extension must be critical.")
                 }
             }
+            ParsedExtension::SubjectKeyIdentifier(_) => {
+                if critical {
+                    bail!("SubjectKeyIdentifier cannot be critical")
+                }
+            }
             // All other extensions constitute an invalid certificate
             // TODO: This might need to be relaxed to allow for modifications
             _ => bail!("Unexpected extension or unparsed extension encountered."),
@@ -235,6 +245,64 @@ pub fn check_self_signed_client_cert(cert_path: impl AsRef<Path>) -> Result<()> 
     }
     if !certificate_policies {
         bail!("CertificatePolicies extension not present.")
+    }
+    Ok(())
+}
+
+pub fn check_ca(cert_path: impl AsRef<Path>) -> Result<()> {
+    let contents = std::fs::read(cert_path)?;
+    let (_rem, cert) = x509_parser::pem::parse_x509_pem(&contents)?;
+    let cert = cert.parse_x509()?;
+    let exts = cert.extensions();
+    let mut key_usage = false;
+    let mut certificate_policies = false;
+    let mut basic_constraints = false;
+    let mut ski = false;
+    for ext in exts {
+        let critical = ext.critical;
+        match ext.parsed_extension() {
+            ParsedExtension::CertificatePolicies(_) => {
+                if critical {
+                    certificate_policies = true;
+                } else {
+                    bail!("CertificatePolicies extension must be critical.")
+                }
+            }
+            ParsedExtension::KeyUsage(ku) => {
+                if critical && ku.crl_sign() && ku.key_cert_sign() {
+                    key_usage = true;
+                } else {
+                    bail!("KeyUsage extension must be critical and keyCertSign and crlSign must be true.")
+                }
+            }
+            ParsedExtension::BasicConstraints(bc) => {
+                if critical && bc.path_len_constraint.is_none() && bc.ca {
+                    basic_constraints = true;
+                } else {
+                    bail!("BasicConstraints must be critical, cA must be true, and pathLen must be absent.")
+                }
+            }
+            ParsedExtension::SubjectKeyIdentifier(_) => {
+                if critical {
+                    bail!("SubjectKeyIdentifier cannot be critical")
+                } else {
+                    ski = true;
+                }
+            }
+            _ => bail!("Unexpected extension or unparsed extension encountered."),
+        }
+    }
+    if !key_usage {
+        bail!("KeyUsage extension not present.")
+    }
+    if !certificate_policies {
+        bail!("CertificatePolicies extension not present.")
+    }
+    if !basic_constraints {
+        bail!("BasicConstraints extension not present.")
+    }
+    if !ski {
+        bail!("SubjectKeyIdentifier extension not present.")
     }
     Ok(())
 }
