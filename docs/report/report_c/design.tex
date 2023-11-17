@@ -137,3 +137,7 @@ Furthermore, as a general rule, we prioritise designing a highly generic interfa
 IEEE 2030.5 Resources can be communicated between clients \& servers as their EXI representations. EXI is a binary format for XML, aiming to be more efficient (Measured by number of bytes sent for the same payload, and computation required to decode) by sacrificing human readability. As of present, there exists no Rust library for producing EXI from XML or from Rust data types, and vice-versa.
 Developing a Rust EXI library fit for use in IEEE 2030.5 is a large enough of an undertaking to warrant it's own thesis, and as such, is not included in our implementation.
 
+\subsection{Rust Usability}
+A major constraint for potential users of our library is that they will need to have a strong understanding of the Rust programming language. Users will need to be be familiar with common design patterns when working with concurrent, asynchronous Rust code. This in of itself requires a solid understanding of how to write single-threaded Rust code.
+
+It will be unreasonably difficult for a programmer to develop an IEEE 2030.5 client as their first complete Rust program. 

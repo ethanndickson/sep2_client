@@ -625,8 +625,10 @@ An \texttt{OpenSSL} TLS configuration is generated when a IEEE 2030.5 Client, ca
     \item The IP address of the target IEEE 2030.5 server for this client instance.
     \item Path to a IEEE 2030.5 "Device Certificate" or "Self-Signed Client Certificate" \texttt{.pem} file.
     \item Path to the certificate's corresponding private key \texttt{.pem} file.
-    \item Path to a IEEE 2030.5 "Root certificate" \texttt{.pem} file. 
+    \item Path to a IEEE 2030.5 "Root certificate" (SERCA) \texttt{.pem} file. 
 \end{itemize}
+
+IEEE 2030.5 places one additional restriction on what certificate can be used in the Subscription / Notification mechanism, namely that "all hosts implementing server functionality SHALL use a device certificate".
 
 The relevant details on these certificate types are in IEEE 2030.5 \texttt{6.11.8.3.3}, \texttt{6.11.8.4.3} and \texttt{6.11.8.2}. We require the path to the CA to be supplied as to not require developers to install the CA on the system.
 
@@ -871,11 +873,99 @@ One way to implement this would be to use the asynchronous sleep functions provi
 
 Whilst our client library is primarily for use on servers operating under the client aggregation model, again, we do not want to limit use of the library to that model. IEEE 2030.5 refers to particular end-user energy devices as "sleepy devices", that have intermittent internet connections, and spend the majority of their time in modes of low power consumption. Should our implementation rely on asynchronous sleeps, we risk that, under specific cases, clients experience unnecessarily elongated intervals between polling.
 
-A naive implementation that addresses this would have each individual background task (one for each polled resource) wake intermittently, and check if it's time to poll their resource. This would be an unnecessary overhead of tasks repeatedly waking and sleeping.
+A naive implementation that addresses this would have each individual Tokio task (one for each polled resource) wake intermittently, and check if it's time to poll their resource. This would be an unnecessary overhead of tasks repeatedly waking and sleeping.
 
-Our final implementation uses a poll task queue, implemented using a binary heap that sorts tasks by their next scheduled poll time. Then, we use a single task that sleeps, and wakes intermittently to check if it is time to poll the resource at the top of the queue. Once that time arrives, the resource is polled and the stored user call-back is called with the result. The next time to poll on the poll task is then updated before pushing it to the back of the queue. This process is entirely asynchronous, if it is time to poll multiple resources, each request will be sent off without waiting for the previous to complete. 
+Our final implementation uses a poll job queue, implemented using a binary heap that sorts jobs by their next scheduled poll time. Then, we use a single Tokio task that sleeps, and wakes intermittently to check if it is time to poll the resource at the top of the queue. Once that time arrives, the resource is polled and the stored user call-back is called with the result. The next time to poll on the poll task is then updated before pushing the job to the back of the queue. This process is entirely asynchronous, if it is time to poll multiple resources, each request will be sent off without waiting for the previous to complete. 
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            type PollHandler =
+                Box<dyn Fn() 
+                    -> Pin<Box<dyn Future<Output = ()> 
+                    + Send + 'static>> 
+                    + Send + Sync + 'static>;
+
+            struct PollJob {
+                handler: PollHandler,
+                interval: Duration,
+                next: Instant,
+            }
+
+            type PollQueue = Arc<Mutex<BinaryHeap<PollJob>>>;
+
+        \end{lstlisting}
+        \label{fig:pollimplds}
+        \vspace{-10pt}
+        \caption{Rust types used in implementing asynchronous resource polling}
+    \end{center}
+\end{figure}
+
+Figure 6.26 shows the data structures guiding our implementation. A \texttt{PollHandler} is simply an async function that takes zero arguments, and returns nothing. This function contains the user-supplied callback within. A \texttt{PollJob} couples this function with the poll rate duration and the timestamp at which the next poll should occur.
+\texttt{PollQueue} is a thread-safe Binary Heap of these \texttt{PollJob} instances, sorted by their next poll timestamp.
+
 
 \subsection{Subscription / Notification}
+The second method IEEE 2030.5 defines for receiving updates to Resources is via Subscription / Notification.
+Using this mechanism, a client runs it's own lightweight HTTP server, with predefined routes that servers POST updated resources to. Clients notify servers of these routes by first POSTing a Subscription resource, where they set the \texttt{notificationURI} field to an absolute URI.
+
+\subsubsection{Interface}
+This mechanism is optional, and runs irrespective of an instance of a client capable of making HTTP requests. Therefore, we provide users with the \texttt{ClientNotifServer} type, which can be instantiated much like a client.
+
+To instantiate a \texttt{ClientNotifServer}, a developer must provide:
+
+\begin{itemize}
+    \item The IP address and port the server will listen on for TCP connections.
+    \item Path to a IEEE 2030.5 "Device Certificate" \texttt{.pem} file.
+    \item Path to the certificate's corresponding private key \texttt{.pem} file.
+    \item Path to a IEEE 2030.5 "Root certificate" (SERCA) \texttt{.pem} file. 
+\end{itemize}
+
+Once created, library users can add routes to the server by specifying the relative path to listen on, and an appropriate callback. In this case, a callback is a function that accepts one argument, a \texttt{Notification<T>}, where \texttt{T} is some resource, and returns a \texttt{SEPResponse}, the same type discussed in 6.2.4. The SEPResponse returned is constructed into an appropriate HTTP response, and then returned.
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            async fn incmg_dera(notif: Notification<DERAvailability>)
+                 -> SEPResponse {
+                println!("DERAvailability Received: {:?}", notif);
+                SEPResponse::NoContent
+            }
+        \end{lstlisting}
+        \label{fig:notiffn}
+        \vspace{-10pt}
+        \caption{Example callback function for use by the \texttt{ClientNotifServer}}
+    \end{center}
+\end{figure}
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            let server = ClientNotifServer::new(
+                "127.0.0.1:1338",
+                "client_cert.pem",
+                "client_private_key.pem",
+                "serca.pem"
+            )?
+            .add("/dera", incmg_dera)
+            .add("/txtmsg,| notif: Notification<TextMessage> | {
+                println!("Message Received: {:?}", notif);
+                async move { SEPResponse::NoContent }
+            }).run(signal::ctrl_c()).await;
+        \end{lstlisting}
+        \label{fig:notifroutes}
+        \vspace{-10pt}
+        \caption{Example instantiation and route creation on a \texttt{ClientNotifServer}}
+    \end{center}
+\end{figure}
+
+Figure 6.27 shows an implementation of a function that can be used to as a route callback. In this case, the callback will have the server respond with \texttt{HTTP 204 No Content}. Figure 6.28 shows this function used as the callback for HTTP requests on the "/dera" route. The same figure shows how a closure with an appropriate function signature can be used, and also how the server can be run. 
+The run function accepts an optional generic argument, an event that completes in the future, that can be used to end the server. In this example we provide it with a Tokio \texttt{SIGINT} (CTRL+C) signal handler. Upon receiving that signal, the server will attempt a graceful shutdown.
+
+\subsubsection{Ergonomics}
+Using the same exact method used in implementing Polling Callbacks, we place as few restrictions on the user of our Subscription / Notification mechanism. We allow users to implement a callback via a manual trait implementation, or by any function or closure with a matching function signature.
+
+\subsubsection{Internals}
 
 \subsection{Time}
 
