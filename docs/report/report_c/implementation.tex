@@ -520,9 +520,9 @@ IEEE 2030.5 provides the requirement that MRIDs are sufficiently cryptographical
                 let id: u128 = /* Generate Random u128 */
                 let time: u128 = /* Get Unix Timestamp */
                 let count: u128 = /* Fetch and increment MRID_COUNT */
-                HexBinary128((time << 32) 
-                            | (id << 32) | (count << 32) 
-                            | pen_id as u128)
+                HexBinary128(
+                    time << 32 | id << 32 | 
+                    count << 32 | pen_id as u128)
             }
         \end{lstlisting}
         \label{fig:mridgenalgo}
@@ -594,6 +594,7 @@ To communicate with IEEE 2030.5 servers using HTTP we use the Rust \texttt{hyper
 
 \subsubsection{TCP}
 Clients and servers using HTTP/1.1 must use TCP. The most sensible approach to implementing TCP is to wrap the target operating system's sockets library. This is done for us by the Rust standard library.
+Additional, when instantiating the client, users can set a TCP keepalive duration value, that will then be passed to \texttt{hyper}.
 
 \subsection{Security}
 The security function set of IEEE 20305 involves "securing transactions between clients and servers" via HTTP over TLS, or more commonly referred to as HTTPS. IEEE 2030.5 mandates a variation of TLS, mTLS, be used. mTLS provides a mechanism for mutually authenticating clients and servers. 
@@ -657,9 +658,128 @@ Additionally, we provide an interface for library users to verify that the provi
     \end{center}
 \end{figure}
 
-We distinguish between IEEE 2030.5 'device certificates', and 'self signed client certificates', as they have different requirements. Furthermore, the Subscription / Notification mechanism forbids the use of the latter.
+We distinguish between IEEE 2030.5 'device certificates', and 'self signed client certificates', as they have different requirements. The Subscription / Notification mechanism, as discussed later, forbids the use of the latter.
 
 \subsection{Core Client Functionality}
+The core functionality of our IEEE 2030.5 client library is providing users with an interface for interacting with IEEE 2030.5 servers - creating and sending HTTP requests.
+Our interface uses Rust's type system to ensure the contents of POST and PUT requests contain valid Resources, and that the contents of Responses to client GET requests also contain valid XML resources.
+
+For all outgoing requests, our library also ensures spec adherence in terms of required HTTP headers. 
+
+\begin{itemize}
+    \item GET requests contain an \texttt{Accept} header, specifying that the body of the response should be \texttt{application/sep+xml}.
+    \item PUT and POST requests contain appropriately set \texttt{Content-Length} and \texttt{Content-Type} headers.
+    \item All outgoing requests also include the required date header, formatted as specified in RFC 7231, with appropriate accommodations for the Time function set. \cite{rfc7231}
+\end{itemize}
+
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            async fn get<R: SEResource>(&self, path: &str) 
+                -> Result<R>;
+            async fn post<R: SEResource>(&self, path: &str, resource: &R) 
+                -> Result<SEPResponse>;
+            async fn put<R: SEResource>(&self, path: &str, resource: &R) 
+                -> Result<SEPResponse>;
+            async fn delete(&self, path: &str) 
+                -> Result<SEPResponse>;
+        \end{lstlisting}
+        \label{fig:clientrequestinterface}
+        \vspace{-10pt}
+        \caption{Our interface for the core client functionality}
+    \end{center}
+\end{figure}
+
+Once a client is instantiated, Figure 6.20 shows the functions operating on an instance of a client (\texttt{\&self}) for making requests. A generic \texttt{<R: SEResource>} parameter on these function signatures requires that the library user specify the type provided, as to determine how to serialise and deserialise, but Rust can infer this from the context. 
+
+For all these functions we automate error handling on behalf of the library user. Without knowing exact client use cases it's difficult to determine what level of error transparency they will require. As such, we make some assumptions on what information is and isn't useful.
+
+\begin{itemize}
+    \item For GET requests, we return an error if the request could not be made for any reason OR if the returned Resource body could not be deserialised into the provided type successfully.
+    \item For POST, PUT and DELETE we only return an error if the actual request failed to send, or if there was no response from the server. In all other cases a value of the SEPResponse enum is returned.
+\end{itemize}
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            enum SEPResponse {
+                /// HTTP 201 w/ Location header value, if it exists
+                /// 2030.5-2018 - 5.5.2.4
+                Created(Option<String>),
+                /// HTTP 204
+                /// 2030.5-2018 - 5.5.2.5
+                NoContent,
+                /// HTTP 400 
+                /// 2030.5-2018 - 5.5.2.9
+                BadRequest(Option<Error>),
+                /// HTTP 404 
+                /// 2030.5-2018 - 5.5.2.11
+                NotFound,
+                /// HTTP 405 w/ Allow header value 
+                /// 2030.5-2018 - 5.5.2.12
+                MethodNotAllowed(String),
+            }
+        \end{lstlisting}
+        \label{fig:sepresponse}
+        \vspace{-10pt}
+        \caption{Definition of the SEPResponse enum.}
+    \end{center}
+\end{figure}
+
+Of special note, in Figure 6.21, is the \texttt{HTTP 400 Bad Request} SEPResponse. Per IEEE 2030.5, servers responding with \texttt{HTTP 400} will return an XML representation of an Error resource in the response body. When this occurs, our library will attempt to deserialise the error resource, and return it to the user. If that fails, the SEPResponse enum indicates it's absence using the Rust option type.
+
+The IEEE 2030.5 successful request cases that can be returned are \texttt{201 Created} and \texttt{204 No Content}. Since the specification requires that \texttt{HTTP 201} responses contain an appropriate location header, we include that in the SEPResponse Created enum variant. The sam can be said for \texttt{HTTP 405 Method Not Allowed}, where servers must include an \texttt{Allow} header as part of the response, which we also include in our \texttt{MethodNotAllowed} variant.
+
+Currently, this isn't exhaustive, though it most importantly includes all the successful request cases. For the vast majority of use cases, this abstraction is sufficient. As part of our code release, we'll make library users aware of these deficiencies, and provide them with a plan for future enhancements.
+
+In section TODO we discuss a design flaw with this current implementation, and why this interface might need to be adjusted going forward. In section TODO we discuss how we'll be able to improve the core client functionality, as a result of improvements to libraries in the Rust ecosystem.
+
+\subsubsection{Event Response Interface}
+
+Additionally, our library provides convenience functions for creating and sending response resources when given an event resource, with checks to ensure the provided response status matches up with that of the \texttt{ResponseRequired} field, and the requirements of the specific function set.  As we'll discuss, the use of these are primarily automated via our Event schedules, however we provide them for library users for completeness.
+
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            async fn send_der_response(
+                &self,
+                lfdi: HexBinary160,
+                event: &DERControl,
+                status: ResponseStatus,
+                time: SEPTime,
+            ) -> Result<SEPResponse>;
+
+            async fn send_drlc_response(
+                &self,
+                device: &SEDevice,
+                event: &EndDeviceControl,
+                status: ResponseStatus,
+                time: SEPTime,
+            ) -> Result<SEPResponse>;
+
+            async fn send_pricing_response(
+                &self,
+                lfdi: HexBinary160,
+                event: &TimeTariffInterval,
+                status: ResponseStatus,
+                time: SEPTime,
+            ) -> Result<SEPResponse>;
+
+            async fn send_msg_response(
+                &self,
+                lfdi: HexBinary160,
+                event: &TextMessage,
+                status: ResponseStatus,
+                time: SEPTime,
+            ) -> Result<SEPResponse>;
+        \end{lstlisting}
+        \label{fig:sendresponsefunc}
+        \vspace{-10pt}
+        \caption{Our interface for creating and sending response resources.}
+    \end{center}
+\end{figure}
 
 \subsection{Resource Polling}
 
