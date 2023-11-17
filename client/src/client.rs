@@ -447,7 +447,7 @@ impl Client {
     }
 
     /// Forcibly poll & run the callbacks of all routes polled using [`Client::start_poll`]
-    pub async fn force_poll(&self) {
+    pub async fn force_polls(&self) {
         let mut polls = self.polls.lock().await;
         while polls.peek().is_some() {
             // unwrap trivially safe
