@@ -193,7 +193,7 @@ where
 type PollHandler =
     Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + Sync + 'static>;
 
-struct PollTask {
+struct PollJob {
     handler: PollHandler,
     interval: Duration,
     // Since poll intervals are duration based,
@@ -201,7 +201,7 @@ struct PollTask {
     next: Instant,
 }
 
-impl PollTask {
+impl PollJob {
     /// Run the stored handler, and increment the `next` Instant
     async fn execute(&mut self) {
         tokio::spawn((self.handler)());
@@ -209,27 +209,27 @@ impl PollTask {
     }
 }
 
-impl PartialEq for PollTask {
+impl PartialEq for PollJob {
     fn eq(&self, other: &Self) -> bool {
         self.next == other.next
     }
 }
 
-impl Eq for PollTask {}
+impl Eq for PollJob {}
 
-impl PartialOrd for PollTask {
+impl PartialOrd for PollJob {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for PollTask {
+impl Ord for PollJob {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.next.cmp(&other.next).reverse()
     }
 }
 
-type PollQueue = Arc<Mutex<BinaryHeap<PollTask>>>;
+type PollQueue = Arc<Mutex<BinaryHeap<PollJob>>>;
 
 /// Represents an IEEE 2030.5 Client connection to a single server
 ///
@@ -438,7 +438,7 @@ impl Client {
             }
         });
         let interval = Duration::from_secs(poll_rate as u64);
-        let poll = PollTask {
+        let poll = PollJob {
             handler: new,
             interval,
             next: Instant::now() + interval,
