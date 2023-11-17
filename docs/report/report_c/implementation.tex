@@ -573,6 +573,13 @@ These tests use the example XML resources provided as part of IEEE 2030.5 as a s
 \section{Client Library}
 The client library, \texttt{sep2\_client}, contains the remainder of our implementation, and provides an interface for interacting with IEEE 2030.5 servers, as well as interfaces for handling Event resources, the Time function set, and an implementation of the Subscription / Notification mechanism. 
 
+\subsection{Event-driven Architecture}
+As mentioned, our client library is an I/O bound application, and uses async Rust to most efficiently make use of available resources. async Rust is runtime-agnostic, and must be connected to an executor of asynchronous tasks. In order to make the most of that runtime, asynchronous functions capable of yielding, are to be used in placed of standard, blocking, functions, such as for I/O, or concurrency primitives.
+
+Our client library is therefore implemented using the \texttt{Tokio} runtime, the most popular Rust async runtime \cite{Tokio}. Tokio uses \texttt{epoll} on Linux, and provides asynchronous wrappers for Rust standard library I/O. Furthermore, being the most popular, it is the only runtime to be extended and provide the functionality we require for our Subscription / Notification function set. This is the \texttt{tokio\_openssl} crate.
+
+The Tokio runtime operates on the basis that we as developers create 'tasks' that yield to one another to make progress, even on a single OS thread. The Tokio runtime is then able to distribute these tasks across available operating system threads to best handle the current workload.
+
 \subsection{Application Support}
 In IEEE 2030.5, the Application Support function set is defined to include: \cite{2030}
 
@@ -585,7 +592,7 @@ In IEEE 2030.5, the Application Support function set is defined to include: \cit
 As such, this function set relies on a correct implementation of other standardised functionality. We choose to implement these standards by leveraging well-tested \& open-source implementations of HTTP, XML, and TCP.
 
 \subsubsection{XML}
-IEEE 2030.5 resources are serialised to XML via our \texttt{sep2\_common} crate, which depends on our \texttt{YaSerde} fork, \texttt{SEPSerde}. Internally, this uses the \texttt{xml-rs} crate, an XML parser \& writer \cite{xmlrs}. This library was chosen to due it's emphasis on specification adherence. In our research we found many competing libraries sacrifice correctness and completeness for performance, or are built for a specific usecase, and then no longer maintained. \cite{xmlrsperformance}
+IEEE 2030.5 resources are serialised to XML via our \texttt{sep2\_common} crate, which depends on our \texttt{YaSerde} fork, \texttt{SEPSerde}. Internally, this uses the \texttt{xml-rs} crate, an XML parser \& writer \cite{xmlrs}. This library was chosen to due it's emphasis on specification adherence. In our research we found many competing libraries sacrifice correctness and completeness for performance, or are built for a specific use case, and then no longer maintained. \cite{xmlrsperformance}
 
 Going forward, it may be worthwhile to explore alternative XML libraries that can be substituted into \texttt{SEPSerde} with the goal of improving XML parsing and writing performance. 
 
@@ -782,6 +789,91 @@ Additionally, our library provides convenience functions for creating and sendin
 \end{figure}
 
 \subsection{Resource Polling}
+IEEE 2030.5 defines two methods by which clients can receive updates to resources. One of those methods is via polling, where clients make GET requests on a regular interval.
+
+\subsubsection{Interface}
+We provide users with an abstraction for easily creating these regularly occurring poll events.
+
+This abstraction is provided by any instantiated client capable of making requests.
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            async fn start_poll<T: SEResource>(
+                &self,
+                path: impl Into<String>,
+                poll_rate: Option<Uint32>,
+                callback: impl PollCallback<T>,
+            );
+            async fn force_polls(&self);
+            async fn cancel_polls(&self);
+        \end{lstlisting}
+        \label{fig:pollinterface}
+        \vspace{-10pt}
+        \caption{Our interface for creating and sending response resources.}
+    \end{center}
+\end{figure}
+
+Figure 6.23 shows this interface. \texttt{start\_poll} is given a URI relative to the absolute server URI and a callback, and polls the resource at the given poll rate, or the IEEE 2030.5 default rate of 15 minutes. Each interval, it performs a GET request, and provides the deserialised resource to the callback. Since this is an automated background task, users will only be notified of request failures via the logging API we interact with. Ideally, they would only start polling a route once they know it's valid.
+Additionally, we provide a function for forcibly polling all tasks in the queue, and a function for cancelling all resource polling. Library users may want to forcibly poll al resources in the event they were operating without internet, and have regained connection. Library users may want to cancel all poll tasks when attempting a graceful shutdown, or when acting as a client aggregator, no longer aggregating on behalf of a specific client. 
+
+One flaw with this design is that users cannot implement any form of error handling logic for when a retrieval fails. This is discussed further in section TODO.
+
+\subsubsection{Ergonomics}
+When implementing this interface, we take into consideration it's ergonomics. Thus, we provide two ways for users to implement a polling callback.
+
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            trait PollCallback<T: SEResource>: Clone + Send + Sync + 'static {
+                async fn callback(&self, resource: T);
+            }
+        \end{lstlisting}
+        \label{fig:polltrait}
+        \vspace{-10pt}
+        \caption{A Rust trait representing the behaviour of a Poll callback.}
+    \end{center}
+\end{figure}
+
+The first method allows user to implement the trait in Figure 6.24 on a type, and then pass an instance of taht ype when starting the poll.
+This is useful when users have some thread-safe mutable state they want to share between all poll tasks, as they can implement handlers for multiple resources on a type, and then pass the same underlying instance of the type to multiple poll handlers, and thus access that state in each handler.
+
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            impl<F, R, T: SEResource> PollCallback<T> for F
+            where
+                F: Fn(T) -> R + Send + Sync + Clone + 'static,
+                R: Future<Output = ()> + Send + 'static,
+            {
+                async fn callback(&self, resource: T) {
+                    Box::pin(self(resource)).await
+                }
+            }            
+        \end{lstlisting}
+        \label{fig:pollimplgen}
+        \vspace{-10pt}
+        \caption{Rust code generating implementations of the PollCallback trait for all applicable functions.}
+    \end{center}
+\end{figure}
+
+The second method uses the Rust language feature that allows us to generate implementations of a Rust trait for all types that meet certain conditions. In Figure 6.25 we therefore implement the PollCallback trait for all async, single argument functions that accept a valid Resource, and return the unit type (no value).
+This allows both function pointers to be used, and any thread-safe closure that does not capture any references to it's environment that last less than the length of the program.
+
+The outcome of this is that we've produced an abstraction that places as few restrictions on the caller as possible.
+
+\subsubsection{Internals}
+When implementing this interface, we must address the performance of the client, and it's ability to operate at scale. Client aggregators must be able to handle polling many resources on behalf of many clients.
+
+One way to implement this would be to use the asynchronous sleep functions provided by \texttt{Tokio}, yielding a  task until the next scheduled poll time. Tokio tasks, while slept, have very minimal overhead. Unfortunately, Tokio sleeps, much like Rust's threaded sleeps, do not make progress while the device is slept. 
+
+Whilst our client library is primarily for use on servers operating under the client aggregation model, again, we do not want to limit use of the library to that model. IEEE 2030.5 refers to particular end-user energy devices as "sleepy devices", that have intermittent internet connections, and spend the majority of their time in modes of low power consumption. Should our implementation rely on asynchronous sleeps, we risk that, under specific cases, clients experience unnecessarily elongated intervals between polling.
+
+A naive implementation that addresses this would have each individual background task (one for each polled resource) wake intermittently, and check if it's time to poll their resource. This would be an unnecessary overhead of tasks repeatedly waking and sleeping.
+
+Our final implementation uses a poll task queue, implemented using a binary heap that sorts tasks by their next scheduled poll time. Then, we use a single task that sleeps, and wakes intermittently to check if it is time to poll the resource at the top of the queue. Once that time arrives, the resource is polled and the stored user call-back is called with the result. The next time to poll on the poll task is then updated before pushing it to the back of the queue. This process is entirely asynchronous, if it is time to poll multiple resources, each request will be sent off without waiting for the previous to complete. 
 
 \subsection{Subscription / Notification}
 

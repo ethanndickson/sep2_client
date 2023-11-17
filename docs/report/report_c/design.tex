@@ -6,6 +6,8 @@ Given the context and background surrounding the IEEE 2030.5 protocol, we can be
 \subsection{Client Aggregation Model}
 Of great importance to our design is that we have developed a client library primarily for building client aggregators, the IEEE 2030.5 model preferred by electric utilities.
 
+Despite this being the case, we do not wish to make decisions that would directly impact the ability for our client library to be used under the individual / direct model, such as where our library runs on a lightweight Linux distribution in the consumer environment. Therefore, where possible, we design an implementation capable of operating under both. One example of this we'll discuss is support for IEEE 2030.5 "sleepy devices".
+
 \subsection{Security}
 Improving the security of end-user energy devices was a major motivator behind the development of IEEE 2030 and 2030.5. 
 
