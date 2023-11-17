@@ -455,7 +455,7 @@ where
     /// "If FunctionSetAssignments contain both Event-based function sets (e.g., DRLC, pricing, message) and a
     /// Time resource, then devices SHALL use the Time resource from the same FunctionSetAssignments when
     /// executing the events from the associated Event-based function set."
-    pub async fn update_time(&mut self, time: Time) {
+    pub fn update_time(&mut self, time: Time) {
         let offset = time.current_time.get() - i64::from(current_time());
         self.time_offset
             .store(offset, std::sync::atomic::Ordering::Relaxed);
