@@ -11,21 +11,17 @@ static TIME_OFFSET: AtomicI64 = AtomicI64::new(0);
 
 /// IEEE 2030.5 Representation of SystemTime
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
-pub struct SEPTime {
-    inner: SystemTime,
-}
+pub struct SEPTime(SystemTime);
 
 impl SEPTime {
     fn now() -> SEPTime {
-        SEPTime {
-            inner: SystemTime::now(),
-        }
+        SEPTime(SystemTime::now())
     }
 }
 
 impl From<SEPTime> for SystemTime {
     fn from(value: SEPTime) -> Self {
-        value.inner
+        value.0
     }
 }
 
@@ -44,7 +40,7 @@ impl From<SEPTime> for i64 {
 impl From<SEPTime> for u64 {
     fn from(value: SEPTime) -> Self {
         value
-            .inner
+            .0
             .duration_since(UNIX_EPOCH)
             .expect("Current time earlier than unix epoch")
             .as_secs()
@@ -59,9 +55,9 @@ impl std::ops::Add<i64> for SEPTime {
         // Duration cannot be negative, this branching is required
         let duration = Duration::from_secs(rhs.unsigned_abs());
         if sign.is_positive() {
-            self.inner += duration;
+            self.0 += duration;
         } else {
-            self.inner -= duration;
+            self.0 -= duration;
         }
         self
     }
