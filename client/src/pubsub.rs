@@ -1,6 +1,5 @@
 //! Subscription/Notification Function Set
 
-use ahash::RandomState;
 use anyhow::{Context, Result};
 use hyper::{server::conn::Http, service::service_fn, Body, Method, Request, Response};
 use openssl::ssl::Ssl;
@@ -10,7 +9,6 @@ use std::net;
 use std::path::Path;
 use std::{future::Future, net::SocketAddr, pin::Pin, sync::Arc};
 use tokio::net::TcpListener;
-use tokio::sync::Mutex;
 use tokio_openssl::SslStream;
 
 use crate::client::SEPResponse;
@@ -50,10 +48,8 @@ type RouteHandler = Box<
 >;
 
 struct Router {
-    // We use dashmap to allow for multiple concurrent lookups into the map.
-    // The map is never resized once the server is started, so it doesn't make sense to use a big lock.
-    // It's likely a NotifServer will never store segmented paths, so a hash lookup is acceptable.
-    routes: HashMap<String, Mutex<RouteHandler>, RandomState>,
+    // We use ahash::RandomState for performance, any additional hash safety of std::RandomState is useless
+    routes: HashMap<String, RouteHandler, ahash::RandomState>,
 }
 
 impl Router {
@@ -73,7 +69,6 @@ impl Router {
                         let body = req.into_body();
                         let bytes = hyper::body::to_bytes(body).await?;
                         let xml = String::from_utf8(bytes.to_vec())?;
-                        let func = func.lock().await;
                         Ok(hyper::Response::try_from(func(&xml).await)?)
                     }
                     _ => {
@@ -124,21 +119,27 @@ impl ClientNotifServer {
         T: SEResource,
     {
         let path = path.into();
-        let log_path = path.clone();
-        let new: RouteHandler = Box::new(move |e| {
-            let e = deserialize::<Notification<T>>(e);
-            match e {
-                Ok(resource) => {
-                    log::debug!("NotifServer: Successfully deserialized a resource on {log_path}");
-                    Box::pin(callback.callback(resource))
-                }
-                Err(err) => {
-                    log::error!("NotifServer: Failed to deserialize resource on {log_path}: {err}");
-                    Box::pin(async { SEPResponse::BadRequest(None) })
+        let new: RouteHandler = Box::new({
+            let log_path = path.clone();
+            move |e| {
+                let e = deserialize::<Notification<T>>(e);
+                match e {
+                    Ok(resource) => {
+                        log::debug!(
+                            "NotifServer: Successfully deserialized a resource on {log_path}"
+                        );
+                        Box::pin(callback.callback(resource))
+                    }
+                    Err(err) => {
+                        log::error!(
+                            "NotifServer: Failed to deserialize resource on {log_path}: {err}"
+                        );
+                        Box::pin(async { SEPResponse::BadRequest(None) })
+                    }
                 }
             }
         });
-        self.router.routes.insert(path, Mutex::new(new));
+        self.router.routes.insert(path, new);
         self
     }
 
@@ -179,10 +180,12 @@ impl ClientNotifServer {
             }
 
             // Bind connection to service
-            let router = router.clone();
-            let service = service_fn(move |req| {
-                let handler = router.clone();
-                async move { handler.router(req).await }
+            let service = service_fn({
+                let router = router.clone();
+                move |req| {
+                    let router = router.clone();
+                    async move { router.router(req).await }
+                }
             });
             set.spawn(async move {
                 if let Err(err) = Http::new().serve_connection(stream, service).await {

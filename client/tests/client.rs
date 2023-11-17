@@ -56,12 +56,14 @@ async fn basic_req() {
 async fn basic_poll() {
     let client = test_setup();
     let output: Arc<RwLock<Vec<DeviceCapability>>> = Arc::new(RwLock::new(vec![]));
-    let inner = output.clone();
     client
-        .start_poll("/dcap", Some(Uint32(4)), move |r: DeviceCapability| {
-            let out = inner.clone();
-            async move {
-                out.write().await.push(r);
+        .start_poll("/dcap", Some(Uint32(4)), {
+            let inner = output.clone();
+            move |r: DeviceCapability| {
+                let out = inner.clone();
+                async move {
+                    out.write().await.push(r);
+                }
             }
         })
         .await;
