@@ -403,35 +403,39 @@ impl Client {
     ) where
         T: SEResource,
     {
-        let client = self.clone();
-        let path: String = path.into();
         let poll_rate = poll_rate.unwrap_or(Self::DEFAULT_POLLRATE).get();
-        let new: PollHandler = Box::new(move || {
-            let path = path.clone();
-            let client = client.clone();
-            // Each time this closure is called, we need to produce a single future to return,
-            // that future includes our callback, so we need to clone it every invocation of the poll callback.
-            let callback = callback.clone();
-            Box::pin(async move {
-                match client.get::<T>(&path).await {
-                    Ok(rsrc) => {
-                        log::info!(
-                            "Client: Scheduled poll for Resource {} successful.",
-                            T::name()
-                        );
-                        callback.callback(rsrc).await;
-                    }
-                    Err(err) => {
-                        log::warn!(
+        let new: PollHandler = Box::new({
+            let client = self.clone();
+            let path: String = path.into();
+            move || {
+                Box::pin({
+                    let path = path.clone();
+                    let client = client.clone();
+                    // Each time this closure is called, we need to produce a single future to return,
+                    // that future includes our callback, so we need to clone it every invocation of the poll callback.
+                    let callback = callback.clone();
+                    async move {
+                        match client.get::<T>(&path).await {
+                            Ok(rsrc) => {
+                                log::info!(
+                                    "Client: Scheduled poll for Resource {} successful.",
+                                    T::name()
+                                );
+                                callback.callback(rsrc).await;
+                            }
+                            Err(err) => {
+                                log::warn!(
                             "Client: Scheduled poll for Resource {} at {} failed with reason {}. Retrying in {} seconds.",
                             T::name(),
                             &path,
                             err,
                             &poll_rate
                         );
+                            }
+                        };
                     }
-                };
-            })
+                })
+            }
         });
         let interval = Duration::from_secs(poll_rate as u64);
         let poll = PollTask {

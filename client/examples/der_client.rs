@@ -144,13 +144,16 @@ async fn setup_schedule(
         )
         .await
         .context("Failed to retrieve an initial instance of a DERProgramList")?;
-        let schedule = schedule.clone();
-        let client = client.clone();
-        tokio::spawn(async move {
-            while let Some(derpl) = rx.recv().await {
-                let _ = process_derpl_task(&client, schedule.clone(), derpl)
-                    .await
-                    .map_err(|e| log::warn!("Failed to process DERPL with reason: {e}"));
+
+        tokio::spawn({
+            let schedule = schedule.clone();
+            let client = client.clone();
+            async move {
+                while let Some(derpl) = rx.recv().await {
+                    let _ = process_derpl_task(&client, schedule.clone(), derpl)
+                        .await
+                        .map_err(|e| log::warn!("Failed to process DERPL with reason: {e}"));
+                }
             }
         });
     }
@@ -196,7 +199,6 @@ async fn main() -> Result<()> {
 
     // Create a Notificaton server listening on 1338
     // Make it listen for reading resources on "/reading"
-    let notif_state = state.clone();
     let notifs = ClientNotifServer::new(
         &format!("{}:{}", &args.notif_addr, &args.notif_port),
         &args.cert,
@@ -204,15 +206,18 @@ async fn main() -> Result<()> {
         &args.ca,
     )?
     // Example route that adds to some thread-safe state
-    .add("/reading", move |notif: Notification<Reading>| {
-        let notif_state = notif_state.clone();
-        async move {
-            match notif.resource {
-                Some(r) => {
-                    notif_state.write().await.insert::<ReadingResource>(r);
-                    SEPResponse::Created(None)
+    .add("/reading", {
+        let notif_state = state.clone();
+        move |notif: Notification<Reading>| {
+            let notif_state = notif_state.clone();
+            async move {
+                match notif.resource {
+                    Some(r) => {
+                        notif_state.write().await.insert::<ReadingResource>(r);
+                        SEPResponse::Created(None)
+                    }
+                    None => SEPResponse::BadRequest(None),
                 }
-                None => SEPResponse::BadRequest(None),
             }
         }
     })
