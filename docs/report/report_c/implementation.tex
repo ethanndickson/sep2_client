@@ -965,7 +965,40 @@ The run function accepts an optional generic argument, an event that completes i
 \subsubsection{Ergonomics}
 Using the same exact method used in implementing Polling Callbacks, we place as few restrictions on the user of our Subscription / Notification mechanism. We allow users to implement a callback via a manual trait implementation, or by any function or closure with a matching function signature.
 
+Our abstraction handles invalid HTTP requests, and responds accordingly, as per IEEE 2030.5, without any intervention.
+
 \subsubsection{Internals}
+To serve requests over HTTPS we once again use \texttt{OpenSSL} to generate a TLS config using the provided certificates and private key. To merge our TCP stream, created using a Tokio \texttt{TcpListener}, and our TLS configuration, into a single TLS Stream we require the \texttt{tokio\_openssl} crate \cite{tokioopenssl}. This stream can then be passed to \texttt{hyper} to serve the request.
+
+The rest of the implementation requires us to route incoming HTTP requests to the correct user-defined callback. The simple nature of the server, and lack of parametrized route names results in a straight-forward implementation.
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            type RouteHandler = Box<
+            dyn Fn(&str) -> Pin<Box<dyn Future<Output = SEPResponse>
+             + Send + 'static>>
+             + Send
+             + Sync
+             + 'static
+             >;
+
+            struct Router {
+                routes: HashMap<String, RouteHandler, ahash::RandomState>,
+            }
+
+        \end{lstlisting}
+        \label{fig:routerimpl}
+        \vspace{-10pt}
+        \caption{Rust types used in implementing a concurrent HTTP router}
+    \end{center}
+\end{figure}
+
+Figure 6.29 shows that our implementation uses a \texttt{HashMap} from strings (routes) to stored callbacks. 
+
+The default hashing algorithm chosen by Rust standard library sacrifices performance in order to defend against \texttt{HashDoS} attacks, as it uses an implementation of \texttt{SipHash}. Our router hashmap is never modified once the server is started, meaning we do not have to worry about \texttt{HashDoS} attacks. 
+
+Therefore, we use the hashing algorithm provided by \texttt{ahash}, which is significantly faster, yet less resistant to \texttt{HashDoS} attacks \cite{ahash} \cite{hashbrown}.
 
 \subsection{Time}
 

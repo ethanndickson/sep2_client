@@ -116,6 +116,8 @@ If the client was being developed in a dynamically typed programming language, o
 
 We therefore assume the single route usage is purely for the purpose of the example, and that in reality, client developers do not desire this functionality.
 
+We also assume that, due to the small subset of IEEE 2030.5 resources being subscribable, that parametrized HTTP routes are not required, and that all routes are simply a relative URI interpreted literally.
+
 \subsection{DNS-SD}
 IEEE 2030.5 states that a connection to a server can be established by specifying a specific IP address or hostname and port. In the event cannot be provided, the specification states that DNS-SD can be used to query a local network for servers, whilst providing clients with the ability to only query for servers advertising support for specific function sets. 
 
