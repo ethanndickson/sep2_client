@@ -4,7 +4,7 @@ use sep2_client::{
     pubsub::{ClientNotifServer, RouteCallback},
 };
 use sep2_common::packages::{dcap::DeviceCapability, edev::EndDevice, pubsub::Notification};
-use std::{future, time::Duration};
+use std::{convert::Infallible, future, time::Duration};
 
 fn test_setup() -> Client {
     Client::new_https(
@@ -44,7 +44,7 @@ async fn run_notif_server() {
     .add("/edev", |_: Notification<EndDevice>| async move {
         SEPResponse::Created(None)
     });
-    tokio::spawn(client.run(future::pending::<()>()));
+    tokio::spawn(client.run(future::pending::<Infallible>()));
     tokio::time::sleep(Duration::from_secs(4)).await;
 }
 

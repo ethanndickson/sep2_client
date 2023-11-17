@@ -1,14 +1,16 @@
 //! Subscription/Notification Function Set
 
+use ahash::RandomState;
 use anyhow::{Context, Result};
-use dashmap::DashMap;
 use hyper::{server::conn::Http, service::service_fn, Body, Method, Request, Response};
 use openssl::ssl::Ssl;
 use sep2_common::{deserialize, packages::pubsub::Notification, traits::SEResource};
+use std::collections::HashMap;
 use std::net;
 use std::path::Path;
 use std::{future::Future, net::SocketAddr, pin::Pin, sync::Arc};
 use tokio::net::TcpListener;
+use tokio::sync::Mutex;
 use tokio_openssl::SslStream;
 
 use crate::client::SEPResponse;
@@ -51,27 +53,27 @@ struct Router {
     // We use dashmap to allow for multiple concurrent lookups into the map.
     // The map is never resized once the server is started, so it doesn't make sense to use a big lock.
     // It's likely a NotifServer will never store segmented paths, so a hash lookup is acceptable.
-    routes: DashMap<String, RouteHandler>,
+    routes: HashMap<String, Mutex<RouteHandler>, RandomState>,
 }
 
 impl Router {
     fn new() -> Self {
         Router {
-            routes: DashMap::new(),
+            routes: HashMap::default(),
         }
     }
 
     async fn router(&self, req: Request<Body>) -> Result<Response<Body>> {
         let path = req.uri().path().to_owned();
-        match self.routes.get_mut(&path) {
-            Some(mut func) => {
+        match self.routes.get(&path) {
+            Some(func) => {
                 let method = req.method();
                 match method {
                     &Method::POST => {
                         let body = req.into_body();
                         let bytes = hyper::body::to_bytes(body).await?;
                         let xml = String::from_utf8(bytes.to_vec())?;
-                        let func = func.value_mut();
+                        let func = func.lock().await;
                         Ok(hyper::Response::try_from(func(&xml).await)?)
                     }
                     _ => {
@@ -117,7 +119,7 @@ impl ClientNotifServer {
     ///
     /// The `RouteCallback` trait can be implemented on any threadsafe type,
     /// however it is automatically implemented for any applicable 'Fn'
-    pub fn add<T>(self, path: impl Into<String>, callback: impl RouteCallback<T>) -> Self
+    pub fn add<T>(mut self, path: impl Into<String>, callback: impl RouteCallback<T>) -> Self
     where
         T: SEResource,
     {
@@ -136,7 +138,7 @@ impl ClientNotifServer {
                 }
             }
         });
-        self.router.routes.insert(path, new);
+        self.router.routes.insert(path, Mutex::new(new));
         self
     }
 
