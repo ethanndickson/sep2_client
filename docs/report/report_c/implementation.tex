@@ -996,7 +996,7 @@ The rest of the implementation requires us to route incoming HTTP requests to th
 
 Figure 6.29 shows that our implementation uses a \texttt{HashMap} from strings (routes) to stored callbacks. 
 
-The default hashing algorithm chosen by Rust standard library sacrifices performance in order to defend against \texttt{HashDoS} attacks, as it uses an implementation of \texttt{SipHash}. Our router hashmap is never modified once the server is started, meaning we do not have to worry about \texttt{HashDoS} attacks. 
+The default hashing algorithm chosen by Rust standard library sacrifices performance in order to defend against \texttt{HashDoS} attacks, as it uses an implementation of \texttt{SipHash}. Our router hashmap is never modified once the server is started, and therefore any DOS attacks on a client notification server instance would not be mitigated by a more secure hashing algorithm.
 
 Therefore, we use the hashing algorithm provided by \texttt{ahash}, which is significantly faster, yet less resistant to \texttt{HashDoS} attacks \cite{ahash} \cite{hashbrown}.
 
@@ -1048,6 +1048,83 @@ For per event function set time synchronisation, a similar interface is present 
 \end{figure}
 
 \subsection{Event Schedules}
+In IEEE 2030.5 some function sets employ the use of Event resources, resources that include a start timestamp, and a duration for which they are active. These event resources are exposed to clients with the intention they take specific action during that interval. Servers have the ability to cancel those events by updating them, and supersede these events by exposing new ones, at any time. Clients communicate with servers about these Event resources by creating and sending Response resources. 
+
+An exhaustive list of function sets utilising Event resources are:
+
+\begin{itemize}
+    \item Distributed Energy Resources
+    \item Demand Response and Load Control
+    \item Messaging
+    \item Pricing
+    \item Flow Reservation
+\end{itemize}
+
+\subsubsection{Interface}
+
+For each of these function sets (excl. Flow Reservation) we produce a \texttt{Schedule} abstraction that acts as a black-box handler of events. It accepts instances of Event resources and whenever an event starts, ends, or is cancelled or superseded whilst active, the schedule calls the defined callback such that the client can apply the event to the relevant device(s), and determine the Response resource status to return to the server. In many cases, such as when resources are cancelled before starting, the client need not be informed, and the schedule is instead capable of determining the correct response status itself, and creating and sending it automatically.
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            trait Scheduler<E: SEEvent, H: EventHandler<E>> {
+                type Program;
+
+                fn new(
+                    client: Client,
+                    device: Arc<RwLock<SEDevice>>,
+                    handler: Arc<H>,
+                    tickrate: Duration,
+                ) -> Self;
+
+                async fn add_event(&mut self, 
+                                   event: E, program:
+                                   &Self::Program, 
+                                   server_id: u8);
+            }
+        \end{lstlisting}
+        \label{fig:schedulertrait}
+        \vspace{-10pt}
+        \caption{Definition of the Scheduler trait}
+    \end{center}
+\end{figure}
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            fn update_time(&mut self, time: Time);
+            fn shutdown(&mut self);
+        \end{lstlisting}
+        \label{fig:schedulerimpl}
+        \vspace{-10pt}
+        \caption{Interface common to all schedules}
+    \end{center}
+\end{figure}
+
+Figure 6.32 and 6.33 show the interface common to all schedules.
+
+% TODO
+
+
+\subsubsection{Ergonomics}
+To instantiate a Schedule, library users must first define an \texttt{EventHandler} trait implementation for a specific Event resource.
+
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
+                async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus;
+            }
+        \end{lstlisting}
+        \label{fig:schedulertrait}
+        \vspace{-10pt}
+        \caption{Definition of the Scheduler trait}
+    \end{center}
+\end{figure}
+
+% TODO
+
 
 \subsection{Logging}
 
