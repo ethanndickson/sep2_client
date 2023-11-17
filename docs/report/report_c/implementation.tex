@@ -1001,6 +1001,51 @@ The default hashing algorithm chosen by Rust standard library sacrifices perform
 Therefore, we use the hashing algorithm provided by \texttt{ahash}, which is significantly faster, yet less resistant to \texttt{HashDoS} attacks \cite{ahash} \cite{hashbrown}.
 
 \subsection{Time}
+All IEEE 2030.5 clients must implement the Time function set. They must be able to use the current time to set HTTP date headers, update last modified timestamps, and check if a given Event resource has started or ended. Clients must be able to synchronise their device time with that of an IEEE 2030.5 server. This is done by having Servers expose Time resources, and having clients use that Time resource to create all timestamps. In the case there are multiple servers exposing time resources, the specification allows Clients to choose just one Time resource, with the most accurate time, and synchronise using that.
+
+The exception to this are event schedules: "... devices SHALL use the Time resource from the same FunctionSetAssignments when executing the events from the associated Event-based function set." \cite{IEEE2030.5}.
+
+\subsubsection{Interface}
+Our client library must provide a generic abstraction that allows developers to synchronise time globally, and per event function set.
+
+Throughout IEEE 2030.5 Client development, timestamps are required in a variety of formats. To provide a convenient interface for converting between these formats, we provide users with a \texttt{SEPTime} abstraction, that wraps the existing Rust native \texttt{SystemTime}, and represents a single timestamp that can be compared. \texttt{SEPTime} can be converted into:
+
+\begin{itemize}
+    \item A Rust \texttt{u64} for internal comparisons.
+    \item An IEEE 2030.5 \texttt{Int64} for Resource fields and attributes
+    \item An RFC 7231 HTTP Timestamp String via SystemTime
+\end{itemize} 
+
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            fn current_time() -> SEPTime;
+            
+            fn current_time_with_offset() -> SEPTime
+            
+            fn update_time_offset(time: Time);
+        \end{lstlisting}
+        \label{fig:timeinterface}
+        \vspace{-10pt}
+        \caption{Time function set interface}
+    \end{center}
+\end{figure}
+
+Figure 6.30 details the interface we provide. Users can supply a Time resource to \texttt{update\_time\_offset} and update the global time offset. All future calls to \texttt{current\_time\_with\_offset} will then be synchronised with that specific Time resource.
+
+For per event function set time synchronisation, a similar interface is present on Event schedules (Figure 6.31). Schedules can be provided a Time resource that will be used to determine the start and end time stamps of all events for that function set, as well as the HTTP Date header of automated schedule HTTP requests.
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            fn update_time(&mut self, time: Time);
+        \end{lstlisting}
+        \label{fig:eventtime}
+        \vspace{-10pt}
+        \caption{Function operating on an instance of a Schedule for synchronising time.}
+    \end{center}
+\end{figure}
 
 \subsection{Event Schedules}
 
