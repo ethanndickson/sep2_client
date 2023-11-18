@@ -25,14 +25,14 @@ IEEE 2030.5 is a specification with a wide range of applications. It aims to pro
 For this reason, instead of developing any single binary application, we've instead designed and implemented a series of Rust libraries (called 'Crates'), for use by developers to allow them to develop IEEE 2030.5 compliant software, providing them with an abstraction for interacting with IEEE 2030.5 servers and resources.
 
 \subsubsection{XML Serialisation \& Deserialisation Library: \- SEPSerde}
-As we've established, resources can be communicated between clients and servers as their XML representations. This means we require the ability to serialize \& deserialize Rust data types to and from XML.
+As we've established, resources can be communicated between clients and servers as their XML representations. This means we require the ability to serialise \& deserialise Rust data types to and from XML.
 Fortunately, there already exists a popular Rust crate for this purpose, built for use in embedded communication protocols, called \texttt{YaSerde} \cite[]{YaSerde}.
 
 However, this library does not perfectly fit IEEE 2030.5 requirements. To address this, we have forked YaSerde, and developed a crate \texttt{SEPSerde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to IEEE 2030.5.
 Note that we are yet to complete the renaming of this library, in all code snippets the library will still be referred to as \texttt{YaSserde}.
 
 \subsubsection{Common Library: \- sep2\_common}
-IEEE 2030.5 resources are required for use in both clients and servers. For that reason, we've developed a common library with a Rust implementation of the IEEE 2030.5 XSD, whilst including our \texttt{SEPSerde} crate as to allow these resources to be serialized and deserialized to and from XML.
+IEEE 2030.5 resources are required for use in both clients and servers. For that reason, we've developed a common library with a Rust implementation of the IEEE 2030.5 XSD, whilst including our \texttt{SEPSerde} crate as to allow these resources to be serialised and deserialised to and from XML.
 
 This common library, \texttt{sep2\_common}, can then be easily integrated and implemented in a future 2030.5 server implementation, as to avoid resources being implemented and stored differently on either. 
 For the sake of modularity, and to avoid unnecessarily large binaries when compiled, this crate comes complete with compile-time flags (called Crate 'features') for each of the resource packages in IEEE 2030.5, where packages correspond to function sets.
@@ -142,4 +142,4 @@ Developing a Rust EXI library fit for use in IEEE 2030.5 is a large enough of an
 \subsection{Rust Usability}
 A major constraint for potential users of our library is that they will need to have a strong understanding of the Rust programming language. Users will need to be be familiar with common design patterns when working with concurrent, asynchronous Rust code. This in of itself requires a solid understanding of how to write single-threaded Rust code.
 
-It will be unreasonably difficult for a programmer to develop an IEEE 2030.5 client as their first complete Rust program.
+It would be very difficult for a programmer to develop an IEEE 2030.5 client as their first complete Rust program.
