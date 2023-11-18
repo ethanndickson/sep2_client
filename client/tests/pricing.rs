@@ -5,7 +5,7 @@ use std::{sync::Arc, time::Duration};
 use sep2_client::{
     client::Client,
     device::SEDevice,
-    event::{EIStatus, EventHandler, EventInstance, Schedule, Scheduler},
+    event::{EIStatus, EventCallback, EventInstance, Schedule, Scheduler},
     time::current_time,
 };
 use sep2_common::{
@@ -22,8 +22,8 @@ use sep2_common::{
 use tokio::sync::RwLock;
 
 fn test_setup() -> (
-    Schedule<TimeTariffInterval, TimeTariffIntervalHandler>,
-    Arc<TimeTariffIntervalHandler>,
+    Schedule<TimeTariffInterval>,
+    TimeTariffIntervalHandler,
     (TariffProfile, RateComponent),
 ) {
     let client = Client::new_https(
@@ -37,9 +37,9 @@ fn test_setup() -> (
     .unwrap();
     let device =
         SEDevice::new_from_cert("../certs/client_cert.pem", DeviceCategoryType::all()).unwrap();
-    let handler = Arc::new(TimeTariffIntervalHandler {
-        logs: RwLock::new(vec![]),
-    });
+    let handler = TimeTariffIntervalHandler {
+        logs: Arc::new(RwLock::new(vec![])),
+    };
     (
         Schedule::new(
             client,
@@ -52,12 +52,13 @@ fn test_setup() -> (
     )
 }
 
+#[derive(Clone)]
 struct TimeTariffIntervalHandler {
-    logs: RwLock<Vec<String>>,
+    logs: Arc<RwLock<Vec<String>>>,
 }
 
 #[async_trait::async_trait]
-impl EventHandler<TimeTariffInterval> for TimeTariffIntervalHandler {
+impl EventCallback<TimeTariffInterval> for TimeTariffIntervalHandler {
     async fn event_update(&self, event: &EventInstance<TimeTariffInterval>) -> ResponseStatus {
         let log = match event.status() {
             EIStatus::Scheduled => {

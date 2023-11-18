@@ -16,7 +16,7 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 use crate::{
     client::{Client, SEPResponse},
     device::SEDevice,
-    event::{EIPair, EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
+    event::{EIPair, EIStatus, EventCallback, EventInstance, Events, Schedule, Scheduler},
 };
 
 /// Given two TimeTariffIntervals, determine which is superseded, and which is superseding, or None if neither supersede one another
@@ -39,7 +39,7 @@ fn pricing_supersedes<'a>(
 }
 
 // Pricing Function Set
-impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
+impl Schedule<TimeTariffInterval> {
     async fn pricing_start_task(self, mut rx: Receiver<()>) {
         loop {
             // Intermittently sleep until next event start time
@@ -63,7 +63,7 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
             // Notify client and server
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
+            let resp = (self.handler)(target).await;
             self.auto_pricing_response(target.event(), resp).await;
         }
     }
@@ -91,7 +91,7 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
             // Notify client and server
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
+            let resp = (self.handler)(target).await;
             self.auto_pricing_response(target.event(), resp).await;
         }
     }
@@ -107,7 +107,7 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
         let events = events.downgrade();
         let ei = events.get(target_mrid).unwrap();
         let resp = if current_status == EIStatus::Active {
-            (self.handler).event_update(ei).await
+            (self.handler)(ei).await
         } else {
             ResponseStatus::EventCancelled
         };
@@ -148,14 +148,12 @@ impl<H: EventHandler<TimeTariffInterval>> Schedule<TimeTariffInterval, H> {
 }
 
 #[async_trait::async_trait]
-impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
-    for Schedule<TimeTariffInterval, H>
-{
+impl Scheduler<TimeTariffInterval> for Schedule<TimeTariffInterval> {
     type Program = (TariffProfile, RateComponent);
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
-        handler: Arc<H>,
+        handler: impl EventCallback<TimeTariffInterval>,
         tickrate: Duration,
     ) -> Self {
         let (tx, rx) = tokio::sync::broadcast::channel::<()>(1);
@@ -163,7 +161,10 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
             client,
             device,
             events: Arc::new(RwLock::new(Events::new())),
-            handler,
+            handler: Arc::new(move |ei| {
+                let handler = handler.clone();
+                Box::pin(async move { handler.event_update(ei).await })
+            }),
             bc_sd: tx.clone(),
             tickrate,
             time_offset: Arc::new(AtomicI64::new(0)),
@@ -277,7 +278,7 @@ impl<H: EventHandler<TimeTariffInterval>> Scheduler<TimeTariffInterval, H>
                     // Determine appropriate status
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
-                        (self.handler).event_update(superseded).await;
+                        (self.handler)(superseded).await;
                         if superseded.program_mrid() != superseding.program_mrid() {
                             // If the two events come from different programs
                             ResponseStatus::EventAbortedProgram

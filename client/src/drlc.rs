@@ -14,7 +14,7 @@ use sep2_common::packages::{
 
 use crate::{
     client::SEPResponse,
-    event::{EIPair, EIStatus, EventHandler, EventInstance, Schedule},
+    event::{EIPair, EIStatus, EventCallback, EventInstance, Schedule},
 };
 
 use std::{
@@ -45,7 +45,7 @@ fn drlc_supersedes<'a>(
 }
 
 // Demand Response Load Control Function Set
-impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
+impl Schedule<EndDeviceControl> {
     async fn drlc_start_task(self, mut rx: Receiver<()>) {
         loop {
             tokio::select! {
@@ -68,7 +68,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
 
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
+            let resp = (self.handler)(target).await;
             self.auto_drlc_response(target.event(), resp).await;
         }
     }
@@ -94,7 +94,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
             // Notify client and server
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
+            let resp = (self.handler)(target).await;
             self.auto_drlc_response(target.event(), resp).await;
         }
     }
@@ -110,7 +110,7 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
         let events = events.downgrade();
         let ei = events.get(target_mrid).unwrap();
         let resp = if current_status == EIStatus::Active {
-            (self.handler).event_update(ei).await
+            (self.handler)(ei).await
         } else {
             ResponseStatus::EventCancelled
         };
@@ -153,14 +153,12 @@ impl<H: EventHandler<EndDeviceControl>> Schedule<EndDeviceControl, H> {
 }
 
 #[async_trait::async_trait]
-impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
-    for Schedule<EndDeviceControl, H>
-{
+impl Scheduler<EndDeviceControl> for Schedule<EndDeviceControl> {
     type Program = DemandResponseProgram;
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
-        handler: Arc<H>,
+        handler: impl EventCallback<EndDeviceControl>,
         tickrate: Duration,
     ) -> Self {
         let (tx, rx) = tokio::sync::broadcast::channel::<()>(1);
@@ -168,7 +166,10 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
             client,
             device,
             events: Arc::new(RwLock::new(Events::new())),
-            handler,
+            handler: Arc::new(move |ei| {
+                let handler = handler.clone();
+                Box::pin(async move { handler.event_update(ei).await })
+            }),
             bc_sd: tx.clone(),
             tickrate,
             time_offset: Arc::new(AtomicI64::new(0)),
@@ -281,7 +282,7 @@ impl<H: EventHandler<EndDeviceControl>> Scheduler<EndDeviceControl, H>
                     // Determine appropriate response
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
-                        (self.handler).event_update(superseded).await;
+                        (self.handler)(superseded).await;
                         if superseded.program_mrid() != superseding.program_mrid() {
                             // If the two events come from different programs
                             ResponseStatus::EventAbortedProgram

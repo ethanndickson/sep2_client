@@ -6,6 +6,7 @@
 use std::{
     collections::{hash_map, HashMap},
     future::Future,
+    pin::Pin,
     sync::{atomic::AtomicI64, Arc},
     time::{Duration, Instant},
 };
@@ -40,7 +41,7 @@ where
     // Event primacy
     primacy: PrimacyType,
     // The SEEvent instance
-    event: E,
+    event: Box<E>,
     // The MRID of the program this event belongs to
     // In the pricing function set,
     // multiple TimeTariffIntervals can be active
@@ -114,7 +115,7 @@ impl<E: SEEvent> EventInstance<E> {
         let end: i64 = start + i64::from(event.interval().duration.get());
         EventInstance {
             status: event.event_status().current_status.into(),
-            event,
+            event: Box::new(event),
             primacy,
             start,
             end,
@@ -137,7 +138,7 @@ impl<E: SEEvent> EventInstance<E> {
         let end: i64 = start + i64::from(event.interval().duration.get()) + randomize(rand_start);
         EventInstance {
             status: event.event_status().current_status.into(),
-            event,
+            event: Box::new(event),
             primacy,
             start,
             end,
@@ -217,7 +218,7 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait::async_trait]
 /// A Trait specifying a callback for a [`Schedule`]
-pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
+pub trait EventCallback<E: SEEvent>: Clone + Send + Sync + 'static {
     /// Called whenever the state of an event is updated such that a response cannot be automatically determined, and the client device must be made aware.
     ///
     /// Allows the client to apply the event at the device-level, and determine the correct response code.
@@ -242,9 +243,9 @@ pub trait EventHandler<E: SEEvent>: Send + Sync + 'static {
 
 /// Currently useless.
 #[async_trait::async_trait]
-impl<F, R, E: SEEvent> EventHandler<E> for F
+impl<F, R, E: SEEvent> EventCallback<E> for F
 where
-    F: Fn(&EventInstance<E>) -> R + Send + Sync + 'static,
+    F: Fn(&EventInstance<E>) -> R + Clone + Send + Sync + 'static,
     R: Future<Output = ResponseStatus> + Send + 'static,
 {
     async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus {
@@ -359,11 +360,18 @@ where
     }
 }
 
+pub(crate) type EventHandler<E> = Arc<
+    dyn Fn(&EventInstance<E>) -> Pin<Box<dyn Future<Output = ResponseStatus> + Send + '_>>
+        + Send
+        + Sync
+        + 'static,
+>;
+
 /// A Trait representing the common interface of all schedules.
 ///
 // This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 #[async_trait::async_trait]
-pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
+pub trait Scheduler<E: SEEvent> {
     /// The type of the program the specific SEEvent belongs to, containing a primacy value and a unique program MRID.
     type Program;
 
@@ -379,7 +387,7 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
-        handler: Arc<H>,
+        handler: impl EventCallback<E>,
         tickrate: Duration,
     ) -> Self;
 
@@ -405,10 +413,9 @@ pub trait Scheduler<E: SEEvent, H: EventHandler<E>> {
 ///
 /// However, schedules currently do not clean up their background tasks when all are dropped,
 /// thus [`Schedule::shutdown`] will perform a graceful shutdown.
-pub struct Schedule<E, H>
+pub struct Schedule<E>
 where
     E: SEEvent,
-    H: EventHandler<E>,
 {
     pub(crate) client: Client,
     // Send + Sync end device, as the EndDevice resource may be updated
@@ -416,7 +423,7 @@ where
     // All Events added to this schedule, indexed by mRID
     pub(crate) events: Arc<RwLock<Events<E>>>,
     // Callback provider for informing client of event state transitions
-    pub(crate) handler: Arc<H>,
+    pub(crate) handler: EventHandler<E>,
     // Broadcast to tasks to shut them down
     pub(crate) bc_sd: Sender<()>,
     // How often schedule background tasks should wake to check for an event end or event start.
@@ -428,10 +435,9 @@ where
 }
 
 // Manual clone implementation since H doesn't need to be clone
-impl<E, H> Clone for Schedule<E, H>
+impl<E> Clone for Schedule<E>
 where
     E: SEEvent,
-    H: EventHandler<E>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -446,10 +452,9 @@ where
     }
 }
 
-impl<E, H> Schedule<E, H>
+impl<E> Schedule<E>
 where
     E: SEEvent,
-    H: EventHandler<E>,
 {
     /// Updates the schedule-specific time offset.
     /// "If FunctionSetAssignments contain both Event-based function sets (e.g., DRLC, pricing, message) and a

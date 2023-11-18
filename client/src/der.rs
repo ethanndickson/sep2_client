@@ -22,7 +22,7 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 use crate::{
     client::{Client, SEPResponse},
     device::SEDevice,
-    event::{EIPair, EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
+    event::{EIPair, EIStatus, EventCallback, EventInstance, Events, Schedule, Scheduler},
 };
 
 impl EventInstance<DERControl> {
@@ -49,7 +49,7 @@ fn der_supersedes<'a>(
     }
 }
 
-impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
+impl Schedule<DERControl> {
     async fn der_start_task(self, mut rx: Receiver<()>) {
         loop {
             // Intermittently sleep until next event start time
@@ -72,7 +72,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 
             // Notify client and server
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
+            let resp = (self.handler)(target).await;
             self.auto_der_response(target.event(), resp).await;
             // If the device opts-out or if the event cannot be active, we update it's internal status.
             match resp {
@@ -107,7 +107,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
             // Notify client and server
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
+            let resp = (self.handler)(target).await;
             self.auto_der_response(target.event(), resp).await;
         }
     }
@@ -131,7 +131,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
         let ei = events.get(target_mrid).unwrap();
         let resp = if current_status == EIStatus::Active {
             // If the event was active, let the client know it is over
-            (self.handler).event_update(ei).await
+            (self.handler)(ei).await
         } else {
             // If it's not active, the client doesn't even know about this event
             ResponseStatus::EventCancelled
@@ -177,7 +177,7 @@ impl<H: EventHandler<DERControl>> Schedule<DERControl, H> {
 /// DER is a function set where events exhibit 'direct control', according to the specification.
 /// Thus, this Schedule will determine when overlapping or superseded events should be superseded based off their target, their primacy, and their creation time and when they are no longer superseded, if their superseding event is cancelled.
 #[async_trait::async_trait]
-impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERControl, H> {
+impl Scheduler<DERControl> for Schedule<DERControl> {
     type Program = DERProgram;
     /// Create a schedule for the given [`Client`] & it's [`SEDevice`] representation.
     ///
@@ -185,7 +185,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
-        handler: Arc<H>,
+        handler: impl EventCallback<DERControl>,
         tickrate: Duration,
     ) -> Self {
         let (tx, rx) = tokio::sync::broadcast::channel::<()>(1);
@@ -193,7 +193,10 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
             client,
             device,
             events: Arc::new(RwLock::new(Events::new())),
-            handler,
+            handler: Arc::new(move |ei| {
+                let handler = handler.clone();
+                Box::pin(async move { handler.event_update(ei).await })
+            }),
             bc_sd: tx.clone(),
             tickrate,
             time_offset: Arc::new(AtomicI64::new(0)),
@@ -308,7 +311,7 @@ impl<H: EventHandler<DERControl>> Scheduler<DERControl, H> for Schedule<DERContr
                     let status = if prev_status == EIStatus::Active {
                         // Since the newly superseded event is over, tell the client it's finished
                         // We override whatever response the client provides to the more correct one
-                        (self.handler).event_update(superseded).await;
+                        (self.handler)(superseded).await;
                         if superseded.program_mrid() != superseding.program_mrid() {
                             // If the two events come from different programs
                             ResponseStatus::EventAbortedProgram

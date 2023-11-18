@@ -5,7 +5,7 @@ use std::{sync::Arc, time::Duration};
 use sep2_client::{
     client::Client,
     device::SEDevice,
-    event::{EIStatus, EventHandler, EventInstance, Schedule, Scheduler},
+    event::{EIStatus, EventCallback, EventInstance, Schedule, Scheduler},
     time::current_time,
 };
 use sep2_common::{
@@ -20,10 +20,7 @@ use sep2_common::{
 };
 use tokio::sync::RwLock;
 
-fn test_setup() -> (
-    Schedule<DERControl, DERControlHandler>,
-    Arc<DERControlHandler>,
-) {
+fn test_setup() -> (Schedule<DERControl>, DERControlHandler) {
     let client = Client::new_https(
         "https://127.0.0.1:1337",
         "../certs/client_cert.pem",
@@ -35,9 +32,9 @@ fn test_setup() -> (
     .unwrap();
     let device =
         SEDevice::new_from_cert("../certs/client_cert.pem", DeviceCategoryType::all()).unwrap();
-    let handler = Arc::new(DERControlHandler {
-        logs: RwLock::new(vec![]),
-    });
+    let handler = DERControlHandler {
+        logs: Arc::new(RwLock::new(vec![])),
+    };
     (
         Schedule::new(
             client,
@@ -49,12 +46,13 @@ fn test_setup() -> (
     )
 }
 
+#[derive(Clone)]
 struct DERControlHandler {
-    logs: RwLock<Vec<String>>,
+    logs: Arc<RwLock<Vec<String>>>,
 }
 
 #[async_trait::async_trait]
-impl EventHandler<DERControl> for DERControlHandler {
+impl EventCallback<DERControl> for DERControlHandler {
     async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
         let log = match event.status() {
             EIStatus::Scheduled => {

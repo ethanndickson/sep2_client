@@ -7,7 +7,7 @@ use clap::Parser;
 use sep2_client::{
     client::{Client, SEPResponse},
     device::SEDevice,
-    event::{EIStatus, EventHandler, EventInstance, Schedule, Scheduler},
+    event::{EIStatus, EventCallback, EventInstance, Schedule, Scheduler},
     pubsub::ClientNotifServer,
 };
 use sep2_common::packages::{
@@ -38,7 +38,7 @@ struct Handler {}
 
 // Example definition of how DER event status updates should be handled.
 #[async_trait::async_trait]
-impl EventHandler<DERControl> for Handler {
+impl EventCallback<DERControl> for Handler {
     async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
         match event.status() {
             EIStatus::Scheduled => {
@@ -84,7 +84,7 @@ async fn poll_derprograms(client: &Client, path: &str) -> Result<Receiver<DERPro
 // A task to be run asynchronously - given a DERProgramList, add all events to the schedule
 async fn process_derpl_task(
     client: &Client,
-    mut schedule: Schedule<DERControl, Handler>,
+    mut schedule: Schedule<DERControl>,
     derpl: DERProgramList,
 ) -> Result<()> {
     for derp in derpl.der_program {
@@ -111,7 +111,7 @@ async fn process_derpl_task(
 async fn setup_schedule(
     client: &Client,
     edr: Arc<RwLock<SEDevice>>,
-    schedule: Schedule<DERControl, Handler>,
+    schedule: Schedule<DERControl>,
 ) -> Result<()> {
     // Add our device to the server
     let res = client.post("/edev", &edr.read().await.edev).await.unwrap();
@@ -240,10 +240,10 @@ async fn main() -> Result<()> {
     // Create an event handler with it's own state
     let handler = Handler::default();
     // Create a DER FS Schedule (DERControl)
-    let schedule: Schedule<DERControl, Handler> = Scheduler::new(
+    let schedule: Schedule<DERControl> = Scheduler::new(
         client.clone(),
         edr.clone(),
-        Arc::new(handler),
+        handler,
         // 10 minute intermittent sleeps
         Duration::from_secs(60 * 10),
     );

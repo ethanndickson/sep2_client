@@ -9,7 +9,7 @@
 
 use sep2_common::packages::flow_reservation::FlowReservationResponse;
 
-use crate::event::{EventHandler, Schedule};
+use crate::event::{EventCallback, Schedule};
 
 use std::{
     sync::{atomic::AtomicI64, Arc},
@@ -26,16 +26,14 @@ use crate::{
 
 // Flow Reservation Schedule
 #[async_trait::async_trait]
-impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse, H>
-    for Schedule<FlowReservationResponse, H>
-{
+impl Scheduler<FlowReservationResponse> for Schedule<FlowReservationResponse> {
     type Program = ();
 
     #[allow(unused_variables)]
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
-        handler: Arc<H>,
+        handler: impl EventCallback<FlowReservationResponse>,
         tickrate: Duration,
     ) -> Self {
         let (tx, rx) = tokio::sync::broadcast::channel::<()>(1);
@@ -43,7 +41,10 @@ impl<H: EventHandler<FlowReservationResponse>> Scheduler<FlowReservationResponse
             client,
             device,
             events: Arc::new(RwLock::new(Events::new())),
-            handler,
+            handler: Arc::new(move |ei| {
+                let handler = handler.clone();
+                Box::pin(async move { handler.event_update(ei).await })
+            }),
             bc_sd: tx.clone(),
             tickrate,
             time_offset: Arc::new(AtomicI64::new(0)),

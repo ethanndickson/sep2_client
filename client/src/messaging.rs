@@ -19,11 +19,11 @@ use tokio::sync::{broadcast::Receiver, RwLock};
 use crate::{
     client::{Client, SEPResponse},
     device::SEDevice,
-    event::{EIStatus, EventHandler, EventInstance, Events, Schedule, Scheduler},
+    event::{EIStatus, EventCallback, EventInstance, Events, Schedule, Scheduler},
 };
 
 // Messaging Function Set
-impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
+impl Schedule<TextMessage> {
     async fn msg_start_task(self, mut rx: Receiver<()>) {
         loop {
             tokio::select! {
@@ -43,7 +43,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
 
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
+            let resp = (self.handler)(target).await;
             self.auto_msg_response(target.event(), resp).await;
         }
     }
@@ -67,7 +67,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
 
             let events = events.downgrade();
             let target = events.get(&mrid).unwrap();
-            let resp = self.handler.event_update(target).await;
+            let resp = (self.handler)(target).await;
             self.auto_msg_response(target.event(), resp).await;
         }
     }
@@ -88,7 +88,7 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
         let ei = events.get(target_mrid).unwrap();
         let resp = if current_status == EIStatus::Active {
             // If the event was active, let the client know it is over
-            (self.handler).event_update(ei).await
+            (self.handler)(ei).await
         } else {
             // If it's not active, the client doesn't even know about this event
             ResponseStatus::EventCancelled
@@ -138,12 +138,12 @@ impl<H: EventHandler<TextMessage>> Schedule<TextMessage, H> {
 ///
 /// TODO: This implementation currently does not support manual acknowledgement of text messages, as while the client's handler is called, a lock is acquired on the scheduler, meaning it cannot progress.
 #[async_trait::async_trait]
-impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMessage, H> {
+impl Scheduler<TextMessage> for Schedule<TextMessage> {
     type Program = MessagingProgram;
     fn new(
         client: Client,
         device: Arc<RwLock<SEDevice>>,
-        handler: Arc<H>,
+        handler: impl EventCallback<TextMessage>,
         tickrate: Duration,
     ) -> Self {
         let (tx, rx) = tokio::sync::broadcast::channel::<()>(1);
@@ -151,7 +151,10 @@ impl<H: EventHandler<TextMessage>> Scheduler<TextMessage, H> for Schedule<TextMe
             client,
             device,
             events: Arc::new(RwLock::new(Events::new())),
-            handler,
+            handler: Arc::new(move |ei| {
+                let handler = handler.clone();
+                Box::pin(async move { handler.event_update(ei).await })
+            }),
             bc_sd: tx.clone(),
             tickrate,
             time_offset: Arc::new(AtomicI64::new(0)),
