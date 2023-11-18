@@ -536,6 +536,8 @@ Going forward, it would be ideal to calculate the possibility of a global collis
 \subsection{Testing}
 \texttt{sep2\_common} is developed alongside a suite of tests, ensuring all resources can be serialised and deserialised, and that their XML representations adhere to IEEE 2030.5.
 
+When running LLVM source-based coverage on \texttt{sep2\_common}, the \texttt{grcov} report claims we have 59\% coverage, or 1647 \slash 2791 lines of code covered by tests. The vast majority of the missing coverage is code from compile-time code generation from libraries other than ours. In the vast majority of cases, this code is already tested. Regardless, we strive to improve this figure going forward.
+
 \subsubsection{MRID Generation}
 We provide a test verifying that the PEN ID can be obtained from a given MRID, and that there are no collisions when generating several million MRIDs on a single instance of the program. This is to be expected, as we use include a global, mutable counter in the final value.
 
@@ -1303,6 +1305,35 @@ Situations that result in a \texttt{INFO} log include:
 \end{itemize}
 
 \subsection{Testing}
+This client library has been built alongside tests with the goal to maximise test coverage. When running LLVM source-based coverage on \texttt{sep2\_client}, the \texttt{grcov} report claims we have 71.11\% coverage, or 1297 \slash 1824 lines of code covered by tests. \cite{grcov} \cite{llvmcov}
+
+In section TODO we discuss future improvements to testing.
+
+\subsubsection{Mock Server}
+With the goal of testing the client's ability to make HTTP requests, we required a way to mock an IEEE 2030.5 server. For this, we implemented a 'dumb' IEEE 2030.5 server that produces hardcoded resources and responses for specific inputs. This test server follows a near identical implementation to that of the Subscription / Notification mechanism. We use this test server to ensure functions that make HTTP requests fail and succeed as expected.
+
+We also use this server to conduct system tests. These system tests follow the examples outlined in IEEE 2030.5 Annex C.
+
+\subsubsection{Subscription / Notification}
+In order to send notifications to clients, IEEE 2030.5 need to operate a client capable of making HTTP POST requests. In our client library, a \texttt{Client} instance is seperate from a \texttt{ClientNotifServer} instance, meaning our testing process is straight-forward - we make requests to the server using our client. 
+
+Our tests ensure that a client interacting with the server is capable of sending HTTP Post requests, and that the expected response is received. We also implicitly test that our notification server does not crash during regular use.
+
+\subsubsection{Event Schedules}
+As each schedule for each function set behaves differently, they are tested seperately. For each schedule we create a set of of unique events that each last several seconds, and compare the output on the given callback with the expected output. 
+
+Cases we test include:
+
+\begin{itemize}
+    \item Basic sequential execution of events.
+    \item Cancelling \& superseding events in progress.
+    \item Cancelling \& superseding scheduled events .
+    \item Ensuring events superseded by cancelled events are rescheduld.
+    \item Ensuring Events with different primacy values supersede as required.
+    \item Ensuring DER events with differing controls do not supersede.
+    \item Ensuring TextMessages do not supersede at all.
+    \item Ensuring TimeTariffIntervals from different RateComponents do not supersede one another.
+\end{itemize}
 
 \subsubsection{Security}
 During development, we maintained a local certificate authority via the tool \texttt{mkcert}. However, this tool is not capable of producing certificates that match those required by IEEE 2030.5
