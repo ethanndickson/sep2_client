@@ -226,7 +226,7 @@ impl Scheduler<DERControl> for Schedule<DERControl> {
             match (current_status, incoming_status) {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
-                    log::warn!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
+                    log::info!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
                     self.cancel_dercontrol(&mrid, current_status, incoming_status.into()).await;
                 },
                 // Scheduled -> (Cancelled || CancelledRandom)

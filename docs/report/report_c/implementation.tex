@@ -1121,7 +1121,10 @@ A thread-safe reference to our \texttt{SEDevice} abstraction is also required, a
 
 Schedules also take a duration value, determining the length of intermittent sleeps, addressing the same problem we discussed in 6.2.5.
 
-One instantiated, events are added to the schedule via the \texttt{add\_event} function, which takes a copy of the event, a reference to the event's program, and some unique ID pertaining to the server that the event was sourced from. This function is designed to be called every time a copy of the event is retrieved, via polling, or as a notification. Every event contains a unique MRID, and successive calls for the same MRID will simply update the status of the event, such as if the server has cancelled it.
+One instantiated, events are added to the schedule via the \texttt{add\_event} function, which takes a copy of the event, a reference to the event's program, and some unique ID pertaining to the server that the event was sourced from. This function is designed to be called every time a copy of the event is retrieved, via polling, or as a notification. Every event contains a unique MRID, and successive calls for the same MRID will simply update the status of the event, if the server has cancelled it. 
+
+If an event retrieved from a server has a status that differs from the schedule copy of the event, and that status is not cancelled, the client will log accordingly. In some cases this is expected, such as when working with events where the start-time is randomised on the client. In other cases such as when an event is marked as superseded on the server and is not locally, and the client will log a warning.
+
 
 We require that a reference to the Event's program is included in order to mark which program an Event was added from. This allows the schedule to send the "Event aborted due to alternate program event" response status, in Table 27 of IEEE 2030.5.
 
@@ -1177,7 +1180,7 @@ Once again, we place as few restrictions on the library user as possible. Users 
                 async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus;
             }
         \end{lstlisting}
-        \label{fig:schedulertrait}
+        \label{fig:eventhandlertrait}
         \vspace{-10pt}
         \caption{Definition of the Scheduler trait}
     \end{center}
@@ -1203,7 +1206,8 @@ If the returned status implies the client device is opting out of the event, the
 Since these cases are non-trivial, we provide an in-depth explanation of the behaviour of the callback as part of our library documentation.
 
 \subsubsection{Internals}
-All implemented schedules share the same core implementation. \texttt{EventInstance}s are stored in a hashmap. The unique event MRID is the key into this hashmap. This gives us constant time lookups for events, and ensures a schedule cannot store duplicate events.
+All implemented schedules share the same core implementation. \texttt{EventInstance}s are stored in a hashmap. The unique event MRID is the key into this hashmap. This gives us constant time lookups for events, and ensures a schedule cannot store duplicate events. Notably, unlike the hashmap used in the Subscription / Notification mechanism, our \texttt{EventsMap} uses the default, more HashDoS resistant, hashing algorithm. We make this decision as this hashmap does grow as the schedule runs, and MRIDs are technically provided as external input, making the possibility of a \texttt{HashDoS} attack possible, such as if resources were not retrieved (or sent) securely.
+Realistically, this is an overly cautious measure; \texttt{aHash} still provides resistance to \texttt{HashDoS} attacks
 
 \begin{figure}[h]
     \begin{center}
@@ -1219,7 +1223,7 @@ All implemented schedules share the same core implementation. \texttt{EventInsta
                 next_end: Option<(i64, MRIDType)>,
             }
         \end{lstlisting}
-        \label{fig:schedulertrait}
+        \label{fig:eventmapimpl}
         \vspace{-10pt}
         \caption{Internal Events data structure}
     \end{center}
@@ -1233,7 +1237,7 @@ When these tasks find that an event should be started or ended, it updates it's 
 
 Finally, as to avoid our hashmap of events growing endlessly as the program runs, we have a third Tokio task act as a form of garbage collection, deleting cancelled or superseded events if they have not been updated for an extended period of time. Currently, this is configured at a week, but should be adjusted in the future as necessary, or provided as a configuration option.
 
-The remainder of the schedule implementation differs for each function set.
+The remainder of the schedule implementation differs for each function set. We've attempted to eliminate as much duplicate code as possible, however, we've been relatively unsuccessful. Each schedule behaves sufficiently different to each other that any further improvements would be pushing the boundaries of what is possible in Rust.
 
 \subsubsection{DER}
 The DER function set extends our core schedule implementation with events that can supersede one another, and a set of rules defining how and when this occurs. Therefore when an event is added to a DER schedule, it compares it with all other events in the schedule, and determines if it supersedes, or is superseded by another. 
@@ -1278,6 +1282,25 @@ Whilst we could implement a Flow Reservation schedule with minimal assumptions, 
 If one were to implement the FLow Reservation schedule with a specific use case in mind, it would be a straight forward implementation, and a great deal of existing coe in our client library could be reused. For that reason, we do not provide an implementation for this schedule, and insead leave it to library users if they require it. Instead, we provide them with an ample resource for developing an IEEE 2030.5 event schedule, our codebase.
 
 \subsection{Logging}
+Our client library exposes log messages under a generic logging facade. We use industry standard log levels, \texttt{FATAL, ERROR, WARN, INFO, DEBUG} and \texttt{TRACE}. To accomplish this we use the \texttt{log} crate, developed by the Rust foundation \cite{logcrate}. The logs we create can therefore be attached to any given log implementation, whatever is most suitable for the users of the library.
+
+As many parts of the client library run in the background (Polling, notification server, event schedule) logging is, in many cases the only way to discern that an error has occured, and that the client has recovered. 
+
+Situations that result in a \texttt{WARN}, or an \texttt{ERROR} log include:
+
+\begin{itemize}
+    \item When a regularly polled resource could not be retrieved
+    \item If there is a mismatch between the status of an event in the schedule, and a copy retrieved from a server (and then fed into the schedule)
+    \item If an incoming Notification server request or connection could not be handled
+\end{itemize}
+
+Situations that result in a \texttt{INFO} log include:
+
+\begin{itemize}
+    \item When a resource is retrieved, from polling or otherwise
+    \item When a POST or PUT request is successful.
+    \item When jobs that run in the background shutdown / cleanup (Schedules, Servers).
+\end{itemize}
 
 \subsection{Testing}
 
