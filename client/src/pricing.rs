@@ -46,7 +46,7 @@ impl Schedule<TimeTariffInterval> {
             tokio::select! {
                 _ = tokio::time::sleep(self.tickrate) => (),
                 _ = rx.recv() => {
-                    log::info!("TimeTarriffIntervalSchedule: Shutting down event start task...");
+                    log::info!("TimeTariffIntervalSchedule: Shutting down event start task...");
                     break
                 },
             }
@@ -74,7 +74,7 @@ impl Schedule<TimeTariffInterval> {
             tokio::select! {
                 _ = tokio::time::sleep(self.tickrate) => (),
                 _ = rx.recv() => {
-                    log::info!("TimeTarriffIntervalSchedule: Shutting down event end task...");
+                    log::info!("TimeTariffIntervalSchedule: Shutting down event end task...");
                     break
                 },
             }
@@ -193,24 +193,24 @@ impl Scheduler<TimeTariffInterval> for Schedule<TimeTariffInterval> {
             match (current_status, incoming_status) {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
-                    log::warn!("TimeTarriffIntervalSchedule: TimeTariffInterval ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
+                    log::warn!("TimeTariffIntervalSchedule: TimeTariffInterval ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
                     self.cancel_timetariffinterval(&mrid, current_status, incoming_status.into()).await;
                 },
                 // Scheduled -> (Cancelled || CancelledRandom)
                 (EIStatus::Scheduled, EventStatus::Cancelled | EventStatus::CancelledRandom) => {
-                    log::info!("TimeTarriffIntervalSchedule: TimeTariffInterval ({mrid} has been marked as cancelled by the server. It will not be started");
+                    log::info!("TimeTariffIntervalSchedule: TimeTariffInterval ({mrid} has been marked as cancelled by the server. It will not be started");
                     self.cancel_timetariffinterval(&mrid, current_status, incoming_status.into()).await;
                 },
                 // Scheduled -> Active
                 (EIStatus::Scheduled, EventStatus::Active) => {
-                    log::info!("TimeTarriffIntervalSchedule: TimeTariffInterval ({mrid}) has entered it's earliest effective start time.")
+                    log::info!("TimeTariffIntervalSchedule: TimeTariffInterval ({mrid}) has entered it's earliest effective start time.")
                 }
                 // Scheduled -> Superseded
                 (EIStatus::Scheduled, EventStatus::Superseded) =>
-                    log::warn!("TimeTarriffIntervalSchedule: TimeTariffInterval ({mrid}) has been marked as superseded by the server, yet it is not locally."),
+                    log::warn!("TimeTariffIntervalSchedule: TimeTariffInterval ({mrid}) has been marked as superseded by the server, yet it is not locally."),
                 // Active -> Scheduled
                 (EIStatus::Active, EventStatus::Scheduled) =>
-                    log::warn!("TimeTarriffIntervalSchedule: TimeTariffInterval ({mrid}) is active locally, and scheduled on the server. Is the client clock ahead?"),
+                    log::warn!("TimeTariffIntervalSchedule: TimeTariffInterval ({mrid}) is active locally, and scheduled on the server. Is the client clock ahead?"),
                 // Active -> Active
                 (EIStatus::Active, EventStatus::Active) => (),
                 // Complete -> Any
@@ -232,7 +232,7 @@ impl Scheduler<TimeTariffInterval> for Schedule<TimeTariffInterval> {
                 incoming_status,
                 EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
             ) {
-                log::warn!("TimeTarriffIntervalSchedule: Told to schedule TimeTariffInterval ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
+                log::warn!("TimeTariffIntervalSchedule: Told to schedule TimeTariffInterval ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
                 self.auto_pricing_response(&event, incoming_status.into())
                     .await;
                 return;
@@ -251,7 +251,7 @@ impl Scheduler<TimeTariffInterval> for Schedule<TimeTariffInterval> {
 
             // The event may have expired already
             if ei.end_time() <= self.schedule_time().into() {
-                log::warn!("TimeTarriffIntervalSchedule: Told to schedule TimeTariffInterval ({mrid}) which has already ended, sending server response and not scheduling.");
+                log::warn!("TimeTariffIntervalSchedule: Told to schedule TimeTariffInterval ({mrid}) which has already ended, sending server response and not scheduling.");
                 // Do not add event to schedule
                 // For function sets with direct control ... Do this response
                 self.auto_pricing_response(ei.event(), ResponseStatus::EventExpired)

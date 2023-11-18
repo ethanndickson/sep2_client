@@ -746,7 +746,9 @@ In section TODO we discuss a design flaw with this current implementation, and w
 
 \subsubsection{Event Response Interface}
 
-Additionally, our library provides convenience functions for creating and sending response resources when given an event resource, with checks to ensure the provided response status matches up with that of the \texttt{ResponseRequired} field, and the requirements of the specific function set.  As we'll discuss, the use of these are primarily automated via our Event schedules, however we provide them for library users for completeness.
+Additionally, our library provides convenience functions for creating and sending response resources when given an event resource, with checks to ensure the provided response status matches up with that of the \texttt{ResponseRequired} field, and the requirements of the specific function set.  As we'll discuss, the use of these are primarily automated via our Event schedules, however we provide them to library users for completeness.
+
+Each function sends the appropriate \texttt{SEResponse}-implementing type to the server, returning an error if the inputs are invalid.
 
 
 \begin{figure}[h]
@@ -875,7 +877,9 @@ Whilst our client library is primarily for use on servers operating under the cl
 
 A naive implementation that addresses this would have each individual Tokio task (one for each polled resource) wake intermittently, and check if it's time to poll their resource. This would be an unnecessary overhead of tasks repeatedly waking and sleeping.
 
-Our final implementation uses a poll job queue, implemented using a binary heap that sorts jobs by their next scheduled poll time. Then, we use a single Tokio task that sleeps, and wakes intermittently to check if it is time to poll the resource at the top of the queue. Once that time arrives, the resource is polled and the stored user call-back is called with the result. The next time to poll on the poll task is then updated before pushing the job to the back of the queue. This process is entirely asynchronous, if it is time to poll multiple resources, each request will be sent off without waiting for the previous to complete. 
+Our final implementation uses a poll job queue, implemented using a binary heap that sorts jobs by their next scheduled poll time. Then, we use a single Tokio task that sleeps, and wakes, intermittently to check if it is time to poll the resource at the top of the queue. Once that time arrives, the resource is polled and the stored user call-back is called with the result. The next time to poll on the poll task is then updated before pushing the job to the back of the queue. This process is entirely asynchronous, if it is time to poll multiple resources, each request will be sent off without waiting for the previous to complete. 
+
+For the sake of flexibility, and to give end user control over this process, but also for the sake of testing, we allow users to define the length of these intermittent sleep intervals when the instantiate the client.
 
 \begin{figure}[h]
     \begin{center}
@@ -1060,6 +1064,14 @@ An exhaustive list of function sets utilising Event resources are:
     \item Flow Reservation
 \end{itemize}
 
+All Schedules share very similar implementations. They differ in:
+
+\begin{itemize}
+    \item What response status codes can be sent (defined in IEEE 2030.5 Table 27)
+    \item Under what circumstances events supersede one another
+    \item Whether or not event start times and durations can be randomised
+\end{itemize}
+
 \subsubsection{Interface}
 
 For each of these function sets (excl. Flow Reservation) we produce a \texttt{Schedule} abstraction that acts as a black-box handler of events. It accepts instances of Event resources and whenever an event starts, ends, or is cancelled or superseded whilst active, the schedule calls the defined callback such that the client can apply the event to the relevant device(s), and determine the Response resource status to return to the server. In many cases, such as when resources are cancelled before starting, the client need not be informed, and the schedule is instead capable of determining the correct response status itself, and creating and sending it automatically.
@@ -1067,13 +1079,13 @@ For each of these function sets (excl. Flow Reservation) we produce a \texttt{Sc
 \begin{figure}[h]
     \begin{center}
         \begin{lstlisting}
-            trait Scheduler<E: SEEvent, H: EventHandler<E>> {
+            trait Scheduler<E: SEEvent> {
                 type Program;
 
                 fn new(
                     client: Client,
                     device: Arc<RwLock<SEDevice>>,
-                    handler: Arc<H>,
+                    handler: impl EventCallback<E>,
                     tickrate: Duration,
                 ) -> Self;
 
@@ -1101,14 +1113,62 @@ For each of these function sets (excl. Flow Reservation) we produce a \texttt{Sc
     \end{center}
 \end{figure}
 
-Figure 6.32 and 6.33 show the interface common to all schedules.
+Figure 6.32 and 6.33 show the interface common to all schedules. Each schedule is associated with the type of the Event resource, and the type of the associated Event program. The type of the associated program in our interface is inferred from the type of the Event resource.
 
-% TODO
+To instantiate a schedule library users must supply a previously instantiated client, capable of making HTTP requests. Schedules must support multiple servers, whereas a \texttt{Client} instance pertain to a specific server, therefore, we override the base URI in the \texttt{Client} instance when creating and sending automated responses from the schedule. For that reason, any \texttt{Client} instance can be used.
 
+A thread-safe reference to our \texttt{SEDevice} abstraction is also required, as well as a callback to be called when the schedule needs to alert the client of event updates.
+
+Schedules also take a duration value, determining the length of intermittent sleeps, addressing the same problem we discussed in 6.2.5.
+
+One instantiated, events are added to the schedule via the \texttt{add\_event} function, which takes a copy of the event, a reference to the event's program, and some unique ID pertaining to the server that the event was sourced from. This function is designed to be called every time a copy of the event is retrieved, via polling, or as a notification. Every event contains a unique MRID, and successive calls for the same MRID will simply update the status of the event, such as if the server has cancelled it.
+
+We require that a reference to the Event's program is included in order to mark which program an Event was added from. This allows the schedule to send the "Event aborted due to alternate program event" response status, in Table 27 of IEEE 2030.5.
+
+Similarly, we require that some unique 8 bit integer is provided as a form of server ID, as to mark internally which events were sourced from different servers. The, when an event from one server supersedes an event from another, we can send the "Event aborted due to alternate server event" response status, also in Table 27. \cite{IEEE2030.5}
+
+Finally, we provide a function for cleaning up the Tokio tasks spawned by the Schedule, freeing all allocated resources. This currently requires shutdown to be manually called. In the future, we'd like to have it automatically be called when the Schedule is dropped, which is a straight-forward refactor.
+
+\subsubsection{SEDevice Abstraction}
+
+Responses to Events, auto-generated or otherwise, contain device-specific information. For all event function sets this is the device's short form identifier, and long form identifier. In the event of the Demand Response and Load Control function set, devices also return data representing their state, such as their applied load reduction value.
+Furthermore, events should only be applied when the category of device the Event targets matches the category of the device.
+
+To inform a given event schedule of all these variables, we provide library usesr with an abstraction that represents a singular IEEE 2030.5 end-user energy device. This is the \texttt{SEDevice} struct.
+In addition to the data already mentioned, this struct also contains an instance of an EndDevice resource, such that all information a developer may require when referring to a singular device is available.
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            pub struct SEDevice {
+                pub lfdi: HexBinary160,
+                pub sfdi: SFDIType,
+                pub edev: EndDevice,
+                pub device_categories: DeviceCategoryType,
+                #[cfg(feature = "drlc")]
+                pub appliance_load_reduction: Option<ApplianceLoadReduction>,
+                #[cfg(feature = "drlc")]
+                pub applied_target_reduction: Option<AppliedTargetReduction>,
+                #[cfg(feature = "drlc")]
+                pub duty_cycle: Option<DutyCycle>,
+                #[cfg(feature = "drlc")]
+                pub offset: Option<Offset>,
+                #[cfg(feature = "drlc")]
+                pub override_duration: Option<Uint16>,
+                #[cfg(feature = "drlc")]
+                pub set_point: Option<SetPoint>,
+            }
+        \end{lstlisting}
+        \label{fig:sedevicestruct}
+        \vspace{-10pt}
+        \caption{Definition of the SEDevice struct}
+    \end{center}
+\end{figure}
+
+Figure 6.34 shows the contents of this struct. For the sake of modularity, we use Rust compile flags to hide the DRLC function set specific fields when the DRLC schedule is not being used. 
 
 \subsubsection{Ergonomics}
-To instantiate a Schedule, library users must first define an \texttt{EventHandler} trait implementation for a specific Event resource.
-
+Once again, we place as few restrictions on the library user as possible. Users can implement a callback via a manual trait implementation, or by any function or closure with a matching function signature.
 
 \begin{figure}[h]
     \begin{center}
@@ -1123,8 +1183,99 @@ To instantiate a Schedule, library users must first define an \texttt{EventHandl
     \end{center}
 \end{figure}
 
-% TODO
+Figure 6.34 defines the trait containing this function signature. A single argument function that takes in an EventInstance, containing the corresponding event resource, and returns a ResponseStatus. 
 
+The \texttt{EventInstance<E>} type provides users with a way to inspect the event, providing users with:
+
+\begin{itemize}
+    \item The current status, as a Rust enum
+    \item The underlying event resource
+    \item The primacy of the program
+    \item The start time and end time of the event, as a Unix timestamp
+    \item The corresponding program MRID
+    \item The user-defined server ID
+\end{itemize}
+
+When determining the ResponseStatus to return, library users need only to refer to Table 27 of the specification.
+
+If the returned status implies the client device is opting out of the event, the scheduler also knows to mark the event as cancelled internally. In the event an event is superseded whilst active, our scheduler would have more information on what response to send to the server, and in that case the provided response status is ignored.
+
+Since these cases are non-trivial, we provide an in-depth explanation of the behaviour of the callback as part of our library documentation.
+
+\subsubsection{Internals}
+All implemented schedules share the same core implementation. \texttt{EventInstance}s are stored in a hashmap. The unique event MRID is the key into this hashmap. This gives us constant time lookups for events, and ensures a schedule cannot store duplicate events.
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            type EventsMap<E> = HashMap<MRIDType, EventInstance<E>>;
+
+            struct Events<E>
+            where
+                E: SEEvent,
+            {
+                map: EventsMap<E>,
+                next_start: Option<(i64, MRIDType)>,
+                next_end: Option<(i64, MRIDType)>,
+            }
+        \end{lstlisting}
+        \label{fig:schedulertrait}
+        \vspace{-10pt}
+        \caption{Internal Events data structure}
+    \end{center}
+\end{figure}
+
+Figure 6.36 shows our wrapper around this hashmap that provides two values that act as hashmap invariants. These invariants store the time, and the MRID of the next event to start and the next event to end, or \texttt{None} if there are no events waiting to start or end. When instantiated, a schedule creates two Tokio tasks that sleep intermittently until it's time for an event to start.
+
+This \texttt{Events} wrapper is designed with the intention of minimizing the overhead when a Tokio task wakes from sleep and checks if it's time for the next event to start or end, it needs only read a single value.
+
+When these tasks find that an event should be started or ended, it updates it's status, notifies the client via the callback and uses the output of the callback to send a response to the server. When constructing a response, the schedule uses the data stored in the \texttt{SEDevice} instance it was passed, and uses the last Time resource provided to it via \texttt{update\_time}.
+
+Finally, as to avoid our hashmap of events growing endlessly as the program runs, we have a third Tokio task act as a form of garbage collection, deleting cancelled or superseded events if they have not been updated for an extended period of time. Currently, this is configured at a week, but should be adjusted in the future as necessary, or provided as a configuration option.
+
+The remainder of the schedule implementation differs for each function set.
+
+\subsubsection{DER}
+The DER function set extends our core schedule implementation with events that can supersede one another, and a set of rules defining how and when this occurs. Therefore when an event is added to a DER schedule, it compares it with all other events in the schedule, and determines if it supersedes, or is superseded by another. 
+
+We determine if two \texttt{DERControl} instances supersede if they both target the same hardware controls (the fields of DERControlBase) and if their active time periods overlap. If this is the case, the superseding event is the one with the lower program primacy, or if their primacies are the same, and one is newer than the other.
+
+If an event is superseded and active, the callback is called, and the appropriate response to the server created and sent, as per Table 27, including the necessary comparisons between program MRIDs and server IDs.
+
+We are also required to handle the case where an event is superseded by another, and then the superseding event is cancelled before the superseded event would start. To handle this we store, for each event, a list of MRIDs corresponding to events that supersede it. When an event is cancelled, it's removed from all those lists. Any superseded events that would not have started yet with an empty list can therefore be un-superseded.
+This behaviour isn't explicitly mentioned in the specification, but follows naturally from the remaining rules. Additionally, this behaviour is implemented by EPRI C in their library.
+
+DER events are 'randomizable' events. Therefore, when adding them to our Schedule we first determine their start time and interval with a random offset within the given range.
+
+Since DERControl events apply only to specific device categories, we check if there is an intersection between the targeted categories, and the categories set in \texttt{SEDevice}.
+
+Finally, the interface we defined in Figure 6.22 is responsible for checking that a valid response can be constructed from a ResponseStatus and Event, and that it adheres to Table 27. If this is not the case, and an automated response cannot be made for any reason, the schedule will log accordingly.
+
+\subsubsection{DRLC}
+The DRLC function set schedule operates near identically to the DER schedule, with different types, and one difference in behaviour. They both exhibit 'direct control' over a device, and as such, only one event can be active at any given point in time.
+
+Unlike DER, \texttt{EndDeviceControl} instances do not target specific hardware controls. To check if two events supersede we need only check if they are active at the same time, and then use their primacy and creation time to determine which supersedes which.
+
+Once again, the interface in Figure 6.22 ensures created responses are valid.
+
+\subsubsection{Messaging}
+The Messaging function set schedule differs greatly from the others, in that multiple \texttt{TextMessage} events can be active at once. For that reason, the implementation remains the same, but without any tracking of superseded events.
+
+\subsubsection{Pricing}
+The Pricing function is very much similar to DER and DRLC. One difference is that a DER event requires both the \texttt{TariffProfile} resource, and the \texttt{RateComponent} resource. Together, these form the "Program" of the event. "Pricing clients shall support at least one RateComponent instance for each TarifProfile." and "Pricing servers SHALL provide at most one active TimeTariffInterval per rate component." indicate this.
+
+Therefore, we use the provided \texttt{RateComponent} resource to determine the program MRID, and the provided \texttt{TariffProfile} to determine the primacy of the \texttt{TimeTariffInterval} resource. 
+
+By that measure, a \texttt{TimeTariffInterval} event supersedes another if their active times overlap, and they belong to the same rate component.
+
+\subsubsection{Flow Reservation}
+The Flow Reservation function set contains an Event resource (\texttt{FlowReservationResponse}), and it contains a response for that Event, \texttt{FlowReservationResponseResponse}. However, it does not contain an Event program, nor does the specification provide instructions for under what circumstances clients should send \texttt{FlowReservationResponseResponse}, and with what response status.
+
+IEEE 2030.5 Table 27 details response types by function set, and the Flow Reservation function set is mysteriously not present. Furthermore, IEEE 2030.5 is unclear on under what circumstances \texttt{FlowReservationResponse} events are permitted to overlap, and when they should be superseded. 
+
+Whilst we could implement a Flow Reservation schedule with minimal assumptions, it's interface and behaviour would differ greatly from all the other schedules. It would defer to the client supplied callback in all cases, and require them to manually specify every response, and also unlike every other schedule, not accept some program resource.
+
+If one were to implement the FLow Reservation schedule with a specific use case in mind, it would be a straight forward implementation, and a great deal of existing coe in our client library could be reused. For that reason, we do not provide an implementation for this schedule, and insead leave it to library users if they require it. Instead, we provide them with an ample resource for developing an IEEE 2030.5 event schedule, our codebase.
 
 \subsection{Logging}
 
