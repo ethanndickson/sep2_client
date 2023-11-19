@@ -48,11 +48,18 @@ For that reason, we have produced \texttt{sep2\_client}, a framework for develop
 Much like \texttt{sep2\_common}, we provide compile-time flags for different function sets. For example, clients that don't run a Subscription / Notification server, need not compile it.
 
 \subsection{Open-source Software}
-Our implementation will be open-sourced as it aims to address the lack of open-source IEEE 2030.5 tooling. Consequently, it's crucial that our codebase is well documented, and well tested, as to encourage and enable users to contribute modifications and fixes, and to reassure potential users of it's correctness.
+Our implementation aims to address the lack of open-source IEEE 2030.5 software and tooling. Consequently, it's crucial that our codebase is well documented, and well tested, as to encourage and enable users to contribute modifications and fixes, and to reassure potential users of it's correctness.
 
-As it stands, our client and common library are reasonably well-tested, with code coverage of 73.72\% when measured by lines of code.
+When choosing an open-source license for which we distribute our implementation under, we consider the licenses of all other software we depend on. The Rust programming language is released under both the MIT license, and the Apache 2.0 license. 
 
-Furthermore, included alongside our implementation are inline comments that are used to generate 'rustdoc' documentation from our source code. Once generated, they can be distributed as a stand-alone website documenting the features and interfaces of each crate. We place an emphasis on ensuring that this documentation can be easily understood by those who are already familiar with the Rust programming language.
+Furthermore, all our Rust library dependencies are licensed under either the MIT license, or both the MIT license and Apache 2.0, with the exception of OpenSSL, which is only licensed under Apache 2.0.
+
+Therefore, we are given the ability to release our implementation under either license, or both. 
+
+As part of our research, we discovered a rationale for MIT \& Apache 2.0 dual licensing being overwhelmingly used by Rust crates. This rationale claims that Apache 2.0 improves the interoperability of Rust crates in terms of their licensing, while the MIT license allows for software developed downstream to be licensed under the GPLv2.
+\cite{relicense} \cite{relicensejosh}
+
+For that reason, we follow the vast majority of Rust libraries, and the Rust programming language itself, and have released our \texttt{sep2\_common} crate, and our \texttt{sep2\_client} crate under both the MIT and Apache 2.0 licenses.
 
 \subsubsection{Ergonomic Interface}
 
@@ -119,7 +126,7 @@ We therefore assume the single route usage is purely for the purpose of the exam
 We also assume that, due to the small subset of IEEE 2030.5 resources being subscribable, that parametrized HTTP routes are not required, and that all routes are simply a relative URI interpreted literally.
 
 \subsection{DNS-SD}
-IEEE 2030.5 states that a connection to a server can be established by specifying a specific IP address or hostname and port. In the event cannot be provided, the specification states that DNS-SD can be used to query a local network for servers, whilst providing clients with the ability to only query for servers advertising support for specific function sets. 
+IEEE 2030.5 states that a connection to a server can be established by specifying a specific IP address or hostname and port. In the event cannot be provided, the specification states that DNS-SD can be used to query a network for servers, whilst providing clients with the ability to only query for servers advertising support for specific function sets. 
 
 As it stands, there is little perceived value in this functionality. Our client library primarily targets the client aggregation model and as such client developers will almost certainly be capable of supplying the address and port of a server.
 The client manual for the EPRI IEEE 2030.5 Client Library shares the same belief. \cite{eprimanual}
