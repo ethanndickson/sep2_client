@@ -1,1 +1,88 @@
-\chapter{Future Work}\label{ch:future}
+\chapter{Evaluation \& Future Work}\label{ch:future}
+Despite all we've accomplished during this thesis, there are many features and improvements we haven't been able to implement purely due to time constraints, as well as functionality whose implementation is not entirely within our control.
+Furthermore, we've been able to identify some flaws in our existing design, potential pain points for developers using our library, and unnecessary restrictions.
+
+In this chapter we'll compare our implementation to existing solutions.
+We'll discuss it's weaknesses and how we plan to improve them, and we'll provide a plan for any and all future work.
+
+\section{EPRI IEEE 2030.5 Client}
+We'll first provide a reference point for our progress on this thesis project by comparing it to that of the EPRI IEEE 2003.5 client library, implemented in C.
+This library is the oldest, and most popular open-source implementation of the client protocol.
+
+\begin{table}[h]
+	\centering
+	\begin{tabular}{llll}
+		\toprule
+		\textbf{Feature} & \textbf{sep2\_common + sep2\_client} & \textbf{EPRI 2030.5}\\
+		\midrule
+		XML Resource Serialisation \& Deserialisation & Yes & Yes \\
+		EXI Resource Serialisation \& Deserialisation & No  & Yes \\
+		DNS-SD                                        & No  & Yes \\
+		Resource Scheduled Polling                    & Yes & Yes \\
+		Subscription / Notification Mechanism         & Yes & No \\
+		DER Event Scheduler                           & Yes & Yes \\
+		DRLC Event Scheduler                          & Yes & No \\
+		Pricing Event Scheduler                    	  & Yes & No \\
+		Messaging Event Scheduler                     & Yes & No \\
+		Flow Reservation Event Scheduler              & No  & Yes \\
+		Scheduler Time Offset                         & Yes & No \\
+		Global Time Offset                            & Yes & Yes \\
+		CSIP-AUS Extensions                           & Yes & No \\
+		QualityLogic Formal IEEE 2030.5 Testing       & No  & Yes \\
+		Memory Safety Guarantees                      & Yes & No \\
+		\bottomrule
+	\end{tabular}
+	\caption{EPRI IEEE 2030.5 Client comparison table}
+	\label{tab:comparsiontable}
+\end{table}
+
+Table 7.1 shows a comparison of features, functionality, and safety and correctness properties between our implementation, and EPRI's.
+
+Of note is that our client library does not include an implementation for DNS-SD and EXI Resource Serialisation \& deserialisation. In sections 5.2 and 5.3 we discuss the reasoning behind this.  
+
+In terms of Event function sets, our client has a more complete implementation. We provide library users with black-box schedulers handling DER, Messaging, Pricing, and Demand Response and Load Control events. The EPRI C implementation only includes a schedule for Distributed Energy Resources. The same goes for applying Time resources at a schedule level, EPRI provides no way to have different schedules use different time resources, as would be required under certain circumstances.
+
+Importantly, EPRI's implementation does NOT include a subscription / notification mechanism, the resource retrieval method mandated as part of CSIP (American). \cite{20305workshop}
+
+However, EPRI's implementation has the benefit of having undergone formal testing provided by QualityLogic, which is a paid, service. Due to the cost of the service, it is unlikely our implementation will ever have the opportunity to undergo the same testing.
+
+\section{Maintainability}
+With the goal of this thesis to produce an IEEE 2030.5 client library implementation that can be released under open-source licenses, we develop our implementation with a focus on ensuring it can be maintained into the future. 
+
+As of present, this takes the form of:
+
+\begin{itemize}
+    \item Generated 'rustdoc' documentation, as is preferred by the Rust open-source ecosystem.
+    \item Reasonable internal documentation, with explicit references to IEEE 2030.5 to justify behaviours.
+    \item Example client binary source-code, showing the DER function set and event scheduler in use under the direct / individual model.
+    \item GitHub project management, detailing planned enhancements and broken functionality as issues.
+    \item The modular nature of our implementation; functionality delegated to different Rust crates.
+\end{itemize}
+
+In order to ensure our client is maintainable into the future, we will:
+
+\begin{itemize}
+    \item Produce additional full client binary examples, showing usage of the subscription / notification model, and other event schedules.
+    \item Develop function usage examples, and include them as part of the rustdoc.
+    \item Respond to and engage with library users, and their feedback, including attempting to fix any and all issues they encounter.
+\end{itemize}
+
+\section{Rust Async Traits}
+
+\section{Testing}
+As it stands, our client and common library are reasonably well-tested, with code coverage of 73.72\% when measured by lines of code.
+
+
+\section{Benchmarking}
+
+\section{Memory Profiling}
+
+\section{Error Handling}
+
+\section{Native Rust TLS}
+
+\section{Improved HTTP Requests}
+
+\section{Authenticating Notification / Subscription}
+
+
