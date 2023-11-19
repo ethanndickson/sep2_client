@@ -96,8 +96,8 @@ features = ["der","pubsub"]
 
 
 # Dependencies
-Due to security requirements in the IEEE 2030.5 Specification, this library only supports TLS using OpenSSL.
-Therefore, to use this library you will require a local installation of OpenSSL with support for `ECDHE-ECDSA-AES128-CCM8`.
+Due to the security requirements of IEEE 2030.5, this library only supports TLS using OpenSSL.
+To use this library you will require a local installation of OpenSSL with support for `ECDHE-ECDSA-AES128-CCM8`.
 
 
 [^1]: The library happens to performs as expected on macOS. If you would like to test the client locally on macOS, ensure `openssl` does not refer to `libressl`, as is the case by default. 
