@@ -2,13 +2,12 @@
 
 Further proving that the IEEE 2030.5 protocol is worth implementing is it's adoption by electric utilities, as well as the tariffs and guidelines created by government energy regulars who mandate it's use.
 Consequently, many implementations of the protocol exist already, with the vast majority of them proprietary, or implementing proprietary extensions of the standard.
-In this section, we will examine both, and discuss how they may influence our open-source implementation. 
+In this section, we will examine both.
 
 \section{California Public Utilities Commission}
 'Electric Rule 21' is a tariff put forward by CPUC. Within it are a set of requirements concerning the connection of end-user energy production and storage to the grid. In this tariff, it is explicitly clear that
 "The default application-level protocol shall be IEEE 2030.5, as defined in the California IEEE 2030.5 implementation guide" \cite[]{Rule21}.
 Given that the state of California was among the first to make these considerations to the protocol, it's likely that future writers of legislation or tariffs will be influenced by Rule 21, particularly how they have extended the protocol to achieve scale in the realm of smart inverters.
-For that reason, we let the implementation models for the Californian IEEE 2030.5 implementation guide influence our own development of the protocol, whilst of course still adhering to the specification.
 
 Relating directly to use of the IEEE 2030.5 protocol at scale are the high level architecture models defined in the California SIP implementation guide.
 
@@ -109,8 +108,7 @@ The rationale behind this model is to allow utilities to manage entire geographi
 The IEEE 2030.5 server is not aware of this aggregation, as the chosen communication protocol between an aggregator client and an end-user energy device is unspecified and out of scope of the model, as indicated in Figure 4.2.
 Under this model, aggregators may be communicating with thousands of IEEE 2030.5 compliant clients. For this reason, the California SIP mandates the subscription/notification retrieval method be used by clients, rather than polling.
 This is mandated in order to reduce network traffic, and of course, allow for use of the protocol at scale.
-
-Given the circumstances of this model, the aggregator IEEE 2030.5 client is likely to be hosted in the cloud, or on some form of dedicated server.
+Given this, the aggregator IEEE 2030.5 client is likely to be hosted in the cloud, or on some form of dedicated server.
 
 
 \section{Australian Renewable Energy Agency}
@@ -151,32 +149,31 @@ The IEEE 2030.5 Client implementation by EPRI states, in it's User's Manual, tha
 The one exception to this is that the implementation does not support the subscription/notification mechanism for resource retrieval, as of this report.
 This is particularly unusual given that the California SIP mandates the use of subscription/notification under the client aggregator model, a model of which this implementation was targeted for use in.
 
-One potential pain point for developers utilising this library is the ergonomics of the interface provided. The C programming language, whilst universal, lacks many features present in more modern programming languages that can be used to build more ergonomic and safe interfaces. For instance, the codebase's forced usage of global mutable state for storing retrieved Resources, goes against modern design principles, and could be easily avoided in a more modern programming language. 
+One potential pain point for developers utilising this library is the ergonomics of the interface provided. The C programming language lacks many features present in modern programming languages that can be used to build more ergonomic and safe interfaces. For instance, the codebase's forced usage of global mutable state for storing retrieved Resources, goes against modern design principles, and would be easily avoided in a more modern programming language. 
 
-Furthermore, being written in a language without polymorphism, be it via monomorphisation, dynamic dispatch or tagged unions, C forgoes a great deal of type checking that could be used to make invalid inputs to the interface compile-time errors, instead of run-time errors. For example, due to the lack of tagged unions (or algebraic sum types) in C, many functions exposed to users accept a typeless pointer, which is then cast to a specific type at runtime, providing no compile-time guarantees that that type conversion is possible, or that the underlying input is interpreted correctly, or even that the given pointer points to memory that it the process is capable of reading and/or modifying.
+Furthermore, being written in a language without polymorphism, be it via monomorphisation, dynamic dispatch or tagged unions, C forgoes a great deal of type checking that could be used to make invalid inputs to the interface compile-time errors, instead of run-time errors or invocations of undefined behaviour. For example, due to the lack of tagged unions (or algebraic sum types) in C, many functions exposed to users accept a untyped (void) pointer, which is then cast to a specific type at runtime, providing no compile-time guarantees that that type conversion is possible, or that the underlying input is interpreted correctly, or even that the given pointer points to memory that the process is capable of reading and/or modifying.
 
-In contrast to this, the library is sufficiently modular, providing interfaces across multiple C headers, where users of the library need only compile code that is relevant to their use-case. For example, developers building IEEE 2030.5 clients that need not handle DER function set event resources are not required to compile and work with the code responsible for managing them.
+Regardless, the library is sufficiently modular, providing interfaces across multiple C headers, where users of the library need only compile code that is relevant to their use-case. For example, developers building IEEE 2030.5 clients that need not handle DER function set event resources are not required to compile and work with the code responsible for managing them.
 
-Additionally, the usage of the \texttt{epoll} \texttt{syscall} and the library's state-machine centric design lends itself to the scalability of the client, allowing it to handle operations asynchronously, and better perform it's role operating under the client aggregation model \cite[]{eprimanual}. 
+Additionally, the usage of the \texttt{epoll} \texttt{syscall} and the library's state-machine centric design lends itself to the scalability of the client, allowing it to handle operations asynchronously, and better perform when operating under the client aggregation model \cite[]{eprimanual}. 
 
 \subsection{Battery Storage and Grid Integration Program: envoy-client}
-A newer implementation of the protocol is \texttt{envoy-client}, developed by BSGIP, an initiative of The Australian National University. Of note is that this client has been open-sourced ahead of the release of the IEEE 2030.5 Server library implementation \texttt{envoy}, and provides a very bare implementation of core IEEE 2030.5 Client functionality written in Python, and therefore provides a far more modern interface than that of the EPRI library \cite{envoyclient}. 
+A more modern implementation of the protocol is \texttt{envoy-client}, developed by BSGIP, an initiative of The Australian National University. Of note is that this client has been open-sourced ahead of the release of the IEEE 2030.5 Server library implementation \texttt{envoy}, and provides a very bare implementation of core IEEE 2030.5 client functionality. The library is written in Python, and therefore provides a far more modern interface than that of the EPRI library \cite{envoyclient}. 
 
 The library was released publicly in 2021, and has seen virtually no updates since. It is possible the client will see a major update when the \texttt{envoy} library is released, as improvements to 2030.5 test tooling were indicated as being developed \cite{DOEAdoption}. 
 
 
 Despite being written in Python, a programming language with support for asynchronous programming, async await syntax is not present in the codebase. For that reason, it's likely the user of the library will be required to wrap the provided codebase with async python in order for it to scale as a client aggregator. In theory, it's also likely that the Python Global Interpreter Lock would impact the ability for the client to take advantage of multiple threads, and potentially lead to performance issues at scale. 
 
-Despite the library's current incomplete state, a dynamically typed programming language lends itself well to the nature of 2030.5 client-server resource communication, as it allows for deserialisation of XML resources to dynamically typed Python dictionaries, where each key and value can have a different type, using the python "Any" type. This lack of type-checking on resources leads to faster development times, and is part of BGSIP's justification for the client \& server being implemented in Python. 
+Despite the library's current, incomplete, state, a dynamically typed programming language lends itself reasonably well to the nature of 2030.5 client-server resource communication, as it allows for deserialisation of XML resources to dynamically typed Python dictionaries, where each key and value can have a different type, using the python "Any" type. This lack of type-checking on resources leads to faster development times, and is part of BGSIP's justification for the client \& server being implemented in Python. 
 
 Under this design, the checking of XML attributes and elements is left to the user of the library - they must ensure that the given XML resource is of the same type as expected, and that it contains the expected fields. 
 
-By the very nature of dynamic typing, Python provides no guarantees that parts of resources accessed are present, where unchecked accesses to data may lead to runtime errors. 
+By the very nature of dynamic typing, Python provides no guarantees that fields of resources accessed are present or valid. Unchecked accesses to fields may lead to runtime errors. 
 
-With minimal dependencies, and without an interface for TLS, the library is as portable as Python itself.
+With minimal dependencies, and without a fixed implementation of TLS, the library is as portable as Python, and the Python requests library.
 
-Under these circumstances, the library is an ideal tool for quickly testing an IEEE 2030.5 Server implementation, but would likely struggle in real-world use, aggregating on behalf of clients.
-
+Given this, the library would be an acceptable tool for quickly testing an IEEE 2030.5 Server implementation, but would likely struggle in production use, such as when aggregating on behalf of clients, due to it's incompleteness.
 
 
 

@@ -4,7 +4,7 @@
 The IEEE 2030.5 protocol follows a REST API architecture, and as such, adopts a client-server model.
 
 Transmitted between clients and servers are 'Resources', all of which are defined in a standardised schema, an XSD. 
-Despite the client-server model, IEEE 2030.5 purposefully does not make distinctions between clients and servers, as to avoid resources having differing behaviours on each. Rather, a server exposes resources to clients, while clients retrieve, update, create and delete resources on servers.
+Despite the client-server model, IEEE 2030.5 purposefully does not make distinctions client resources and server resources, as to avoid them having differing behaviours on each. Rather, a server exposes resources to clients, while clients retrieve, update, create and delete resources on servers.
 Servers communicate with many clients, and under a set of specified requirements, clients can communicate with multiple servers.
 
 Being the product of existing technologies, the IEEE 2030.5 resources cover a wide range of applications. As such, the specification logically groups resources into discrete 'function sets', of which there are twenty-five. 
@@ -22,7 +22,7 @@ As a result, the protocol employs the HTTP request methods of GET, POST, PUT and
 
 The specification requires that SSL/TLS certificates be signed, and all encryption done, using ECC cipher suites, with the ability to use RSA cipher suites as a fallback. Unlike regular TLS, these certificates are not only used to verify a server's identity, but are also used to verify a client's identity, using a protocol colloquially referred to as "Mutual TLS" or mTLS.
 
-The standardised resource schema is defined in a XSD, as all transmitted resources are represented using either XML, or EXI, with the HTTP/1.1 \texttt{Content-Type} header set to \texttt{sep+xml} or \texttt{sep-exi}, respectively.
+The standardised resource schema is defined in using XSD, as all transmitted resources are represented using either XML, or EXI, with the HTTP/1.1 \texttt{Content-Type} header set to \texttt{sep+xml} or \texttt{sep-exi}, respectively.
 
 In order to connect to servers, clients must be able to resolve hostnames to IP addresses using DNS. Similarly, the specification permits the ability for clients to discover servers on a local network using DNS-SD.
 

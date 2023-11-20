@@ -11,30 +11,31 @@ Despite this being the case, we do not wish to make decisions that would directl
 \subsection{Security}
 Improving the security of end-user energy devices was a major motivator behind the development of IEEE 2030 and 2030.5. 
 
-Parallel to that measure of improving security, when considering a programming language for our implementation, we want to ensure that we are upholding the security-prioritised design of the protocol. In 2019, Microsoft attributed 70\% of all CVEs in software in the last 12 years to be caused by memory safety issues \cite[]{SecurityMemorySafety}. 
+Parallel to that measure of improving security, when considering a programming language for our implementation, we want to ensure that we are upholding the security-prioritised design of the protocol.
 
-For that reason, we wish to develop our libraries in a programming language that is memory safe. A language where there are fewer attack vectors that target memory unsafety. For that reason, when implementing IEEE 2030.5 in Rust, we limit our development to the subset of Rust that provides memory safety via static analysis, 'Safe' Rust. This is opposed to using 'unsafe' Rust in our client, where raw pointers can be dereferenced, and as such the compiler is unable to provide guarantees on memory safety. When writing unsafe Rust, soundness and memory safety of unsafe code must be proven by hand.
+In 2019, Microsoft attributed 70\% of all CVEs in software in the last 12 years to be caused by memory safety issues \cite[]{SecurityMemorySafety}. For that reason, we wish to develop our implementation in a programming language that is memory safe. A language where there are fewer attack vectors that target memory unsafety. For that reason, when implementing IEEE 2030.5 in Rust, we limit our development to the subset of Rust that provides memory safety via static analysis, 'safe' Rust. This is opposed to using 'unsafe' Rust in our client, where raw pointers can be dereferenced, and as such the compiler is unable to provide guarantees on memory safety. When writing unsafe Rust, soundness and memory safety of unsafe code must be proven by hand.
 
-Furthermore, in developing our implementation we must adhere to many other standards. In in the interest of security, and also correctness, we neglect implementing these standards ourselves, and instead defer to more commonly used, publicly audited, and thoroughly tested implementations of HTTP, SSL, TLS, TCP. 
+Furthermore, in developing our implementation we are required to adhere to many other standards. In in the interest of security, and also correctness, we neglect implementing these standards ourselves, and instead defer to more commonly used, publicly audited, and thoroughly tested implementations of HTTP, SSL, TLS and TCP. 
 
-An exception to this is our usage of \texttt{OpenSSL}, which in 2023 alone has had 19 reported CVEs \cite{OpensslCVE}. In section TODO we discuss alternatives to this going forward.
+An exception to this is our usage of OpenSSL, which in 2023 alone has had 19 reported CVEs \cite{OpensslCVE}. In section 7.3 we discuss alternatives to this going forward.
 
 \subsection{Modularity}
 IEEE 2030.5 is a specification with a wide range of applications. It aims to provide functionality for coordinating virtually all types of end user energy devices. Under CSIP and CSIP-AUS, it can be deployed in different contexts (See Section 4.1), and can require software on both the side of the electric utility, and the end-user energy device.
 
-For this reason, instead of developing any single binary application, we've instead designed and implemented a series of Rust libraries (called 'Crates'), for use by developers to allow them to develop IEEE 2030.5 compliant software, providing them with an abstraction for interacting with IEEE 2030.5 servers and resources.
+For this reason, instead of developing any single binary application, we've instead designed and implemented a series of Rust libraries (called 'Crates'), for use by developers to allow them to develop IEEE 2030.5 compliant software. We provide them with an abstraction for interacting with IEEE 2030.5 servers and resources.
 
 \subsubsection{XML Serialisation \& Deserialisation Library: \- SEPSerde}
-As we've established, resources can be communicated between clients and servers as their XML representations. This means we require the ability to serialise \& deserialise Rust data types to and from XML.
+IEEE 2030.5 resources can be communicated between clients and servers as their XML representations. This means we require the ability to serialise \& deserialise Rust data types to and from XML.
 Fortunately, there already exists a popular Rust crate for this purpose, built for use in embedded communication protocols, called \texttt{YaSerde} \cite[]{YaSerde}.
 
 However, this library does not perfectly fit IEEE 2030.5 requirements. To address this, we have forked YaSerde, and developed a crate \texttt{SEPSerde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to IEEE 2030.5.
+
 Note that we are yet to complete the renaming of this library, in all code snippets the library will still be referred to as \texttt{YaSserde}.
 
 \subsubsection{Common Library: \- sep2\_common}
-IEEE 2030.5 resources are required for use in both clients and servers. For that reason, we've developed a common library with a Rust implementation of the IEEE 2030.5 XSD, whilst including our \texttt{SEPSerde} crate as to allow these resources to be serialised and deserialised to and from XML.
+IEEE 2030.5 resources are used in both clients and servers. For that reason, we've developed a common library with a Rust implementation of the IEEE 2030.5 XSD. This common library includes the code necessary to integrate with our \texttt{SEPSerde} crate, allowing these resources to be serialised and deserialised to and from XML.
 
-This common library, \texttt{sep2\_common}, can then be easily integrated and implemented in a future 2030.5 server implementation, as to avoid resources being implemented and stored differently on either. 
+This common library, \texttt{sep2\_common}, can then be easily integrated and implemented in a future IEEE 2030.5 server implementation, as to avoid resources being implemented and stored differently on either. 
 For the sake of modularity, and to avoid unnecessarily large binaries when compiled, this crate comes complete with compile-time flags (called Crate 'features') for each of the resource packages in IEEE 2030.5, where packages correspond to function sets.
 
 \subsubsection{Client Library: \- sep2\_client}
@@ -43,7 +44,8 @@ Every implementation of a IEEE 2030.5 Client will behave differently to fit the 
 If a IEEE 2030.5 Client is deployed under the "Aggregated Clients Model" it will need to communicate with the end-user energy devices themselves via some undefined protocol.
 If a IEEE 2030.5 Client is deployed under the "Individual/Direct Model" the very same client will be responsible for modifying the hardware of the device itself accordingly. 
 Clearly, it is impossible for us as developers to implement the resulting logic for directly interacting with the electric grid.
-For that reason, we have produced \texttt{sep2\_client}, a framework for developing IEEE 2030.5 Clients, regardless of the specific end-device, and regardless of the model under which it deployed.
+
+We have therefore produced \texttt{sep2\_client}, a framework for developing IEEE 2030.5 Clients, regardless of the specific end-device, and regardless of the model under which it deployed.
 
 Much like \texttt{sep2\_common}, we provide compile-time flags for different function sets. For example, clients that don't run a Subscription / Notification server, need not compile it.
 
@@ -52,14 +54,14 @@ Our implementation aims to address the lack of open-source IEEE 2030.5 software 
 
 When choosing an open-source license for which we distribute our implementation under, we consider the licenses of all other software we depend on. The Rust programming language is released under both the MIT license, and the Apache 2.0 license. 
 
-Furthermore, all our Rust library dependencies are licensed under either the MIT license, or both the MIT license and Apache 2.0, with the exception of OpenSSL, which is only licensed under Apache 2.0.
+Furthermore, all our Rust library dependencies are licensed under either the MIT license, or both the MIT license and the Apache 2.0 license. The exception is OpenSSL, which is only licensed under Apache 2.0.
 
 Therefore, we are given the ability to release our implementation under either license, or both. 
 
-As part of our research, we discovered a rationale for MIT \& Apache 2.0 dual licensing being overwhelmingly used by Rust crates. This rationale claims that Apache 2.0 improves the interoperability of Rust crates in terms of their licensing, while the MIT license allows for software developed downstream to be licensed under the GPLv2 \cite{relicense} \cite{relicensejosh}. 
+As part of our research, we discovered a rationale for MIT \& Apache 2.0 dual licensing being overwhelmingly used by Rust crates. This rationale claims that Apache 2.0 improves the interoperability of Rust crates in terms of their licensing, while the MIT license allows for software developed downstream to be licensed under the GPLv2, whereas the Apache 2.0 does not. \cite{relicense} \cite{relicensejosh}. 
 
 
-For that reason, we follow the vast majority of Rust libraries, and the Rust programming language itself, and have released our \texttt{sep2\_common} crate, and our \texttt{sep2\_client} crate under both the MIT and Apache 2.0 licenses.
+For that reason, we follow the vast majority of Rust libraries, and the Rust programming language itself, and have released our \texttt{sep2\_common} crate, and our \texttt{sep2\_client} crate under both the MIT and Apache 2.0 licenses, allowing library users to choose the license that best their needs when releasing downstream of our implementation.
 
 \subsubsection{Ergonomic Interface}
 
@@ -69,8 +71,10 @@ For example, despite being a strongly typed language, we could have made the dec
 
 Similarly, as we'll discuss, we provide Rust enums \& bitflag implementations for integer enumerations and bitmaps once types are parsed, instead of raw integers.
 
+Further details of how we produce an ergonomic interface are detailed throughout Chapter 6.
+
 \subsection{I/O Bound Computation}
-When designing our implementation, we consider that IEEE 2030.5 clients are I/O bound applications. Furthermore, with the expectation that our client library will be used to primarily develop clients operating under the client aggregation model, it is necessary that our client is able to scale alongside a large proportion of I/O bound operations as it interacts with multiple end-user energy devices, and potentially multiple servers.
+When designing our implementation, we consider that IEEE 2030.5 clients are I/O bound applications. Furthermore, with the expectation that our client library will be used to primarily develop clients operating under the client aggregation model, it is necessary that our implementation is able to scale alongside a large proportion of I/O bound operations as it interacts with multiple end-user energy devices, and potentially multiple servers.
 
 For that reason, we require an abstraction for event-driven architecture, such that computations can be performed while waiting on I/O.
 
@@ -83,52 +87,56 @@ Events a client instance are required to listen for include, but are not limited
     \item Network events, such as an updated resource being pushed to the client via the subscription / notification mechanism, or receiving the response from a sent HTTP request.
 \end{itemize}
 
-For that reason, we implement our client library using async Rust, providing us with a zero cost abstraction for asynchronous programming.
+For that reason, we implement our client library using async Rust, which provides us with a zero cost abstraction for asynchronous programming.
 
 Rust provides runtime-agnostic support for await and async syntax.
-When attached to an runtime, async Rust can use operating system event notifications, such as \texttt{epoll} on Linux, in order to significantly reduce the overhead of polling for new events.
+When attached to an runtime, async Rust can use operating system event notifications, such as via \texttt{epoll} on Linux, in order to significantly reduce the overhead of having to poll for new events.
 
-Furthermore, an async Rust Runtime allows us to take advantage of multiple OS threads, and therefore multiple CPU cores, as to best accommodate for the scale that's required by the client aggregator model.
+Furthermore, an async Rust runtime allows us to take advantage of multiple OS threads, and therefore multiple CPU cores, as to best accommodate for the scale that's required by the client aggregator model.
 
-We are reassured this approach to be sensible,as it is the approach shared by the EPRI C Client implementation. EPRI claims their library to be performant as it leverages asynchronous events via \texttt{epoll} and state machines.
+We are reassured this approach to be sensible, as it is the approach shared by the EPRI C Client implementation. EPRI claims their library to be performant as it leverages asynchronous events via \texttt{epoll} and state machines.
 
 
 \subsection{Reliability}
-Per the nature of the protocol, all software used must be reliable and all expected errors are to be recovered from gracefully. Client instances must run autonomously for extended periods of time, particularly under the client aggregation model. Failure to do so could possibly lead to a denial of service for electricity.
+By the nature of the protocol, all software used must be reliable and all expected errors are to be recovered from gracefully. Client instances must run autonomously for extended periods of time, particularly under the client aggregation model. Failure to do so could possibly lead to a denial of service of the electric grid.
 
-For that reason, we leverage Rust's compile-time guarantees on the reliability of software. For example, in Rust, expected errors are to be handled at compile time. The Rust tagged union types 'Option' and 'Result' force programmers to handle error cases in order to use the output of a process that can fail. Comparatively, a language like C++ uses runtime exceptions to denote errors, such as in the standard library. C++ does not require programmers to handle these exceptions at compile-time.
+For that reason, we leverage Rust's compile-time guarantees that assist the reliability of software. For example, in Rust, expected errors are to be handled at compile time. The Rust tagged union types 'Option' and 'Result' force programmers to handle error cases in order to use the output of a process that can fail. Comparatively, a language like C++ uses runtime exceptions to denote errors, as is the case in the standard library. C++ does not require programmers to handle these exceptions at compile-time, it does not express these exceptions at the type-level like Rust does.
 
-As a result of Rust's type system, safe Rust also eliminates the possibility of a data race when working with multiple threads of execution, further improving the reliability of our implementation.
+Safe Rust, through it's type system, also eliminates the possibility of a data race when working with multiple threads of execution, further improving the reliability of our implementation.
 
 \subsection{Operating System}
-Despite the desire to write code that is portable, our code requires a great deal of operating-system-specific functionality, and as such will need to target a single operating system. 
+Despite the desire to write code that is portable, our code requires a good deal of operating-system-specific functionality. As such, we will target a single operating system. 
 
-Of great consideration when choosing an operating system is the aforementioned 'Aggregator' model for IEEE 2030.5, where by our client would be deployed on a dedicated server, or in the cloud. In this circumstance, it's very much likely an operating system running on the Linux kernel is to be used, due to it's prevalence in server operating-systems.
+Of great consideration when choosing an operating system is the aforementioned 'Aggregator' model for IEEE 2030.5, where by our client would be most likely deployed on a dedicated server, or in the cloud. In this circumstance, it's very much likely an operating system running on the Linux kernel is to be used.
 
 Furthermore, in the event a client is being developed under the Individual/Direct model there exist very lightweight Linux based operating systems for low-spec devices. For that reason Linux based operating systems are the best candidate for our targeted operating system.
 
-We are fortunate enough that we get, for free, a great deal of further portability by the nature of the Rust programming language, and the open-source libraries we use. Both have implementations for a wide variety of common operating systems \cite{RustPlatforms} \cite{TokioDocs}. 
+We are fortunate enough that we get, for 'free', a great deal of portability, simply by the nature of the Rust programming language, and the open-source libraries we use. Both have implementations for a wide variety of common operating systems \cite{RustPlatforms} \cite{TokioDocs}. Of note is that the vast majority of our code is as portable as Rust.
 
-In the case this portability is still not sufficient, our libraries are open-source and allow users to fork our implementation and modify it for their use case, with the vast majority of our code being as portable as Rust itself.
+In the event a library user wishes to use our implementation on an unsupported operating system, our libraries are open-source and allow for others to fork our implementation and modify it for their use case.
     
 \section{Assumptions}
-In designing our client, we've made a set of assumptions on library user expectations, and IEEE 2030.5 Client behaviour that is not present in the spec. These assumptions have determined what functionality we have and have not implemented.
+In designing our client, we've made a set of assumptions on library user expectations, and IEEE 2030.5 Client behaviour that is not present in the spec.
 
 \subsection{Rust Usability}
-A major assumption of this thesis is that users of our libraries will have a strong understanding of the Rust programming language.
+A major assumption of this thesis is that users of our libraries will have a strong understanding of the Rust programming language, as is required to write elegant and performant, asynchronous Rust code.
 
-To make the best use of our implementation, users will need to be be familiar with common design patterns when working with concurrent, asynchronous Rust code. This in of itself requires a solid understanding of single-threaded Rust code.
+To make the best use of our implementation, users will need to be be familiar with common design patterns when working with concurrent, asynchronous Rust code. This in of itself requires a solid understanding of single-threaded Rust code. This thesis is designed to be understood without extensive knowledge of the Rust programming language.
+
+However, our implementation will not be accompanied by explanations or documentation pertaining specifically to the Rust programming language, as many sets of documentation and examples are freely available, and are almost certainly  of higher quality than we could produce. 
+
+We will however, produce thorough documentation and examples for using our libraries specifically.
 
 \subsection{Notification Routes}
-When developing our Subscription/Notification mechanism, as part of the \texttt{sep2\_client} crate, we've made the assumption that library users will not want to a single HTTP route on their notification server that handles all incoming notifications. Instead, each notification containing a different resource would be sent to a different route. Each subscription would have a different \texttt{notificationURI} field on each subscription made.
+When developing our Subscription/Notification mechanism, as part of the \texttt{sep2\_client} crate, we've made the assumption that library users will not want to a use single HTTP route that handles all incoming notifications. Instead, developers would have each notification containing a different resource sent to a different route. That is, subscription resources would have a different \texttt{notificationURI} field on each subscription made.
 
 We make this assumption as the specification makes no mention of whether a single route must be used, yet the examples in the specification show all notifications forwarded to a single URI. Under a single route, each incoming HTTP request would first need to parse the body of the request to determine how to handle it. Using multiple routes simplifies this logic, requiring only the \texttt{Host} header be inspected. 
 
-If the client was being developed in a dynamically typed programming language, or if XML parsing was done untyped, the single route would be a more reasonable approach. This is not the case.
+If the library was being developed in a dynamically typed programming language, or if XML parsing was done untyped (specifically using just strings), the single route would be a more reasonable approach. This is not the case.
 
 We therefore assume the single route usage is purely for the purpose of the example, and that in reality, client developers do not desire this functionality.
 
-We also assume that, due to the small subset of IEEE 2030.5 resources being subscribable, that parametrized HTTP routes are not required, and that all routes are simply a relative URI interpreted literally.
+We also assume that, due to only a small subset of IEEE 2030.5 resources being subscribable, that parametrized HTTP routes are not required, and that all routes are simply a relative URI interpreted literally.
 
 \subsection{DNS-SD}
 IEEE 2030.5 states that a connection to a server can be established by specifying a specific IP address or hostname and port. In the event cannot be provided, the specification states that DNS-SD can be used to query a network for servers, whilst providing clients with the ability to only query for servers advertising support for specific function sets. 
@@ -148,5 +156,5 @@ Fortunately, we have the aforementioned existing open-source implementations to 
 Furthermore, as a general rule, we prioritise designing a highly generic interface that minimises the restrictions placed on library users as much as possible, as to support incorporating our libraries into as many differently designed Rust programs as possible, and not force any one program structure.
 
 \subsection{EXI}
-IEEE 2030.5 Resources can be communicated between clients \& servers as their EXI representations. EXI is a binary format for XML, aiming to be more efficient (Measured by number of bytes sent for the same payload, and computation required to decode) by sacrificing human readability. As of present, there exists no Rust library for producing EXI from XML or from Rust data types, and vice-versa.
+IEEE 2030.5 Resources can additionally be communicated between clients \& servers as their EXI representations. EXI is a binary format for XML, aiming to be more efficient (Measured by number of bytes sent for the same payload, and computation required to decode) by sacrificing human readability. As of present, there exists no Rust library for producing EXI from XML or from Rust data types, and vice-versa.
 Developing a Rust EXI library fit for use in IEEE 2030.5 is a large enough of an undertaking to warrant it's own thesis, and as such, is not included in our implementation.

@@ -76,11 +76,10 @@ In early benchmarks, \texttt{rustls} is shaping up to be more performant and mor
 
 Currently, the \texttt{ring} crate does not support Authenticated Encryption using CCM, as required by IEEE 2030.5, stalling progress on being able to use \texttt{rustls}. As part of our library release, we will inquire with the status of this implementation, and what further work is required to add the functionality to \texttt{ring}. Currently, progress on this feature in ring has stalled, and there may be avenues for us to contribute to ring directly \cite{ringccmpr} \cite{ringccmissue}.
 
-\subsection{HTTP Implementation Improvements}
+\section{HTTP Implementation Improvements}
 Whilst we use the \texttt{hyper} client as part of our implementation, and not the more commonly used wrapper around it, \texttt{reqwest}, we lose a great deal of functionality that is necessary for both ergonomics, and IEEE 2030.5 \cite{reqwest}. 
 
 One such crucial example is the ability to handle HTTP redirects without having to implement it ourselves.
-Another example is that a \texttt{hyper} function for reading a streamed HTTP/1.1 body allocates as per the incoming \texttt{Content-Length} header, and as such, can cause a denial of service if not explicitly handled. Comparatively, this is not something users of \texttt{reqwest} would need to worry about it.
 With the recent release of \texttt{hyper 1.0}, this problem is exacerbated, with the library requiring more of the lower level details be handled in our implementation, as it aims to provide a more generic HTTP implementation.   
 
 \texttt{reqwest} supports TLS using either OpenSSL (via the \texttt{native\_tls} crate), or \texttt{rustls}. However, when used with OpenSSL it does not expose a way to specify the cipher-list used. We require this functionality to force the use of the IEEE 2030.5 cipher suite. One workaround to this would be to have users of our library modify the OpenSSL source-code, and compile a version that has our cipher suite as the default. This is far from ideal from a usability perspective \cite{reqwestopenssl}.
@@ -125,7 +124,6 @@ As it stands, our client and common library are reasonably well-tested, with cod
 	\item Testing automated schedule responses are sent as required (only client output is tested currently).
 	\item Improving coverage wherever possible.
 \end{itemize}
-ensuring all resources are serialised correctly.
 
 Furthermore, we would like to test our implementation against production-ready IEEE 2030.5 servers. There are currently two candidates against which this testing can be done, the \texttt{GridAPPS} IEEE 2030.5 server implementation, and the publicly accessible IEEE 2030.5 Test API hosted by Energy Queensland \cite{sep2clienthandbook} \cite{gridapps}. Both of these servers are not very well advertised, and were discovered very late into this thesis.
 
@@ -143,6 +141,8 @@ One potential pain point in our current implementation is our usage of opaque er
 This simplifies our internal error handling, but limits the potential error cases users of our library can handle. Since we are unable to envisage exactly how users of our library might want to handle errors, it would be more appropriate to use transparent error types that provide more insight into why some operations failed.
 
 Fortunately, our interfaces expose few very functions that return an error. Many error cases occur running in the background. As such, improving error handling would require minimal changes.
+
+One case where improvements could be easily made are user-defined callbacks. Currently our implementation only calls the poll, and notification callbacks when a valid resource could be deserialised, it does not allow the library user to specify a behaviour when an error occurs. We could change this to provide users with the \texttt{Result} enum directly, and allow them to handle the error case however they wish.   
 
 \section{Benchmarking \& Profiling}
 We currently have no data, or frame of reference, for the performance of the client. 

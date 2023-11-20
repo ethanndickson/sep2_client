@@ -5,21 +5,21 @@ Given the context and background of the IEEE 2030.5 protocol, and the high-level
 The common library, \texttt{sep2\_common}, contains all functionality that we have determined to be common to both IEEE 2030.5 clients and servers.
 
 \subsection{Resource Data Types}
-The largest aspect of the common library is the internal representation of resources, the data communicated between clients \& servers. These resources are described precisely in an XSD.
+The primary purpose of the common library is to provide Rust representations of resources, which are described precisely in an XSD.
 Resources range from data that may be used by the electric utility, such as the current load of the device, to resource metadata, such as the rate at which a client should poll a server for a given resource, or what URI endpoint can be used to access a given resource, in the case of a Link resource.
 In IEEE 2030.5, these data structures are separated into packages for each of the function sets.
 
 Whilst IEEE 2030.5 makes no mention of the object oriented programming paradigm, OOP inheritance underpins the design of all resources. Data types use both multi-level and hierarchial inheritance.
-For the purpose of having developers reuse code, many base types appear in the 'common' package; data structures extended by many others.
+For the purpose of having developers reuse code, many base types appear in the 'common' package; data types extended by many others.
 
 \subsubsection{Representing Resources in Rust}
-Rust, despite being influenced by OOP, does not posses the notion of a class, like in languages like C++ or Java. As such, Rust does not define shared behaviour of types through inheritance from a common parent type. 
-Rather shared behaviour is defined through traits, where shared behaviour refers solely to the methods that we can call on that type, the traits a type implements.
+Rust, despite being influenced by OOP languages, does not posses the notion of a class, like in languages like C++ or Java. As such, Rust does not define shared behaviour of types through inheritance from a common parent type. 
+Rather shared behaviour is defined through traits, where shared behaviour refers solely to the methods that we can call on that type - the traits a type implements.
 
 In this sense, Rust polymorphism does not concern itself with what a type is or what that type stores, it concerns itself only with the traits it possesses.
 
-Traits themselves do support inheritance. One can have traits that require other traits to be implemented for a given type. However, this does not change the fact that traits only represent behaviour. 
-There is no way to have a data structure inherit the internal members of another.
+Traits themselves do support a form of inheritance. Traits can require that other traits be implemented for a given type. However, this does not change the fact that traits only represent behaviour - 
+there is no way to have a data structure inherit the internal members of another.
 
 \begin{figure}[H]
     \begin{center}
@@ -46,11 +46,11 @@ There is no way to have a data structure inherit the internal members of another
     \end{center}
 \end{figure}
 
-In Figure 5.2, we have a Rust trait that describes the behaviour of the List base type. All lists are resources, and thus we have a trait bound that all types implementing SEList must first implement the SEResource trait.
+In Figure 6.2, we have a Rust trait that describes the behaviour of the List base type. All lists are resources, and thus we have a trait bound that all types implementing SEList must first implement the SEResource trait.
 
-The prefix \texttt{SE} for 'Smart Energy' simply differentiates the trait from the concrete type with the same name.
+The prefix \texttt{SE} (for 'Smart Energy') simply differentiates the trait from the concrete type with the same name.
 
-This is the extent of native inheritance in rust. We can specify the exact behaviour of types that belong to a trait in detail, but we cannot influence how that behaviour is achieved.
+This is the extent of native inheritance in Rust. We can specify the exact behaviour of types that belong to a trait in detail, but we cannot influence how that behaviour is achieved.
 
 \subsubsection{Emulating inheritance in Rust}
 
@@ -63,7 +63,7 @@ As a result, we're forced to emulate the inheritance of data structure members i
 
 Regardless of the approach, we still do not have have polymorphism using resource base-types as supertypes.
 To allow for polymorphism a trait must be defined for each base-type. That trait must then be implemented for all types that extends that base type. 
-This is unavoidable duplicate code - although Rust provides mechanisms for which it can be generated at compile-time.
+This is unavoidable duplicate code - although Rust provides ways for which it can be generated at compile-time.
 
 \subsubsection{Inheritance via Composition}
 
@@ -123,13 +123,13 @@ Given that there are just under 700 data types in the IEEE 2030.5 schema, we had
 \subsubsection{XSD to Rust types}
 
 If we were to implement the second approach, an existing Rust library can be used to automate the process of defining data types altogether.
-This of course draws on the fact that the IEEE 2030.5 XSD is entirely self-contained, and follows XSD guidelines by W3C. As such, generating rust data types from it is a reasonable approach.
+This of course draws on the fact that the IEEE 2030.5 XSD is entirely self-contained, and follows XSD guidelines by W3C. As such, generating Rust data types from it is a reasonable approach.
 One such way to automate this process would be to design and implement our own XSD parser and struct generator. Fortunately, we are not the first to require such a tool.
 
 On the Rust public crates registry there are several XSD parsers, many of which existing to solve very similar problems; implementing standardised communication protocols in Rust.
 However, for that reason, many of these implementations are developed until they meet the creators needs, at which point the tool is no longer maintained.
 
-Of the most complete parsers, one particular implementation stands out. This particular implementation supports hierarchial inheritance and makes reasonable assumptions on the internal representations of primitive data types.
+Of the most complete parsers, one particular implementation stands out. This crate supports multi-level and hierarchial inheritance and makes reasonable assumptions on the internal representations of primitive data types.
 \texttt{xsd-parser-rs} by \texttt{Lumeo}, was created for use in their \texttt{Open Network Video Interface Forum Client}, software with requirements not dissimilar from that of IEEE 2030.5. \cite[]{xsdparserrs}
 
 \begin{figure}[H]
@@ -160,7 +160,7 @@ Of the most complete parsers, one particular implementation stands out. This par
 
 Figure 6.5 is what \texttt{xsd-parser-rs} currently produces for the List resource. In this figure, it's parsed that the List type inherits from the Resource type, and included the href data member accordingly. It's also included the documentation as found in the schema.
 
-Compared to true OOP inheritance, this has types include their parent type data members in their own type definitions.
+Compared to inheritance in other languages, this has types include their parent type data members in their own type definitions.
 Despite this, the type definitions are far more readable, and align more closely with the output of the client, in that inheritance is flattened out.
 
 
@@ -198,7 +198,7 @@ As mentioned, we've used \texttt{xsd-parser-rs} to automate the process of resol
 
 We add Resource polymorphism to our common library as it can be implemented relatively easily, and assists both ourselves in writing more generic code (such as the Event scheduler), and users of our library, such as by allowing them to store all "Subscribable" resources in a single container.
 
-Therefore, as part of the common library, we define a set of Rust traits that mirror common fields in resources. 
+Therefore, as part of the common library, we define a set of Rust traits that mirror base type resources. 
 
 Since IEEE 2030.5 does not use multiple inheritance (inheriting from more than one base type), if we were to mirror base types to traits exactly, we would be implementing a confusing level of redundancy into our traits.
 For example, \texttt{RespondableSubscribableIdentifiedObject} inherits from \texttt{RespondableSubscribableObject}, which provides it with three new fields that allow it to be 'Identified'. Similarly, \texttt{RespondableIdentifiedObject} inherits from \texttt{RespondableObject}, but provides it with the same Identified fields. In this example, Resources become 'identified' in two different ways. Rather than have two traits that provide the same behaviour, but with two different supertraits, we simplify and provide a single \texttt{SEIdentifiedObject} trait. We do this for all such redundant definitions of fields.
@@ -217,7 +217,7 @@ For example, \texttt{RespondableSubscribableIdentifiedObject} inherits from \tex
     \end{center}
 \end{figure}
 
-To implement these traits for all relevant types we use Rust's procedural macros - Rust code that runs at compile time producing more code to be compiled. A straight forward implementation gives us the ability to derive any of these traits on a type that possesses all the required fields.
+To implement these traits for all relevant types we use Rust's procedural macros - Rust code that runs at compile time producing more code to be compiled. A straight-forward implementation gives us the ability to derive any of these traits on a type that possesses all the required fields.
 
 Manually adding these Derive annotations to all our data types would be extremely time consuming, and is unfeasible. Instead, we use our \texttt{xsd-parser-rs} fork to evaluate all the inheritance in the inheritance tree of a specific type, and use it to automate this process entirely. 
 
@@ -242,11 +242,9 @@ Manually adding these Derive annotations to all our data types would be extremel
 
 The result is all IEEE 2030.5 resources include trait implementations defining behaviour shared between them. 
 
-
-
 \subsection{Resource Serialisation \& Deserialisation}
 IEEE 2030.5 resources can be sent as their XML representations over HTTP. This means our common library requires the ability to serialise and deserialise resources to and from the appropriate XML.
-This means HTTP requests containing resources are sent with \texttt{Content-Type} set to \texttt{application/sep+xml}.
+This means HTTP requests containing resources are sent with the \texttt{Content-Type} header set to \texttt{application/sep+xml}.
 
 On the public Rust crates registry, there exists a popular XML serialisation and serialisation library purpose built for use in embedded communication protocols called \texttt{YaSerde} \cite[]{YaSerde}.
 Despite being developed by different teams, the syntax to use \texttt{YaSerde} on Rust data types is auto-generated by \texttt{xsd-parser-rs}, and as such, is to be used in our client implementation.
@@ -266,6 +264,8 @@ As part of our work we've modified \texttt{YaSerde} (\texttt{SEPSerde}) in order
     \item Allow for data types that use Rust generics to be serialised and deserialised (Notification \& NotificationList )
 \end{itemize}
 
+All done without requiring a manual per-type implementation.
+
 \subsubsection{Notification}
 The 'Notification' resource is a container for delivering resources to clients via the Subscription / Notification method. This means a Notification resource is generic, it contains some other resource as one of it's fields. To represent this as a type, we use Rust generics, where the generic type is bound by the 'SEResource' trait we've defined.
 
@@ -282,7 +282,7 @@ The 'Notification' resource is a container for delivering resources to clients v
     \end{center}
 \end{figure}
 
-This type representation uses Rust's monomorphization, and therefore it being generic has no runtime overhead.
+This type representation uses Rust's monomorphisation, and therefore it being generic has no runtime overhead.
 
 However, this poses some challenges for \texttt{YaSerde} which was not written with this sort of use case in mind. Even more so, the XML representation of a Notification resource is unique, in terms of how it expresses the type of the inner resource.
 
@@ -352,8 +352,8 @@ Unlike the Notification resource, the NotificationList resource's purpose is mor
     \item A NotificationList is a Notification of a List resource, where that List resource is split up into multiple individual notifications.
 \end{itemize}
 
-The latter two interpretations would lead themselves to the most trivial implementation, a NotificationList need simply have a single generic type. The first interpretation would be, as a result of Rust's type-system, very much non-trivial, and would require each Notification to store a SEResource trait object (dynamic dispatch), as to force each Notification to have the same concrete type.
-Fortunately, as mentioned in 5.2.1 we assume developers would want to use different routes for different notifications, making the first interpretation irrelevant.
+The latter two interpretations would lead themselves to the most trivial implementation, a NotificationList need simply have a single generic type. The first interpretation would be, as a result of Rust's type-system, very much non-trivial, and would require each Notification to store a SEResource trait object (dynamic dispatch), as to force each Notification within the list to have the same concrete type.
+Fortunately, as mentioned in 5.2.1 we assume developers would want to use different routes for different notifications, making the first interpretation irrelevant, as all notifications on a single route will contain the same inner resource.
 
 However, that does not yet clarify which of the latter two are correct. In any case, this is merely the behaviour of the NotificationList after being deserialised, and not something we as library developers need to worry about. For that reason we implement NotificationList as simply a list of Notifications, all with the same inner resource.
 
@@ -420,7 +420,7 @@ Figure 6.12 shows our implementation of this, where we first implement a total o
 
 To provide an ergonomic way for working with lists, and ensure lists are always sorted, we use our procedural macros to provide a common interface for working with list resources. List resources contain a Rust \texttt{Vec} internally, which can be pushed to directly, but does not retain the sortedness.
 
-Instead, we provide a \texttt{add} function on all lists that inserts and retains the intended order. This function also updates the 'all' field of the resource (the length of the list), to ensure it remains consistent with the actual contents of the list. Similarly, we provide a \texttt{remove} function. For all other, less common use cases, library users will be required to update the list invariants as necessary. 
+Instead, we provide a \texttt{add} function on all lists that inserts and retains the intended order. This function also updates the 'all' field of the resource (the length of the list), to ensure it remains consistent with the actual contents of the list. Similarly, we provide a \texttt{remove} function maintaining the same invariants. For all other, less common use cases, library users will be required to update the list invariants as necessary. 
 
 \begin{figure}[H]
     \begin{center}
@@ -456,7 +456,7 @@ Instead, we provide a \texttt{add} function on all lists that inserts and retain
 \subsection{CSIP-AUS}
 Implemented in \texttt{sep2\_common} are the IEEE 2030.5 extensions required by CSIP-AUS. These take the form of two additional resources, and additional fields on some existing resources. When extensions are used, IEEE 2030.5 requires that the XML namespace for the extension be included with the resource, and that extension specific fields be prefixed accordingly. For CSIP-AUS this is the \texttt{https://csipaus.org/ns} namespace, and the \texttt{csipaus} prefix  \cite{CSIPAus}.
 
-We make CSIP-AUS extensions available behind the \texttt{csip\_aus} crate feature (library compile flag). When activated, the Rust compiler adds the namespace to existing IEEE 2030.5 resources, and adds the prefix to their respective fields. It also makes the new resources available for use, also with the correct namespace and prefix. Using existing functionality of \texttt{YaSerde}, adding these extensions is straight-forward.
+We make CSIP-AUS extensions available behind the \texttt{csip\_aus} crate feature (compile flag). When activated, the Rust compiler adds the namespace to existing IEEE 2030.5 resources, and adds the prefix to their respective fields. It also makes the new resources available for use, also with the correct namespace and prefix. Using existing functionality of \texttt{YaSerde}, adding these extensions is straight-forward.
 
 As per the Energy Queensland SEP2 Client Handbook, and the CSIP-AUS publication by ARENA, these resources, and our support for the client aggregation model, are the extent to which we, as library developers, can assist users in developing CSIP-AUS compliant clients \cite{sep2clienthandbook} \cite{CSIPAus}. 
 
@@ -504,7 +504,7 @@ Figure 6.15 shows the output of our common library when an EndDevice is construc
 
 
 \subsection{MRID Generation}
-IEEE 2030.5 Servers and Clients are both capable of creating resources. Resources where multiple instances can exist contain a "Master Resource Identifier" (MRID), a 128 bit integer that is globally unique.
+IEEE 2030.5 Servers and Clients are both capable of creating resources. Resources where multiple instances exist, and must be differentiated from one another, contain a "Master Resource Identifier" (MRID), a 128 bit integer that is globally unique.
 As such, library users will require a way of reliably creating cryptographically unique MRIDs. One requirement of the MRIDs is that they contain a IANA Private Enterprise Number (PEN) in the least significant 32 bits.
 
 For that reason, we provide users of our library with a function with the signature \texttt{fn mrid\_gen(pen\_id: u32) -> MRIDType} that produces a new MRID each time it's called.
@@ -561,9 +561,9 @@ Therefore, our first test suite for the common library is to test that all data 
     \end{center}
 \end{figure}
 
-The logic for a test of this type can be succinctly expressed in Rust, as seen in Figure 5.7. 
+The logic for a test of this type can be succinctly expressed in Rust, as seen in Figure 6.17. 
 This test takes advantage of the fact that all our resources are able to automatically implement the 'default' trait, and as such an instance of any resource can be instantiated with default values.
-In Figure 5.7, we first perform this default instantiation, convert the resource to an XML string, and then convert the XML string back into our internal List representation. 
+In Figure 6.17, we first perform this default instantiation, convert the resource to an XML string, and then convert the XML string back into our internal List representation. 
 Finally, we check if the newly deserialised resource is equal to it's default.
 
 For each resource, the only part of this test that differs is the name of the type. As such, we auto-generate this test for each resource, and include it in \texttt{sep2\_common}.
@@ -604,7 +604,7 @@ Going forward, it may be worthwhile to explore alternative XML libraries that ca
 To communicate with IEEE 2030.5 servers using HTTP we use the Rust \texttt{hyper} library, as it currently integrates best with our Security function set requirements, and provides us with adherence to HTTP/1.1 \cite{hyper}. 
 Additionally, when instantiating the client, users can set a HTTP/1.1 \texttt{keepalive} duration value, that will then be passed to \texttt{hyper}.
 
-In section TODO we discuss alternatives to this, and why we'd like to move away from \texttt{hyper} in the future.
+In section 7.3.1 we discuss alternatives to this, and why we'd like to move away from \texttt{hyper} in the future.
 
 \subsubsection{TCP}
 Clients and servers using HTTP/1.1 must use TCP. The most sensible approach to implementing TCP is to wrap the target operating system's sockets library. This is done for us by the Rust standard library.
@@ -621,11 +621,11 @@ Additionally, IEEE 2030.5 defines six classes of X509 certificates, each with di
 Our client library provides developers with a generic interface for meeting the requirements of the Security function set.
 
 \subsubsection{TLS via OpenSSL}
-To implement TLS, we use the publicly audited, and commonly used library \texttt{OpenSSL}. \texttt{OpenSSL} is a C library, for which there exist popular Rust bindings that provide a safe foreign function interface to the underlying C code \cite{openssl}. 
+To implement TLS, we use the publicly audited, and commonly used library OpenSSL. OpenSSL is a C library, for which there exist popular Rust bindings that provide a safe foreign function interface to the underlying C code \cite{openssl}. 
 
-The HTTP library \texttt{hyper} doesn't natively support OpenSSL, but accepts a generic connector interface for use with any conforming external TLS configuration. To accommodate for this, we have \texttt{OpenSSL} generate a TLS config and use the \texttt{hyper\_openssl} library to wrap that configuration in a connector that can be understood by \texttt{hyper} \cite{hyperopenssl}. 
+The HTTP library \texttt{hyper} doesn't natively support OpenSSL, but accepts a generic connector interface for use with any conforming external TLS configuration. To accommodate for this, we have OpenSSL generate a TLS config and use the \texttt{hyper\_openssl} library to wrap that configuration in a connector that can be understood by \texttt{hyper} \cite{hyperopenssl}. 
 
-An \texttt{OpenSSL} TLS configuration is generated when a IEEE 2030.5 Client, capable of making HTTPS requests, is instantiated. To create an IEEE 2030.5 TLS configuration for use in a Client device, library users must provide:
+An OpenSSL TLS configuration is generated when a IEEE 2030.5 Client, capable of making HTTPS requests, is instantiated. To create an IEEE 2030.5 TLS configuration for use in a Client device, library users must provide:
 
 \begin{itemize}
     \item The IP address of the target IEEE 2030.5 server for this client instance.
@@ -658,7 +658,7 @@ Client instances restricted to performing requests via HTTP do not need to suppl
 \end{figure}
 
 \subsubsection{X509 Parsing \& Validation}
-Additionally, we provide an interface for library users to verify that the provided X509 certificates adhere to the specification, that they contain specific extensions and fields. \texttt{OpenSSL} provides this functionality, however the Rust FFI bindings we use do not expose the corresponding API. Rather than write unsafe Rust FFI, and possibly introduce undefined behaviour to our library, we simply defer to the \texttt{X509-Parser} library, which lets us check these conditions efficiently \cite{x509parser}.
+Additionally, we provide an interface for library users to verify that the provided X509 certificates adhere to the specification, that they contain specific extensions and fields. OpenSSL provides this functionality, however the Rust FFI bindings we use do not expose the corresponding API. Rather than write unsafe Rust FFI, and possibly introduce undefined behaviour to our library, we simply defer to the \texttt{X509-Parser} library, which lets us check these conditions efficiently \cite{x509parser}.
 
 \begin{figure}[h]
     \begin{center}
@@ -748,7 +748,7 @@ The IEEE 2030.5 successful request cases that can be returned are \texttt{201 Cr
 
 Currently, this isn't exhaustive, though it most importantly includes all the successful request cases. For the vast majority of use cases, this abstraction is sufficient. As part of our code release, we'll make library users aware of these deficiencies, and provide them with a plan for future enhancements.
 
-In section TODO we discuss a design flaw with this current implementation, and why this interface might need to be adjusted going forward. In section TODO we discuss how we'll be able to improve the core client functionality, as a result of improvements to libraries in the Rust ecosystem.
+In section 7.8 we discuss a design flaw with this current implementation, and why this interface might need to be adjusted going forward. In section 7.4 we discuss how we'll be able to improve the core client functionality, as a result of improvements to libraries in the Rust ecosystem.
 
 \subsubsection{Event Response Interface}
 
@@ -827,7 +827,7 @@ This abstraction is provided by any instantiated client capable of making reques
 Figure 6.23 shows this interface. \texttt{start\_poll} is given a URI relative to the absolute server URI and a callback, and polls the resource at the given poll rate, or the IEEE 2030.5 default rate of 15 minutes. Each interval, it performs a GET request, and provides the deserialised resource to the callback. Since this is an automated background task, users will only be notified of request failures via the logging API we interact with. Ideally, they would only start polling a route once they know it's valid.
 Additionally, we provide a function for forcibly polling all tasks in the queue, and a function for cancelling all resource polling. Library users may want to forcibly poll al resources in the event they were operating without internet, and have regained connection. Library users may want to cancel all poll tasks when attempting a graceful shutdown, or when acting as a client aggregator, no longer aggregating on behalf of a specific client. 
 
-One flaw with this design is that users cannot implement any form of error handling logic for when a retrieval fails. This is discussed further in section TODO.
+One flaw with this design is that users cannot implement any form of error handling logic for when a retrieval fails. This is discussed further in section 7.8.
 
 \subsubsection{Ergonomics}
 When implementing this interface, we take into consideration it's ergonomics. Thus, we provide two ways for users to implement a polling callback.
@@ -980,7 +980,7 @@ Using the same exact method used in implementing Polling Callbacks, we place as 
 Our abstraction handles invalid HTTP requests, and responds accordingly, as per IEEE 2030.5, without any intervention.
 
 \subsubsection{Internals}
-To serve requests over HTTPS we once again use \texttt{OpenSSL} to generate a TLS config using the provided certificates and private key. To merge our TCP stream, created using a Tokio \texttt{TcpListener}, and our TLS configuration, into a single TLS Stream we require the \texttt{tokio\_openssl} crate \cite{tokioopenssl}. This stream can then be passed to \texttt{hyper} to serve the request.
+To serve requests over HTTPS we once again use OpenSSL to generate a TLS config using the provided certificates and private key. To merge our TCP stream, created using a Tokio \texttt{TcpListener}, and our TLS configuration, into a single TLS Stream we require the \texttt{tokio\_openssl} crate \cite{tokioopenssl}. This stream can then be passed to \texttt{hyper} to serve the request.
 
 The rest of the implementation requires us to route incoming HTTP requests to the correct user-defined callback. The simple nature of the server, and lack of parametrized route names results in a straight-forward implementation.
 
@@ -1313,7 +1313,7 @@ Situations that result in a \texttt{INFO} log include:
 \subsection{Testing}
 This client library has been built alongside tests with the goal to maximise test coverage. When running LLVM source-based coverage on \texttt{sep2\_client}, the \texttt{grcov} report claims we have 71.11\% coverage, or 1297 \slash 1824 lines of code covered by tests \cite{grcov} \cite{llvmcov}. 
 
-In section TODO we discuss future improvements to testing.
+In section 7.6 we discuss future improvements to testing.
 
 \subsubsection{Mock Server}
 With the goal of testing the client's ability to make HTTP requests, we required a way to mock an IEEE 2030.5 server. For this, we implemented a 'dumb' IEEE 2030.5 server that produces hardcoded resources and responses for specific inputs. This test server follows a near identical implementation to that of the Subscription / Notification mechanism. We use this test server to ensure functions that make HTTP requests fail and succeed as expected, and that resource polling retrieves the correct number of resources over a given time period. 
