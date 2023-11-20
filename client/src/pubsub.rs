@@ -84,27 +84,31 @@ impl Router {
 /// A lightweight IEEE 2030.5 Server for receiving [`Notification<T>`] resources from a server for the subscription / notification mechanism.
 pub struct ClientNotifServer {
     addr: SocketAddr,
-    cfg: TlsServerConfig,
+    cfg: Option<TlsServerConfig>,
     router: Router,
 }
 
 impl ClientNotifServer {
     /// Create a new Notification server that listens on the given address
-    pub fn new(
-        addr: impl net::ToSocketAddrs,
-        cert_path: impl AsRef<Path>,
-        pk_path: impl AsRef<Path>,
-        rootca_path: impl AsRef<Path>,
-    ) -> Result<Self> {
-        let cfg = create_server_tls_config(cert_path, pk_path, rootca_path)?;
+    pub fn new(addr: impl net::ToSocketAddrs) -> Result<Self> {
         Ok(ClientNotifServer {
             addr: addr
                 .to_socket_addrs()?
                 .next()
                 .context("Given server address did not yield a SocketAddr")?,
-            cfg,
+            cfg: None,
             router: Router::new(),
         })
+    }
+
+    pub fn with_https(
+        mut self,
+        cert_path: impl AsRef<Path>,
+        pk_path: impl AsRef<Path>,
+        rootca_path: impl AsRef<Path>,
+    ) -> Result<Self> {
+        self.cfg = Some(create_server_tls_config(cert_path, pk_path, rootca_path)?);
+        Ok(self)
     }
 
     /// Add a route to the server.
@@ -151,7 +155,7 @@ impl ClientNotifServer {
     /// It will recover from all other errors.
     pub async fn run(self, shutdown: impl Future) -> Result<()> {
         tokio::pin!(shutdown);
-        let acceptor = self.cfg.build();
+        let acceptor = self.cfg.map(|cfg| cfg.build());
         let router = Arc::new(self.router);
         let listener = TcpListener::bind(self.addr).await?;
         let mut set = tokio::task::JoinSet::new();
@@ -170,15 +174,6 @@ impl ClientNotifServer {
             };
             log::debug!("NotifServer: Remote connecting from {}", addr);
 
-            // Perform TLS handshake
-            let ssl = Ssl::new(acceptor.context())?;
-            let stream = SslStream::new(ssl, stream)?;
-            let mut stream = Box::pin(stream);
-            if let Err(e) = stream.as_mut().accept().await {
-                log::error!("NotifServer: Failed to perform TLS handshake: {e}");
-                continue;
-            }
-
             // Bind connection to service
             let service = service_fn({
                 let router = router.clone();
@@ -187,11 +182,29 @@ impl ClientNotifServer {
                     async move { router.router(req).await }
                 }
             });
-            set.spawn(async move {
-                if let Err(err) = Http::new().serve_connection(stream, service).await {
-                    log::error!("NotifServer: Failed to handle connection: {err}");
+
+            if let Some(acceptor) = &acceptor {
+                // Perform TLS handshake
+                let ssl = Ssl::new(acceptor.context())?;
+                let stream = SslStream::new(ssl, stream)?;
+                let mut stream = Box::pin(stream);
+                if let Err(e) = stream.as_mut().accept().await {
+                    log::error!("NotifServer: Failed to perform TLS handshake: {e}");
+                    continue;
                 }
-            });
+                set.spawn(async move {
+                    if let Err(err) = Http::new().serve_connection(stream, service).await {
+                        log::error!("NotifServer: Failed to handle HTTPS connection: {err}");
+                    }
+                });
+            // No TLS
+            } else {
+                set.spawn(async move {
+                    if let Err(err) = Http::new().serve_connection(stream, service).await {
+                        log::error!("NotifServer: Failed to handle HTTP connection: {err}");
+                    }
+                });
+            }
         }
         // Wait for all connection handlers to finish
         log::debug!("NotifServer: Attempting graceful shutdown");

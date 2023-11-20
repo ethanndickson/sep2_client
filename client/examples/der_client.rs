@@ -199,30 +199,26 @@ async fn main() -> Result<()> {
 
     // Create a Notificaton server listening on 1338
     // Make it listen for reading resources on "/reading"
-    let notifs = ClientNotifServer::new(
-        &format!("{}:{}", &args.notif_addr, &args.notif_port),
-        &args.cert,
-        &args.key,
-        &args.ca,
-    )?
-    // Example route that adds to some thread-safe state
-    .add("/reading", {
-        let notif_state = state.clone();
-        move |notif: Notification<Reading>| {
-            let notif_state = notif_state.clone();
-            async move {
-                match notif.resource {
-                    Some(r) => {
-                        notif_state.write().await.insert::<ReadingResource>(r);
-                        SEPResponse::Created(None)
+    let notifs = ClientNotifServer::new(&format!("{}:{}", &args.notif_addr, &args.notif_port))?
+        .with_https(&args.cert, &args.key, &args.ca)?
+        // Example route that adds to some thread-safe state
+        .add("/reading", {
+            let notif_state = state.clone();
+            move |notif: Notification<Reading>| {
+                let notif_state = notif_state.clone();
+                async move {
+                    match notif.resource {
+                        Some(r) => {
+                            notif_state.write().await.insert::<ReadingResource>(r);
+                            SEPResponse::Created(None)
+                        }
+                        None => SEPResponse::BadRequest(None),
                     }
-                    None => SEPResponse::BadRequest(None),
                 }
             }
-        }
-    })
-    // Example route that uses a function pointer
-    .add("/dcap", incoming_dcap);
+        })
+        // Example route that uses a function pointer
+        .add("/dcap", incoming_dcap);
 
     // Spawn an async task to run our notif server
     let notif_handle = tokio::spawn(notifs.run(tokio::signal::ctrl_c()));

@@ -33,17 +33,18 @@ impl RouteCallback<DeviceCapability> for DCAPHandler {
 
 #[tokio::test]
 async fn run_notif_server() {
-    let client = ClientNotifServer::new(
-        "127.0.0.1:1338",
-        "../certs/server_cert.pem",
-        "../certs/server_private_key.pem",
-        "../certs/rootCA.pem",
-    )
-    .unwrap()
-    .add("/dcap", DCAPHandler)
-    .add("/edev", |_: Notification<EndDevice>| async move {
-        SEPResponse::Created(None)
-    });
+    let client = ClientNotifServer::new("127.0.0.1:1338")
+        .unwrap()
+        .with_https(
+            "../certs/server_cert.pem",
+            "../certs/server_private_key.pem",
+            "../certs/rootCA.pem",
+        )
+        .unwrap()
+        .add("/dcap", DCAPHandler)
+        .add("/edev", |_: Notification<EndDevice>| async move {
+            SEPResponse::Created(None)
+        });
     tokio::spawn(client.run(future::pending::<Infallible>()));
     tokio::time::sleep(Duration::from_secs(4)).await;
 }
