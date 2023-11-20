@@ -69,12 +69,30 @@ This comes with a caveat. When async trait functions are declared but not define
 The Tokio runtime is a 'work-stealing' executor. In practice, this means Rust futures we return must implement the \texttt{Send} trait, and can be sent across thread boundaries. Since we cannot express this using an async function in a trait, we would fallback on what would be the desugared syntax alternative, \texttt{impl Future<Output = T> + Send}. This results in a marginally less ergonomic interface, as implementers of the trait now need to wrap their code in a async block themselves. However, this is still superior to the performance overhead and additional dependency that we require for the current workaround.
 
 \section{Native Rust TLS}
-In section 6.2.3 we discussed how make use of the available \texttt{OpenSSL} Rust bindings to implement the security function set, and so far this has been sufficient. However, we note the 19 reported CVEs in \texttt{OpenSSL} in 2023 alone as a cause for alarm \cite{OpensslCVE}. 
+In section 6.2.3 we discussed how make use of the available OpenSSL Rust bindings to implement the security function set, and so far this has been sufficient. However, we note the 19 reported CVEs in OpenSSL in 2023 alone as a cause for alarm \cite{OpensslCVE}. 
 
-However, there exists a project called \texttt{rustls} that eventually aims to compete with \texttt{OpenSSL} by providing a Rust native implementation of TLS for server and client verification, and bulk encryption \cite{rustls}. \texttt{rustls} leverages the \texttt{ring} crate, which provides (almost) native Rust cryptography algorithms \cite{ring}. 
-In early benchmarks, \texttt{rustls} is shaping up to be more performant and more memory efficient than \texttt{OpenSSL}.
+However, there exists a project called \texttt{rustls} that eventually aims to compete with OpenSSL by providing a Rust native implementation of TLS for server and client verification, and bulk encryption \cite{rustls}. \texttt{rustls} leverages the \texttt{ring} crate, which provides (almost) native Rust cryptography algorithms \cite{ring}. 
+In early benchmarks, \texttt{rustls} is shaping up to be more performant and more memory efficient than OpenSSL.
 
 Currently, the \texttt{ring} crate does not support Authenticated Encryption using CCM, as required by IEEE 2030.5, stalling progress on being able to use \texttt{rustls}. As part of our library release, we will inquire with the status of this implementation, and what further work is required to add the functionality to \texttt{ring}. Currently, progress on this feature in ring has stalled, and there may be avenues for us to contribute to ring directly \cite{ringccmpr} \cite{ringccmissue}.
+
+\subsection{HTTP Implementation Improvements}
+Whilst we use the \texttt{hyper} client as part of our implementation, and not the more commonly used wrapper around it, \texttt{reqwest}, we lose a great deal of functionality that is necessary for both ergonomics, and IEEE 2030.5 \cite{reqwest}. 
+
+One such crucial example is the ability to handle HTTP redirects without having to implement it ourselves.
+Another example is that a \texttt{hyper} function for reading a streamed HTTP/1.1 body allocates as per the incoming \texttt{Content-Length} header, and as such, can cause a denial of service if not explicitly handled. Comparatively, this is not something users of \texttt{reqwest} would need to worry about it.
+With the recent release of \texttt{hyper 1.0}, this problem is exacerbated, with the library requiring more of the lower level details be handled in our implementation, as it aims to provide a more generic HTTP implementation.   
+
+\texttt{reqwest} supports TLS using either OpenSSL (via the \texttt{native\_tls} crate), or \texttt{rustls}. However, when used with OpenSSL it does not expose a way to specify the cipher-list used. We require this functionality to force the use of the IEEE 2030.5 cipher suite. One workaround to this would be to have users of our library modify the OpenSSL source-code, and compile a version that has our cipher suite as the default. This is far from ideal from a usability perspective \cite{reqwestopenssl}.
+
+Aside from this, we do not require any of the extra low-level functionality provided by \texttt{hyper}. Outside of security, \texttt{reqwest} is the library better suited to our use case.
+
+Therefore, to use \texttt{reqwest} we require that \texttt{native\_tls} and \texttt{hyper} expose a way to modify the cipher-suite used. As \texttt{native\_tls} is designed to be cross-platform, and OpenSSL is only used on Linux, this seems unlikely.
+
+Alternatively, to use \texttt{reqwest} we require that \texttt{rustls} support the IEEE 2030.5 cipher suite, which first depends on progress on \texttt{ring}.
+
+In the meantime, we will continue to use \texttt{hyper}, and make users of our library aware of the current deficiencies in the library as a result, using GitHub issues.
+Furthermore, we are very much motivated to look into the possibility of contributing to \texttt{rustls}, \texttt{ring}, \texttt{reqwest} or \texttt{native\_tls}, and implementing the required functionality ourselves.
 
 
 \section{Maintainability}
