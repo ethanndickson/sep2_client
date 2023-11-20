@@ -638,7 +638,7 @@ IEEE 2030.5 places one additional restriction on what certificate can be used in
 
 The relevant details on these certificate types are in IEEE 2030.5 \texttt{6.11.8.3.3}, \texttt{6.11.8.4.3} and \texttt{6.11.8.2}. We require the path to the CA to be supplied as to not require developers to install the CA on the system.
 
-Client instances restricted to performing requests via HTTP can be instantiated with just a server address.
+Client instances restricted to performing requests via HTTP do not need to supply any certificates.
 
 \begin{figure}[h]
     \begin{center}
@@ -922,7 +922,7 @@ Using this mechanism, a client runs it's own lightweight HTTP server, with prede
 \subsubsection{Interface}
 This mechanism is optional, and runs irrespective of an instance of a client capable of making HTTP requests. Therefore, we provide users with the \texttt{ClientNotifServer} type, which can be instantiated much like a client.
 
-To instantiate a \texttt{ClientNotifServer}, a developer must provide:
+To instantiate a HTTPS \texttt{ClientNotifServer}, a developer must provide:
 
 \begin{itemize}
     \item The IP address and port the server will listen on for TCP connections.
@@ -930,6 +930,8 @@ To instantiate a \texttt{ClientNotifServer}, a developer must provide:
     \item Path to the certificate's corresponding private key \texttt{.pem} file.
     \item Path to a IEEE 2030.5 "Root certificate" (SERCA) \texttt{.pem} file. 
 \end{itemize}
+
+To instantiate a HTTP \texttt{ClientNotifServer}, only the first is required.
 
 Once created, library users can add routes to the server by specifying the relative path to listen on, and an appropriate callback. In this case, a callback is a function that accepts one argument, a \texttt{Notification<T>}, where \texttt{T} is some resource, and returns a \texttt{SEPResponse}, the same type discussed in 6.2.4. The SEPResponse returned is constructed into an appropriate HTTP response, and then returned.
 
@@ -953,10 +955,10 @@ Once created, library users can add routes to the server by specifying the relat
         \begin{lstlisting}
             let server = ClientNotifServer::new(
                 "127.0.0.1:1338",
-                "client_cert.pem",
-                "client_private_key.pem",
-                "serca.pem"
             )?
+            .with_https("client_cert.pem",
+            "client_private_key.pem",
+            "serca.pem")?
             .add("/dera", incmg_dera)
             .add("/txtmsg,| notif: Notification<TextMessage> | {
                 println!("Message Received: {:?}", notif);

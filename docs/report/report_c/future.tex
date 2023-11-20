@@ -18,6 +18,7 @@ This library is the oldest, and most popular open-source implementation of the c
 		XML Resource Serialisation \& Deserialisation & Yes & Yes \\
 		EXI Resource Serialisation \& Deserialisation & No  & Yes \\
 		DNS-SD                                        & No  & Yes \\
+		TLS via OpenSSL                               & Yes  & Yes \\
 		Resource Scheduled Polling                    & Yes & Yes \\
 		Subscription / Notification Mechanism         & Yes & No \\
 		DER Event Scheduler                           & Yes & Yes \\
@@ -45,6 +46,8 @@ In terms of Event function sets, our client has a more complete implementation. 
 Importantly, EPRI's implementation does NOT include a subscription / notification mechanism, the resource retrieval method mandated as part of CSIP (American). \cite{20305workshop}
 
 However, EPRI's implementation has the benefit of having undergone formal testing provided by QualityLogic, which is a paid, service. Due to the cost of the service, it is unlikely our implementation will ever have the opportunity to undergo the same testing.
+
+Finally, our implementation has the benefit of being written in a memory safe language, safe Rust. The EPRI implementation is written in C, where memory safety must be checked and proven manually. 
 
 \section{Rust Async Traits}
 As of this report, the stable branch of the Rust compiler does not support 'Return Position Impl Trait' (RPIT) in traits (RPITIT). It is simply not supported by the type system. \cite{rustRPITIT}
@@ -96,15 +99,45 @@ In order to ensure our client is maintainable into the future, we will:
 \end{itemize}
 
 \section{Testing}
-As it stands, our client and common library are reasonably well-tested, with code coverage of 73.72\% when measured by lines of code.
+As it stands, our client and common library are reasonably well-tested, with code coverage of 73.72\% when measured by lines of code. We would like to improve this going forward by:
 
+\begin{itemize}
+	\item Testing our resource serialisation against all remaining example XML in Annex C.
+	\item Testing our implementation against all remaining example system tests in Annex C.
+	\item Testing automated schedule responses are sent as required (only client output is tested currently).
+	\item Improving coverage wherever possible.
+\end{itemize}
+ensuring all resources are serialised correctly.
 
-\section{Benchmarking}
+Furthermore, we would like to test our implementation against production-ready IEEE 2030.5 servers. There are currently two candidates against which this testing can be done, the \texttt{GridAPPS} IEEE 2030.5 server implementation, and the publicly accessible IEEE 2030.5 Test API hosted by Energy Queensland \cite{sep2clienthandbook} \cite{gridapps}. Both of these servers are not very well advertised, and were discovered very late into this thesis.
 
-\section{Memory Profiling}
-
-\section{Error Handling}
+Going forward, we will investigate if and how these servers can be used to further test our implementation.
 
 \section{Authenticating Notification / Subscription}
+As of present, a \texttt{ClientNotifServer} can be instantiated without TLS. This is done as to not restrict library users to performing TLS termination at the application, and allowing them to run the notification server behind a reverse proxy or load balancer, such as \texttt{nginx} and \texttt{Apache}. 
+However, this poses some difficulties when paired with \texttt{mTLS}. It is not immediately obvious how client notification servers will perform authentication of incoming requests. This was an issue also encountered  by BSGIP, and discussed in their report "On the implementation and publishing of operating envelopes" \cite{envoyclient}.
+
+It's likely that library users will want to define this authentication  procedure themselves. For that reason, we will likely need to discuss with them how they wish to implement this functionality, and use that to determine if and how it can be implemented into our client in a generic way.
+
+\section{Error Handling}
+One potential pain point in our current implementation is our usage of opaque error types. All errors returned by our interface resolve to a single Error type, provided by the \texttt{anyhow} crate. The exception to this is are parts of the core client functionality interface, however, even in that case many error cases resolve to a single Error type. 
+
+This simplifies our internal error handling, but limits the potential error cases users of our library can handle. Since we are unable to envisage exactly how users of our library might want to handle errors, it would be more appropriate to use transparent error types that provide more insight into why some operations failed.
+
+Fortunately, our interfaces expose few very functions that return an error. Many error cases occur running in the background. As such, improving error handling would require minimal changes.
+
+\section{Benchmarking \& Profiling}
+We currently have no data, or frame of reference, for the performance of the client. 
+
+Going forward, it would be extremely beneficial to perform some form of profiling on an instance of the client in a production context. Particularly, we are interested in what, if any parts of the code are responsible for excessive heap allocations that may impact performance.
+We are also interested in the memory footprint of the client over an extended period of time, to ensure that memory is being freed appropriately. For example, that schedule garbage collection is occurring. 
+
+Furthermore, we would like to know what parts of our implementation that run most frequently and take the longest time to complete, the 'hot' function calls that we would need to optimise further. It's likely these will be the functionality responsible for serialising \& deserialising resources, and will further incentivise us to rewrite \texttt{SEPserde} from scratch.
+
+It would also be sensible to conduct benchmarks of the client when completing a fixed workload, such as several completing several requests simultaneously, and then compare those benchmarks to that of the EPRI C implementation.
+
+
+
+
 
 
