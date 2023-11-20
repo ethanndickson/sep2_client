@@ -580,10 +580,10 @@ As mentioned, our client library is an I/O bound application, and uses async Rus
 
 Our client library is therefore implemented using the \texttt{Tokio} runtime, the most popular Rust async runtime \cite{Tokio}. Tokio uses \texttt{epoll} on Linux, and provides asynchronous wrappers for Rust standard library I/O. Furthermore, being the most popular, it is the only runtime to be extended and provide the functionality we require for our Subscription / Notification function set. This is the \texttt{tokio\_openssl} crate.
 
-The Tokio runtime operates on the basis that we as developers create 'tasks' that yield to one another to make progress, even on a single OS thread. The Tokio runtime is then able to distribute these tasks across available operating system threads to best handle the current workload. Tp use the runtime effectively we need only use async operations in place of blocking operations, and spawn tokio tasks to handle I/O bound operations.
+The Tokio runtime operates on the basis that we as developers create 'tasks' that yield to one as required, in order to make progress, even on a single OS thread. The Tokio runtime is then able to distribute these tasks across available operating system threads to best handle the current workload. To use the runtime effectively we need only use async operations in place of blocking operations, and spawn tokio tasks to handle I/O bound operations.  Spawning a Tokio task is not dissimilar from spawning a thread in Rust.
 
 \subsection{Application Support}
-In IEEE 2030.5, the Application Support function set is defined to include:
+In IEEE 2030.5, the Application Support function set includes:
 
 \begin{itemize}
     \item "RESTful HTTP/1.1 application data exchange semantics"
@@ -596,23 +596,22 @@ In IEEE 2030.5, the Application Support function set is defined to include:
 As such, this function set relies on a correct implementation of other standardised functionality. We choose to implement these standards by leveraging well-tested \& open-source implementations of HTTP, XML, and TCP.
 
 \subsubsection{XML}
-IEEE 2030.5 resources are serialised to XML via our \texttt{sep2\_common} crate, which depends on our \texttt{YaSerde} fork, \texttt{SEPSerde}. Internally, this uses the \texttt{xml-rs} crate, an XML parser \& writer \cite{xmlrs}. This library was chosen to due it's emphasis on specification adherence. In our research we found many competing libraries sacrifice correctness and completeness for performance, or are built for a specific use case, and then no longer maintained \cite{xmlrsperformance}.
+IEEE 2030.5 resources are serialised to XML via our \texttt{sep2\_common} crate, which depends on our \texttt{YaSerde} fork, \texttt{SEPSerde}. Internally, this uses the \texttt{xml-rs} crate, an XML parser \& writer \cite{xmlrs}. This library was chosen to due it's emphasis on correctness. In our research we found many competing libraries sacrifice correctness and completeness for performance, or are built for a specific use case, and then no longer maintained \cite{xmlrsperformance}.
 
 Going forward, it may be worthwhile to explore alternative XML libraries that can be substituted into \texttt{SEPSerde} with the goal of improving XML parsing and writing performance. 
 
 \subsubsection{HTTP}
 To communicate with IEEE 2030.5 servers using HTTP we use the Rust \texttt{hyper} library, as it currently integrates best with our Security function set requirements, and provides us with adherence to HTTP/1.1 \cite{hyper}. 
-Additionally, when instantiating the client, users can set a HTTP/1.1 \texttt{keepalive} duration value, that will then be passed to \texttt{hyper}.
 
 In section 7.3.1 we discuss alternatives to this, and why we'd like to move away from \texttt{hyper} in the future.
 
 \subsubsection{TCP}
-Clients and servers using HTTP/1.1 must use TCP. The most sensible approach to implementing TCP is to wrap the target operating system's sockets library. This is done for us by the Rust standard library.
+Clients and servers using HTTP/1.1 must use TCP. The most sensible approach to implementing TCP is to wrap the target operating system's sockets library. This is done for us by the Rust standard library. Additionally, when instantiating the client, users can set a \texttt{SO\_KEEPALIVE} duration value, which will then be passed to the underlying Linux sockets library.
 
 \subsection{Security}
 The security function set of IEEE 20305 involves "securing transactions between clients and servers" via HTTP over TLS, or more commonly referred to as HTTPS. IEEE 2030.5 mandates a variation of TLS, mTLS, be used. mTLS provides a mechanism for mutually authenticating clients and servers. 
 
-The major constraint implementing the security function set is that "All devices SHALL support \texttt{TLS\_ECDHE\_ECDSA\_WITH\_AES\_128\_CCM\_8} cipher suite", and that the "ECC cipher suite SHALL use elliptic curve secp256r1" \cite{IEEE2030.5}.
+The major constraint implementing the security function set is that "All devices SHALL support the \\ \texttt{TLS\_ECDHE\_ECDSA\_WITH\_AES\_128\_CCM\_8} cipher suite", and that the "ECC cipher suite SHALL use elliptic curve secp256r1" \cite{IEEE2030.5}.
 
 IEEE 2030.5 does allow for additional cipher suites to be used, provided they "provide a cryptographic strength at least equivalent to the mandatory cipher suite" \cite{IEEE2030.5}.  As it stands, users wishing to add additional cipher suites are required to modify the source code of our library, though we do not rule out the possibility of providing an interface for setting additional cipher suites in the future.
 
@@ -628,7 +627,6 @@ The HTTP library \texttt{hyper} doesn't natively support OpenSSL, but accepts a 
 An OpenSSL TLS configuration is generated when a IEEE 2030.5 Client, capable of making HTTPS requests, is instantiated. To create an IEEE 2030.5 TLS configuration for use in a Client device, library users must provide:
 
 \begin{itemize}
-    \item The IP address of the target IEEE 2030.5 server for this client instance.
     \item Path to a IEEE 2030.5 "Device Certificate" or "Self-Signed Client Certificate" \texttt{.pem} file.
     \item Path to the certificate's corresponding private key \texttt{.pem} file.
     \item Path to a IEEE 2030.5 "Root certificate" (SERCA) \texttt{.pem} file. 
@@ -638,7 +636,9 @@ IEEE 2030.5 places one additional restriction on what certificate can be used in
 
 The relevant details on these certificate types are in IEEE 2030.5 \texttt{6.11.8.3.3}, \texttt{6.11.8.4.3} and \texttt{6.11.8.2}. We require the path to the CA to be supplied as to not require developers to install the CA on the system.
 
-Client instances restricted to performing requests via HTTP do not need to supply any certificates.
+Client instances restricted to performing requests via HTTP do not need to supply any certificates, they need only support an absolute URI of the target server. \texttt{hyper} handles DNS resolution, and as such, a hostname can be used. 
+
+Figure 6.18 shows a HTTPS client being instantiated with the server's address, the necessary certificates and key, the defualt \texttt{SO\_KEEPALIVE} value, and the default poll 'tickrate' (see section 6.2.5)/  
 
 \begin{figure}[h]
     \begin{center}
@@ -648,7 +648,8 @@ Client instances restricted to performing requests via HTTP do not need to suppl
                 "client_cert.pem",
                 "client_private_key.pem",
                 "serca.pem",
-                /* Additional configuration ... */
+                None, /* Default SO_KEEPALIVE */
+                None, /* Default polling tickrate */
             )
         \end{lstlisting}
         \label{fig:httpsclientexample}
@@ -658,7 +659,7 @@ Client instances restricted to performing requests via HTTP do not need to suppl
 \end{figure}
 
 \subsubsection{X509 Parsing \& Validation}
-Additionally, we provide an interface for library users to verify that the provided X509 certificates adhere to the specification, that they contain specific extensions and fields. OpenSSL provides this functionality, however the Rust FFI bindings we use do not expose the corresponding API. Rather than write unsafe Rust FFI, and possibly introduce undefined behaviour to our library, we simply defer to the \texttt{X509-Parser} library, which lets us check these conditions efficiently \cite{x509parser}.
+Additionally, we provide an interface for library users to verify that the provided X509 certificates adhere to the specification - that they contain the necessary extensions and fields. OpenSSL provides this functionality, however the Rust FFI bindings we use do not expose the corresponding API. Rather than write unsafe Rust FFI, and possibly introduce undefined behaviour to our library, we simply defer to the \texttt{X509-Parser} library, which lets us check these conditions efficiently \cite{x509parser}.
 
 \begin{figure}[h]
     \begin{center}
@@ -706,7 +707,7 @@ For all outgoing requests, our library also ensures spec adherence in terms of r
     \end{center}
 \end{figure}
 
-Once a client is instantiated, Figure 6.20 shows the functions operating on an instance of a client (\texttt{\&self}) for making requests. A generic \texttt{<R: SEResource>} parameter on these function signatures requires that the library user specify the type provided, as to determine how to serialise and deserialise, but Rust can infer this from the context. 
+Once a client is instantiated, Figure 6.20 shows the functions operating on an instance of a client (\texttt{\&self}) for making requests. A generic \texttt{<R: SEResource>} parameter on these function signatures requires that the library user specify the type provided, as to determine how to serialise and deserialise. This need not be explicit, as Rust is able to infer this from the context.
 
 For all these functions we automate error handling on behalf of the library user. Without knowing exact client use cases it's difficult to determine what level of error transparency they will require. As such, we make some assumptions on what information is and isn't useful.
 
@@ -746,15 +747,15 @@ Of special note, in Figure 6.21, is the \texttt{HTTP 400 Bad Request} SEPRespons
 
 The IEEE 2030.5 successful request cases that can be returned are \texttt{201 Created} and \texttt{204 No Content}. Since the specification requires that \texttt{HTTP 201} responses contain an appropriate location header, we include that in the SEPResponse Created enum variant. The sam can be said for \texttt{HTTP 405 Method Not Allowed}, where servers must include an \texttt{Allow} header as part of the response, which we also include in our \texttt{MethodNotAllowed} variant.
 
-Currently, this isn't exhaustive, though it most importantly includes all the successful request cases. For the vast majority of use cases, this abstraction is sufficient. As part of our code release, we'll make library users aware of these deficiencies, and provide them with a plan for future enhancements.
+Currently, this isn't exhaustive, though it includes all the successful request cases. For the vast majority of use cases, this abstraction is sufficient. As part of our code release, we'll make library users aware of these deficiencies, and provide them with a plan for future enhancements.
 
 In section 7.8 we discuss a design flaw with this current implementation, and why this interface might need to be adjusted going forward. In section 7.4 we discuss how we'll be able to improve the core client functionality, as a result of improvements to libraries in the Rust ecosystem.
 
 \subsubsection{Event Response Interface}
 
-Additionally, our library provides convenience functions for creating and sending response resources when given an event resource, with checks to ensure the provided response status matches up with that of the \texttt{ResponseRequired} field, and the requirements of the specific function set.  As we'll discuss, the use of these are primarily automated via our Event schedules, however we provide them to library users for completeness.
+Pur library provides convenience functions for creating and sending response resources when given an event resource. This interface includes checks to ensure the provided response status matches up with that of the \texttt{ResponseRequired} field, and the requirements of the specific function set.  As we'll discuss, the use of these are primarily automated via our Event schedules. We provide them directly to library users for completeness.
 
-Each function sends the appropriate \texttt{SEResponse}-implementing type to the server, returning an error if the inputs are invalid.
+Each function sends the appropriate \texttt{SEResponse} resource to the server, returning an error if the inputs are invalid.
 
 
 \begin{figure}[h]
@@ -804,7 +805,7 @@ IEEE 2030.5 defines two methods by which clients can receive updates to resource
 \subsubsection{Interface}
 We provide users with an abstraction for easily creating these regularly occurring poll events.
 
-This abstraction is provided by any instantiated client capable of making requests.
+This abstraction is accessible from any instantiated client capable of making requests.
 
 \begin{figure}[h]
     \begin{center}
@@ -825,9 +826,9 @@ This abstraction is provided by any instantiated client capable of making reques
 \end{figure}
 
 Figure 6.23 shows this interface. \texttt{start\_poll} is given a URI relative to the absolute server URI and a callback, and polls the resource at the given poll rate, or the IEEE 2030.5 default rate of 15 minutes. Each interval, it performs a GET request, and provides the deserialised resource to the callback. Since this is an automated background task, users will only be notified of request failures via the logging API we interact with. Ideally, they would only start polling a route once they know it's valid.
-Additionally, we provide a function for forcibly polling all tasks in the queue, and a function for cancelling all resource polling. Library users may want to forcibly poll al resources in the event they were operating without internet, and have regained connection. Library users may want to cancel all poll tasks when attempting a graceful shutdown, or when acting as a client aggregator, no longer aggregating on behalf of a specific client. 
+We also provide a function for forcibly polling all tasks in the queue, and a function for cancelling all resource polling. Library users may want to forcibly poll all resources in the event they were operating without internet, and have regained connection. Library users may want to cancel all poll tasks when attempting a graceful shutdown, no longer aggregating on behalf of a specific device.
 
-One flaw with this design is that users cannot implement any form of error handling logic for when a retrieval fails. This is discussed further in section 7.8.
+One flaw with the current design is that users cannot implement any form of error handling logic for when a retrieval fails. This is discussed further in section 7.8.
 
 \subsubsection{Ergonomics}
 When implementing this interface, we take into consideration it's ergonomics. Thus, we provide two ways for users to implement a polling callback.
@@ -846,8 +847,8 @@ When implementing this interface, we take into consideration it's ergonomics. Th
     \end{center}
 \end{figure}
 
-The first method allows user to implement the trait in Figure 6.24 on a type, and then pass an instance of taht ype when starting the poll.
-This is useful when users have some thread-safe mutable state they want to share between all poll tasks, as they can implement handlers for multiple resources on a type, and then pass the same underlying instance of the type to multiple poll handlers, and thus access that state in each handler.
+The first method allows user to implement the trait in Figure 6.24 on a type, and then pass an instance of that ype when starting the poll.
+This is useful when users have some thread-safe mutable state they want to share between all poll tasks, as they can implement handlers for multiple resources on a type, and then pass the same underlying instance of the type to multiple poll handlers, and thus access that same state in each handler.
 
 
 \begin{figure}[h]
@@ -869,23 +870,23 @@ This is useful when users have some thread-safe mutable state they want to share
     \end{center}
 \end{figure}
 
-The second method uses the Rust language feature that allows us to generate implementations of a Rust trait for all types that meet certain conditions. In Figure 6.25 we therefore implement the PollCallback trait for all async, single argument functions that accept a valid Resource, and return the unit type (no value).
+The second method uses the Rust language feature that allows us to generate implementations of a Rust trait for all types that meet certain conditions. In Figure 6.25 we therefore implement the PollCallback trait for all async, single argument functions that accept a valid Resource, and return the unit type (synonymous for no return value).
 This allows both function pointers to be used, and any thread-safe closure that does not capture any references to it's environment that last less than the length of the program.
 
-The outcome of this is that we've produced an abstraction that places as few restrictions on the caller as possible.
+The outcome of this is that we've produced an abstraction that places as few restrictions on the caller as is reasonably possible.
 
 \subsubsection{Internals}
 When implementing this interface, we must address the performance of the client, and it's ability to operate at scale. Client aggregators must be able to handle polling many resources on behalf of many clients.
 
-One way to implement this would be to use the asynchronous sleep functions provided by \texttt{Tokio}, yielding a  task until the next scheduled poll time. Tokio tasks, while slept, have very minimal overhead. Unfortunately, Tokio sleeps, much like Rust's threaded sleeps, do not make progress while the device is slept. 
+To implement this we use the asynchronous sleep functions provided by \texttt{Tokio}, yielding a  task until the next scheduled poll time. Tokio tasks, while slept, have very minimal overhead. Unfortunately, Tokio sleeps, much like Rust's threaded sleeps, do not make progress while the device is slept. 
 
-Whilst our client library is primarily for use on servers operating under the client aggregation model, again, we do not want to limit use of the library to that model. IEEE 2030.5 refers to particular end-user energy devices as "sleepy devices", that have intermittent internet connections, and spend the majority of their time in modes of low power consumption. Should our implementation rely on asynchronous sleeps, we risk that, under specific cases, clients experience unnecessarily elongated intervals between polling.
+Whilst our client library is primarily for use on servers operating under the client aggregation model, we do not want to limit use of the library to that model. IEEE 2030.5 refers to particular end-user energy devices as "sleepy devices", that have intermittent internet connections, and spend the majority of their time in modes of low power consumption. Should our implementation rely on asynchronous sleeps, we risk that, under specific cases, clients experience unnecessarily elongated intervals between polling.
 
-A naive implementation that addresses this would have each individual Tokio task (one for each polled resource) wake intermittently, and check if it's time to poll their resource. This would be an unnecessary overhead of tasks repeatedly waking and sleeping.
+A naive implementation that addresses this would have each individual Tokio task (one for each polled resource) wake intermittently, and check if it's time to poll their resource. This would be introduce an unnecessary overhead of tasks repeatedly waking and sleeping.
 
-Our final implementation uses a poll job queue, implemented using a binary heap that sorts jobs by their next scheduled poll time. Then, we use a single Tokio task that sleeps, and wakes, intermittently to check if it is time to poll the resource at the top of the queue. Once that time arrives, the resource is polled and the stored user call-back is called with the result. The next time to poll on the poll task is then updated before pushing the job to the back of the queue. This process is entirely asynchronous, if it is time to poll multiple resources, each request will be sent off without waiting for the previous to complete. 
+Our final implementation uses a poll job queue, implemented using a binary heap sorting jobs by their next scheduled poll time. Then, we use a single Tokio task that sleeps, and wakes, intermittently to check if it is time to poll the resource at the top of the queue. Once that time arrives, the resource is retrieved and the stored user callback is given the result. The next time to poll on the poll task is then updated before pushing the job to the back of the queue. This process is entirely asynchronous, if it is time to poll multiple resources, each request will be sent off without waiting for the previous to complete. 
 
-For the sake of flexibility, and to give end user control over this process, but also for the sake of testing, we allow users to define the length of these intermittent sleep intervals when the instantiate the client.
+For the sake of flexibility, and to give end users control over this process, but also for the sake of testing, we allow users to define the length of these intermittent sleep intervals when they instantiate the client, we refer to this duration as the 'tickrate' of the polling task, defined using the Rust \texttt{Duration} type. If not supplied, a default of a 10 minute interval is used.
 
 \begin{figure}[h]
     \begin{center}
@@ -971,16 +972,16 @@ Once created, library users can add routes to the server by specifying the relat
     \end{center}
 \end{figure}
 
-Figure 6.27 shows an implementation of a function that can be used to as a route callback. In this case, the callback will have the server respond with \texttt{HTTP 204 No Content}. Figure 6.28 shows this function used as the callback for HTTP requests on the "/dera" route. The same figure shows how a closure with an appropriate function signature can be used, and also how the server can be run. 
-The run function accepts an optional generic argument, an event that completes in the future, that can be used to end the server. In this example we provide it with a Tokio \texttt{SIGINT} (CTRL+C) signal handler. Upon receiving that signal, the server will attempt a graceful shutdown.
+Figure 6.27 shows an implementation of a function that can be used as a route callback. In this case, the callback will have the server respond with \texttt{HTTP 204 No Content}. Figure 6.28 shows this function used as the callback for HTTP requests on the "/dera" route. The same figure shows how a closure with an appropriate function signature can be used, and also how the server can be run. 
+The run function accepts an optional generic argument, an event that completes in the future (if ever), that can be used to end the server. In this example we provide it with a Tokio \texttt{SIGINT} (CTRL+C) signal handler. Upon receiving that signal, the server will attempt a graceful shutdown.
 
 \subsubsection{Ergonomics}
-Using the same exact method used in implementing Polling Callbacks, we place as few restrictions on the user of our Subscription / Notification mechanism. We allow users to implement a callback via a manual trait implementation, or by any function or closure with a matching function signature.
+Using the same exact method used in implementing Polling Callbacks, we place as few restrictions on the user of our Subscription / Notification mechanism as possible. We allow users to implement a callback via a manual trait implementation, or by any function or closure with a matching function signature.
 
 Our abstraction handles invalid HTTP requests, and responds accordingly, as per IEEE 2030.5, without any intervention.
 
 \subsubsection{Internals}
-To serve requests over HTTPS we once again use OpenSSL to generate a TLS config using the provided certificates and private key. To merge our TCP stream, created using a Tokio \texttt{TcpListener}, and our TLS configuration, into a single TLS Stream we require the \texttt{tokio\_openssl} crate \cite{tokioopenssl}. This stream can then be passed to \texttt{hyper} to serve the request.
+To serve requests over HTTPS we once again use OpenSSL to generate a TLS configuration using the provided certificates and private key. To merge our TCP stream, created using a Tokio \texttt{TcpListener}, and our TLS configuration, into a single TLS Stream we require the \texttt{tokio\_openssl} crate \cite{tokioopenssl}. This stream can then be passed to \texttt{hyper} to serve the request.
 
 The rest of the implementation requires us to route incoming HTTP requests to the correct user-defined callback. The simple nature of the server, and lack of parametrized route names results in a straight-forward implementation.
 
@@ -1013,19 +1014,19 @@ The default hashing algorithm chosen by Rust standard library sacrifices perform
 Therefore, we use the hashing algorithm provided by \texttt{ahash}, which is significantly faster, yet less resistant to \texttt{HashDoS} attacks \cite{ahash} \cite{hashbrown}.
 
 \subsection{Time}
-All IEEE 2030.5 clients must implement the Time function set. They must be able to use the current time to set HTTP date headers, update last modified timestamps, and check if a given Event resource has started or ended. Clients must be able to synchronise their device time with that of an IEEE 2030.5 server. This is done by having Servers expose Time resources, and having clients use that Time resource to create all timestamps. In the case there are multiple servers exposing time resources, the specification allows Clients to choose just one Time resource, with the most accurate time, and synchronise using that.
+All IEEE 2030.5 clients must implement the Time function set. They must be able to use the current time to set HTTP date headers, update last modified timestamps, and check if a given Event resource has started or ended. Clients must be able to synchronise their device time with that of an IEEE 2030.5 server. This is done by having Servers expose Time resources. In the event there are multiple servers exposing time resources, the specification allows clients to choose just one Time resource, with the most accurate time (accuracy is specified within the resource itself), and synchronise using that.
 
-The exception to this are event schedules: "... devices SHALL use the Time resource from the same FunctionSetAssignments when executing the events from the associated Event-based function set." \cite{IEEE2030.5}.
+The exception to this are event schedules: "... devices SHALL use the Time resource from the same FunctionSetAssignments when executing the events from the associated Event-based function set." which implies clients must be able to synchronise time differently, depending on the event-based function set. \cite{IEEE2030.5}.
 
 \subsubsection{Interface}
-Our client library must provide a generic abstraction that allows developers to synchronise time globally, and per event function set.
+Our client library must provide a generic abstraction that allows developers to synchronise time globally, and per event-based function set.
 
 Throughout IEEE 2030.5 Client development, timestamps are required in a variety of formats. To provide a convenient interface for converting between these formats, we provide users with a \texttt{SEPTime} abstraction, that wraps the existing Rust native \texttt{SystemTime}, and represents a single timestamp that can be compared. \texttt{SEPTime} can be converted into:
 
 \begin{itemize}
     \item A Rust \texttt{u64} for internal comparisons.
     \item An IEEE 2030.5 \texttt{Int64} for Resource fields and attributes
-    \item An RFC 7231 HTTP Timestamp String via SystemTime
+    \item An RFC 7231 HTTP Timestamp String via SystemTime and the \texttt{httpdate} crate \cite{httpdate}.
 \end{itemize} 
 
 
@@ -1040,13 +1041,13 @@ Throughout IEEE 2030.5 Client development, timestamps are required in a variety 
         \end{lstlisting}
         \label{fig:timeinterface}
         \vspace{-10pt}
-        \caption{Time function set interface}
+        \caption{Time function set interface.}
     \end{center}
 \end{figure}
 
 Figure 6.30 details the interface we provide. Users can supply a Time resource to \texttt{update\_time\_offset} and update the global time offset. All future calls to \texttt{current\_time\_with\_offset} will then be synchronised with that specific Time resource.
 
-For per event function set time synchronisation, a similar interface is present on Event schedules (Figure 6.31). Schedules can be provided a Time resource that will be used to determine the start and end time stamps of all events for that function set, as well as the HTTP Date header of automated schedule HTTP requests.
+For event-based function set time synchronisation, a similar interface is present on Event schedules (Figure 6.31). Schedules can be provided a Time resource that will be used to determine the start and end time stamps of all events for that function set, as well as the HTTP Date header of automated schedule HTTP requests.
 
 \begin{figure}[h]
     \begin{center}
@@ -1060,7 +1061,7 @@ For per event function set time synchronisation, a similar interface is present 
 \end{figure}
 
 \subsection{Event Schedules}
-In IEEE 2030.5 some function sets employ the use of Event resources, resources that include a start timestamp, and a duration for which they are active. These event resources are exposed to clients with the intention they take specific action during that interval. Servers have the ability to cancel those events by updating them, and supersede these events by exposing new ones, at any time. Clients communicate with servers about these Event resources by creating and sending Response resources. 
+In IEEE 2030.5 some function sets employ the use of Event resources, resources that include a start timestamp, and a duration for which they are active. These event resources are exposed to clients with the intent the device take specific action during that interval. Servers have the ability to cancel those events by updating them, and supersede these events by exposing new ones before the event finishes. Clients communicate with servers about these Event resources by creating and sending Response resources (those that implement the \texttt{SEResponse} trait).
 
 An exhaustive list of function sets utilising Event resources are:
 
@@ -1075,9 +1076,9 @@ An exhaustive list of function sets utilising Event resources are:
 All Schedules share very similar implementations. They differ in:
 
 \begin{itemize}
-    \item What response status codes can be sent (defined in IEEE 2030.5 Table 27)
-    \item Under what circumstances events supersede one another
-    \item Whether or not event start times and durations can be randomised
+    \item What response status codes can be sent (defined in IEEE 2030.5 Table 27).
+    \item Under what circumstances events supersede one another.
+    \item Whether or not event start times and durations can be randomised.
 \end{itemize}
 
 \subsubsection{Interface}
@@ -1105,7 +1106,7 @@ For each of these function sets (excl. Flow Reservation) we produce a \texttt{Sc
         \end{lstlisting}
         \label{fig:schedulertrait}
         \vspace{-10pt}
-        \caption{Definition of the Scheduler trait}
+        \caption{Definition of the Scheduler trait.}
     \end{center}
 \end{figure}
 
@@ -1123,15 +1124,15 @@ For each of these function sets (excl. Flow Reservation) we produce a \texttt{Sc
 
 Figure 6.32 and 6.33 show the interface common to all schedules. Each schedule is associated with the type of the Event resource, and the type of the associated Event program. The type of the associated program in our interface is inferred from the type of the Event resource.
 
-To instantiate a schedule library users must supply a previously instantiated client, capable of making HTTP requests. Schedules must support multiple servers, whereas a \texttt{Client} instance pertain to a specific server, therefore, we override the base URI in the \texttt{Client} instance when creating and sending automated responses from the schedule. For that reason, any \texttt{Client} instance can be used.
+To instantiate a schedule library users must supply a previously instantiated client, capable of making HTTP requests. Schedules must support multiple servers, a \texttt{Client} instance pertains to a specific server, therefore, we override the base URI in the \texttt{Client} instance when creating and sending automated responses from the schedule. For that reason, any \texttt{Client} instance can be used.
 
 A thread-safe reference to our \texttt{SEDevice} abstraction is also required, as well as a callback to be called when the schedule needs to alert the client of event updates.
 
-Schedules also take a duration value, determining the length of intermittent sleeps, addressing the same problem we discussed in 6.2.5.
+Schedules also take a duration value, determining the length of intermittent sleeps, addressing the same problem we discussed in 6.2.5. If not supplied, a default interval of 10 minutes is used.
 
 One instantiated, events are added to the schedule via the \texttt{add\_event} function, which takes a copy of the event, a reference to the event's program, and some unique ID pertaining to the server that the event was sourced from. This function is designed to be called every time a copy of the event is retrieved, via polling, or as a notification. Every event contains a unique MRID, and successive calls for the same MRID will simply update the status of the event, if the server has cancelled it. 
 
-If an event retrieved from a server has a status that differs from the schedule copy of the event, and that status is not cancelled, the client will log accordingly. In some cases this is expected, such as when working with events where the start-time is randomised on the client. In other cases such as when an event is marked as superseded on the server and is not locally, and the client will log a warning.
+If an event retrieved from a server has a status that differs from the schedule copy of the event, and that status is not cancelled, the client will log accordingly. In some cases this is expected, such as when working with events where the start-time is randomised on the client. In other cases such as when an event is marked as superseded on the server and is not locally, the client will log a warning.
 
 
 We require that a reference to the Event's program is included in order to mark which program an Event was added from. This allows the schedule to send the "Event aborted due to alternate program event" response status, in Table 27 of IEEE 2030.5.
@@ -1145,8 +1146,8 @@ Finally, we provide a function for cleaning up the Tokio tasks spawned by the Sc
 Responses to Events, auto-generated or otherwise, contain device-specific information. For all event function sets this is the device's short form identifier, and long form identifier. In the event of the Demand Response and Load Control function set, devices also return data representing their state, such as their applied load reduction value.
 Furthermore, events should only be applied when the category of device the Event targets matches the category of the device.
 
-To inform a given event schedule of all these variables, we provide library usesr with an abstraction that represents a singular IEEE 2030.5 end-user energy device. This is the \texttt{SEDevice} struct.
-In addition to the data already mentioned, this struct also contains an instance of an EndDevice resource, such that all information a developer may require when referring to a singular device is available.
+To inform a given event schedule of all these variables, we provide library users with an abstraction that represents a singular IEEE 2030.5 end-user energy device. This is the \texttt{SEDevice} struct.
+In addition to the data already mentioned, this struct contains an instance of an EndDevice resource, such that all information a developer may require when referring to a singular device is available under the singular type.
 
 \begin{figure}[h]
     \begin{center}
@@ -1190,7 +1191,7 @@ Once again, we place as few restrictions on the library user as possible. Users 
         \end{lstlisting}
         \label{fig:eventhandlertrait}
         \vspace{-10pt}
-        \caption{Definition of the Scheduler trait}
+        \caption{Definition of the Scheduler trait.}
     \end{center}
 \end{figure}
 
@@ -1199,12 +1200,12 @@ Figure 6.34 defines the trait containing this function signature. A single argum
 The \texttt{EventInstance<E>} type provides users with a way to inspect the event, providing users with:
 
 \begin{itemize}
-    \item The current status, as a Rust enum
-    \item The underlying event resource
-    \item The primacy of the program
-    \item The start time and end time of the event, as a Unix timestamp
-    \item The corresponding program MRID
-    \item The user-defined server ID
+    \item The current status, as a Rust enum.
+    \item The underlying event resource.
+    \item The primacy of the program.
+    \item The start time and end time of the event, as a Unix timestamp.
+    \item The corresponding program MRID.
+    \item The user-defined server ID.
 \end{itemize}
 
 When determining the ResponseStatus to return, library users need only to refer to Table 27 of the specification.
@@ -1214,8 +1215,8 @@ If the returned status implies the client device is opting out of the event, the
 Since these cases are non-trivial, we provide an in-depth explanation of the behaviour of the callback as part of our library documentation.
 
 \subsubsection{Internals}
-All implemented schedules share the same core implementation. \texttt{EventInstance}s are stored in a hashmap. The unique event MRID is the key into this hashmap. This gives us constant time lookups for events, and ensures a schedule cannot store duplicate events. Notably, unlike the hashmap used in the Subscription / Notification mechanism, our \texttt{EventsMap} uses the default, more HashDoS resistant, hashing algorithm. We make this decision as this hashmap does grow as the schedule runs, and MRIDs are technically provided as external input, making the possibility of a \texttt{HashDoS} attack possible, such as if resources were not retrieved (or sent) securely.
-Realistically, this is an overly cautious measure; \texttt{aHash} still provides resistance to \texttt{HashDoS} attacks
+All implemented schedules share the same core implementation. \texttt{EventInstance}s are stored in a hashmap, and the unique event MRID is the key into this hashmap. This gives us constant time lookups for events, and ensures a schedule cannot store duplicate events. Notably, unlike the hashmap used in the Subscription / Notification mechanism, our \texttt{EventsMap} uses the default, more HashDoS resistant, hashing algorithm. We make this decision as this hashmap does grow as the schedule runs, and MRIDs are technically provided as external input, making the possibility of a \texttt{HashDoS} attack possible, such as if resources were not retrieved (or sent) securely.
+Realistically, this is perhaps an overly cautious measure; \texttt{aHash} still provides resistance to \texttt{HashDoS} attacks.
 
 \begin{figure}[h]
     \begin{center}
@@ -1237,7 +1238,7 @@ Realistically, this is an overly cautious measure; \texttt{aHash} still provides
     \end{center}
 \end{figure}
 
-Figure 6.36 shows our wrapper around this hashmap that provides two values that act as hashmap invariants. These invariants store the time, and the MRID of the next event to start and the next event to end, or \texttt{None} if there are no events waiting to start or end. When instantiated, a schedule creates two Tokio tasks that sleep intermittently until it's time for an event to start.
+Figure 6.36 shows our wrapper around this hashmap that provides two values that act as hashmap invariants. These invariants store the time, and the MRID of the next event to start and the next event to end, or \texttt{None} if there are no events waiting to start or end. When instantiated, a schedule creates two Tokio tasks that sleep intermittently until it's time for an event to start. 
 
 This \texttt{Events} wrapper is designed with the intention of minimizing the overhead when a Tokio task wakes from sleep and checks if it's time for the next event to start or end, it needs only read a single value.
 
@@ -1245,21 +1246,21 @@ When these tasks find that an event should be started or ended, it updates it's 
 
 Finally, as to avoid our hashmap of events growing endlessly as the program runs, we have a third Tokio task act as a form of garbage collection, deleting cancelled or superseded events if they have not been updated for an extended period of time. Currently, this is configured at a week, but should be adjusted in the future as necessary, or provided as a configuration option.
 
-The remainder of the schedule implementation differs for each function set. We've attempted to eliminate as much duplicate code as possible, however, we've been relatively unsuccessful. Each schedule behaves sufficiently different to each other that any further improvements would be pushing the boundaries of what is possible in Rust.
+The remainder of the schedule implementation differs for each function set. We've attempted to eliminate as much duplicate code as possible, however, we've been relatively unsuccessful. Each schedule behaves sufficiently different to each other such that any further improvements would be pushing the boundaries of what is currently possible in Rust.
 
 \subsubsection{DER}
 The DER function set extends our core schedule implementation with events that can supersede one another, and a set of rules defining how and when this occurs. Therefore when an event is added to a DER schedule, it compares it with all other events in the schedule, and determines if it supersedes, or is superseded by another. 
 
-We determine if two \texttt{DERControl} instances supersede if they both target the same hardware controls (the fields of DERControlBase) and if their active time periods overlap. If this is the case, the superseding event is the one with the lower program primacy, or if their primacies are the same, and one is newer than the other.
+We determine if two \texttt{DERControl} instances supersede if they both target the same hardware controls (the fields of DERControlBase) and if their active time periods overlap. If this is the case, the superseding event is the one with the lower program primacy, or if their primacies are the same, the event with the latest creation timestamp.
 
-If an event is superseded and active, the callback is called, and the appropriate response to the server created and sent, as per Table 27, including the necessary comparisons between program MRIDs and server IDs.
+If an event is superseded and active, the user-defined callback is called, and the appropriate response to the server created and sent, as per Table 27, including the necessary comparisons between program MRIDs and server IDs.
 
 We are also required to handle the case where an event is superseded by another, and then the superseding event is cancelled before the superseded event would start. To handle this we store, for each event, a list of MRIDs corresponding to events that supersede it. When an event is cancelled, it's removed from all those lists. Any superseded events that would not have started yet with an empty list can therefore be un-superseded.
-This behaviour isn't explicitly mentioned in the specification, but follows naturally from the remaining rules. Additionally, this behaviour is implemented by EPRI C in their library.
+This behaviour isn't explicitly mentioned in the specification, but follows naturally from the given rules. Additionally, this behaviour is implemented by EPRI C in their library.
 
 DER events are 'randomizable' events. Therefore, when adding them to our Schedule we first determine their start time and interval with a random offset within the given range.
 
-Since DERControl events apply only to specific device categories, we check if there is an intersection between the targeted categories, and the categories set in \texttt{SEDevice}.
+Since DERControl events apply only to specific device categories, we check if there is an intersection between the event targeted categories, and the categories set in \texttt{SEDevice}.
 
 Finally, the interface we defined in Figure 6.22 is responsible for checking that a valid response can be constructed from a ResponseStatus and Event, and that it adheres to Table 27. If this is not the case, and an automated response cannot be made for any reason, the schedule will log accordingly.
 
@@ -1268,13 +1269,13 @@ The DRLC function set schedule operates near identically to the DER schedule, wi
 
 Unlike DER, \texttt{EndDeviceControl} instances do not target specific hardware controls. To check if two events supersede we need only check if they are active at the same time, and then use their primacy and creation time to determine which supersedes which.
 
-Once again, the interface in Figure 6.22 ensures created responses are valid.
+Once again, the interface in Figure 6.22 ensures created responses are valid, where created responses require additional information from the supplied \texttt{SEDevice} instance. 
 
 \subsubsection{Messaging}
-The Messaging function set schedule differs greatly from the others, in that multiple \texttt{TextMessage} events can be active at once. For that reason, the implementation remains the same, but without any tracking of superseded events.
+The Messaging function set schedule differs greatly from the others, in that multiple \texttt{TextMessage} events can be active at once. For that reason, the implementation remains the same, but without any tracking of superseded events, and marginally different possible response status values. 
 
 \subsubsection{Pricing}
-The Pricing function is very much similar to DER and DRLC. One difference is that a DER event requires both the \texttt{TariffProfile} resource, and the \texttt{RateComponent} resource. Together, these form the "Program" of the event. "Pricing clients shall support at least one RateComponent instance for each TarifProfile." and "Pricing servers SHALL provide at most one active TimeTariffInterval per rate component." indicate this.
+The Pricing function is very much similar to DER and DRLC. One difference is that a Pricing event requires both the \texttt{TariffProfile} resource, and the \texttt{RateComponent} resource. Together, these form the "Program" of the event. "Pricing clients shall support at least one RateComponent instance for each TarifProfile." and "Pricing servers SHALL provide at most one active TimeTariffInterval per rate component." indicate this.
 
 Therefore, we use the provided \texttt{RateComponent} resource to determine the program MRID, and the provided \texttt{TariffProfile} to determine the primacy of the \texttt{TimeTariffInterval} resource. 
 
@@ -1285,27 +1286,27 @@ The Flow Reservation function set contains an Event resource (\texttt{FlowReserv
 
 IEEE 2030.5 Table 27 details response types by function set, and the Flow Reservation function set is mysteriously not present. Furthermore, IEEE 2030.5 is unclear on under what circumstances \texttt{FlowReservationResponse} events are permitted to overlap, and when they should be superseded. 
 
-Whilst we could implement a Flow Reservation schedule with minimal assumptions, it's interface and behaviour would differ greatly from all the other schedules. It would defer to the client supplied callback in all cases, and require them to manually specify every response, and also unlike every other schedule, not accept some program resource.
+Whilst we could implement a Flow Reservation schedule with minimal assumptions, it's interface and behaviour would differ greatly from all the other schedules. It would defer to the client supplied callback in all cases, and require them to manually specify every response. Unlike every other schedule, it cannot some program resource type.
 
-If one were to implement the FLow Reservation schedule with a specific use case in mind, it would be a straight forward implementation, and a great deal of existing coe in our client library could be reused. For that reason, we do not provide an implementation for this schedule, and insead leave it to library users if they require it. Instead, we provide them with an ample resource for developing an IEEE 2030.5 event schedule, our codebase.
+If one were to implement the FLow Reservation schedule with a specific use case in mind, it would be a straight forward implementation, and a great deal of existing code in our client library could be reused. For that reason, we do not provide an implementation for this schedule, and instead leave it to library users to implement as required. We have, nonetheless, provided them with an ample resource for developing an IEEE 2030.5 event schedule, our codebase.
 
 \subsection{Logging}
-Our client library exposes log messages under a generic logging facade. We use industry standard log levels, \texttt{FATAL, ERROR, WARN, INFO, DEBUG} and \texttt{TRACE}. To accomplish this we use the \texttt{log} crate, developed by the Rust foundation \cite{logcrate}. The logs we create can therefore be attached to any given log implementation, whatever is most suitable for the users of the library.
+Our client library exposes log messages under a generic logging facade. We use industry standard log levels, \texttt{FATAL, ERROR, WARN, INFO, DEBUG} and \texttt{TRACE}. To accomplish this we use the \texttt{log} crate, developed by the Rust foundation \cite{logcrate}. The logs we create can therefore be attached to any given log implementation or logging frontend, whatever is most suitable for the users of the library.
 
-As many parts of the client library run in the background (Polling, notification server, event schedule) logging is, in many cases the only way to discern that an error has occured, and that the client has recovered. 
+As many parts of the client library run in the background (Polling, notification server, event schedule) logging is, in many cases the only way to discern that an error has occurred, and that the client has recovered. 
 
 Situations that result in a \texttt{WARN}, or an \texttt{ERROR} log include:
 
 \begin{itemize}
-    \item When a regularly polled resource could not be retrieved
-    \item If there is a mismatch between the status of an event in the schedule, and a copy retrieved from a server (and then fed into the schedule)
-    \item If an incoming Notification server request or connection could not be handled
+    \item When a regularly polled resource could not be retrieved.
+    \item If there is a mismatch between the status of an event in the schedule, and a copy retrieved from a server (and then fed into the schedule).
+    \item If an incoming Notification server request or connection could not be handled.
 \end{itemize}
 
 Situations that result in a \texttt{INFO} log include:
 
 \begin{itemize}
-    \item When a resource is retrieved, from polling or otherwise
+    \item When a resource is retrieved, from polling or otherwise.
     \item When a POST or PUT request is successful.
     \item When jobs that run in the background shutdown / cleanup (Schedules, Servers).
 \end{itemize}
@@ -1321,12 +1322,12 @@ With the goal of testing the client's ability to make HTTP requests, we required
 We also use this server to conduct system tests. These system tests follow the examples outlined in IEEE 2030.5 Annex C, currently only testing the core client functionality.
 
 \subsubsection{Subscription / Notification}
-In order to send notifications to clients, IEEE 2030.5 need to operate a client capable of making HTTP POST requests. In our client library, a \texttt{Client} instance is seperate from a \texttt{ClientNotifServer} instance, meaning our testing process is straight-forward - we make requests to the server using our client. 
+In order to send notifications to clients, IEEE 2030.5 need to operate a client capable of making HTTP POST requests. In our client library, a \texttt{Client} instance is seperate from a \texttt{ClientNotifServer} instance, meaning our testing process is straight-forward - we make requests to the notification server using our client. 
 
-Our tests ensure that a client interacting with the server is capable of sending HTTP Post requests, and that the expected response is received. We also implicitly test that our notification server does not crash during regular use.
+Our tests ensure that a client interacting with the server is capable of receiving HTTP POST requests, and that the expected response is received. We also implicitly test that our notification server does not crash during regular use.
 
 \subsubsection{Event Schedules}
-As each schedule for each function set behaves differently, they are tested seperately. For each schedule we create a set of of unique events that each last several seconds, and compare the output on the given callback with the expected output. 
+As each schedule for each function set behaves differently, they are tested separately. For each schedule we create a set of of unique events that each last several seconds, and compare the output on the given callback with the expected output. 
 
 Cases we test include:
 
@@ -1334,7 +1335,7 @@ Cases we test include:
     \item Basic sequential execution of events.
     \item Cancelling \& superseding events in progress.
     \item Cancelling \& superseding scheduled events .
-    \item Ensuring events superseded by cancelled events are rescheduld.
+    \item Ensuring events superseded by cancelled events are rescheduled.
     \item Ensuring Events with different primacy values supersede as required.
     \item Ensuring DER events with differing controls do not supersede.
     \item Ensuring TextMessages do not supersede at all.
@@ -1342,10 +1343,11 @@ Cases we test include:
 \end{itemize}
 
 \subsubsection{Security}
-During development, we maintained a local certificate authority via the tool \texttt{mkcert}. However, this tool is not capable of producing certificates that match those required by IEEE 2030.5
+During development, we maintained a local certificate authority via the tool \texttt{mkcert} and used it for testing \cite{mkcert}. However, this tool is not capable of producing certificates that match those required by IEEE 2030.5
+
 In order to properly test our Security function set, we required TLS certificates as close as possible to those used in the real world; certificates that include all the relevant X509 extensions, and are generated using the specified elliptic curve, and are compatible with the mandatory cipher suite. For this reason, we consult the SunSpec Alliance, who provide free IEE 2030.5 test certificates upon request. As part of this thesis we have requested certificate packages for both our client, and test server, and have tested them when communicating resources, and our interface for parsing and validating X509 certificates.
 
-However, these certificates do not provide us a way with interacting with any publicly accessible IEEE 2030.5 test servers. For that, we'll require test certificates from Energy Queensland, as discussed in TODO.
+However, these certificates do not provide us a way with interacting with any publicly accessible IEEE 2030.5 test servers. For that, we'll require test certificates from Energy Queensland, as discussed in section 7.6.
 
 
 
