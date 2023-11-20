@@ -115,17 +115,17 @@ Given the circumstances of this model, the aggregator IEEE 2030.5 client is like
 
 \section{Australian Renewable Energy Agency}
 "Common Smart Inverter Profile" (Common SIP) (CSIP-AUS) is an implementation guide developed by the "DER Integration API Technical Working Group" in order to "promote interoperability amongst DER and DNSPs in Australia".
-The implementation guide requires DER adhere to IEEE 2030.5, whilst also mandating the client aggregator model, and recommending the use of the subscription/notification mechanism, in addition to polling. These are very similar requirements to that of American CSIP. \cite[]{CSIPAus}
+The implementation guide requires DER adhere to IEEE 2030.5, whilst also mandating the client aggregator model, and recommending the use of the subscription/notification mechanism, in addition to polling. These are very similar requirements to that of American CSIP \cite[]{CSIPAus}. 
 
 Importantly, the Australian Common SIP extends upon existing IEEE 2030.5 resources whilst still adhering to IEEE 2030.5.
 As per IEEE 2030.5, resource extensions are to be made under a different XML namespace, in this case \texttt{https://csipaus.org/ns}. Likewise, extension specified fields are to be appropriately prefixed with \texttt{csipaus}. 
 
-The additional fields and resources in CSIP-AUS work to provide DERs with support for \texttt{Dynamic Operating Envelopes}, bounds on the amount of power imported or exported over a period of time. \cite[]{CSIPAus}
+The additional fields and resources in CSIP-AUS work to provide DERs with support for \texttt{Dynamic Operating Envelopes}, bounds on the amount of power imported or exported over a period of time \cite[]{CSIPAus}. 
 
 \section{SunSpec Alliance}
 
 As of present, the specification behind the aforementioned SunSpec Modbus is still available and distributed, as it's "semantically identical and thus fully interoperable with IEEE 2030.5". 
-The primary motivation for implementing SunSpec Modbus is it's compliance with IEEE 1547, the standard for the interconnection of DER into the grid. \cite[]{SunSpecModbus}
+The primary motivation for implementing SunSpec Modbus is it's compliance with IEEE 1547, the standard for the interconnection of DER into the grid \cite[]{SunSpecModbus}. 
 
 \section{Open-source implementation}
 
@@ -157,12 +157,12 @@ Furthermore, being written in a language without polymorphism, be it via monomor
 
 In contrast to this, the library is sufficiently modular, providing interfaces across multiple C headers, where users of the library need only compile code that is relevant to their use-case. For example, developers building IEEE 2030.5 clients that need not handle DER function set event resources are not required to compile and work with the code responsible for managing them.
 
-Additionally, the usage of the \texttt{epoll} \texttt{syscall} and the library's state-machine centric design lends itself to the scalability of the client, allowing it to handle operations asynchronously, and better perform it's role operating under the client aggregation model. \cite[]{eprimanual}
+Additionally, the usage of the \texttt{epoll} \texttt{syscall} and the library's state-machine centric design lends itself to the scalability of the client, allowing it to handle operations asynchronously, and better perform it's role operating under the client aggregation model \cite[]{eprimanual}. 
 
 \subsection{Battery Storage and Grid Integration Program: envoy-client}
-A newer implementation of the protocol is \texttt{envoy-client}, developed by BSGIP, an initiative of The Australian National University. Of note is that this client has been open-sourced ahead of the release of the IEEE 2030.5 Server library implementation \texttt{envoy}, and provides a very bare implementation of core IEEE 2030.5 Client functionality written in Python, and therefore provides a far more modern interface than that of the EPRI library. \cite{envoyclient}
+A newer implementation of the protocol is \texttt{envoy-client}, developed by BSGIP, an initiative of The Australian National University. Of note is that this client has been open-sourced ahead of the release of the IEEE 2030.5 Server library implementation \texttt{envoy}, and provides a very bare implementation of core IEEE 2030.5 Client functionality written in Python, and therefore provides a far more modern interface than that of the EPRI library \cite{envoyclient}. 
 
-The library was released publicly in 2021, and has seen virtually no updates since. It is possible the client will see a major update when the \texttt{envoy} library is released, as improvements to 2030.5 test tooling were indicated as being developed. \cite{DOEAdoption}
+The library was released publicly in 2021, and has seen virtually no updates since. It is possible the client will see a major update when the \texttt{envoy} library is released, as improvements to 2030.5 test tooling were indicated as being developed \cite{DOEAdoption}. 
 
 
 Despite being written in Python, a programming language with support for asynchronous programming, async await syntax is not present in the codebase. For that reason, it's likely the user of the library will be required to wrap the provided codebase with async python in order for it to scale as a client aggregator. In theory, it's also likely that the Python Global Interpreter Lock would impact the ability for the client to take advantage of multiple threads, and potentially lead to performance issues at scale. 

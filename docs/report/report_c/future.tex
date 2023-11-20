@@ -43,14 +43,14 @@ Of note is that our client library does not include an implementation for DNS-SD
 
 In terms of Event function sets, our client has a more complete implementation. We provide library users with black-box schedulers handling DER, Messaging, Pricing, and Demand Response and Load Control events. The EPRI C implementation only includes a schedule for Distributed Energy Resources. The same goes for applying Time resources at a schedule level, EPRI provides no way to have different schedules use different time resources, as would be required under certain circumstances.
 
-Importantly, EPRI's implementation does NOT include a subscription / notification mechanism, the resource retrieval method mandated as part of CSIP (American). \cite{20305workshop}
+Importantly, EPRI's implementation does NOT include a subscription / notification mechanism, the resource retrieval method mandated as part of CSIP (American) \cite{20305workshop}. 
 
 However, EPRI's implementation has the benefit of having undergone formal testing provided by QualityLogic, which is a paid, service. Due to the cost of the service, it is unlikely our implementation will ever have the opportunity to undergo the same testing.
 
 Finally, our implementation has the benefit of being written in a memory safe language, safe Rust. The EPRI implementation is written in C, where memory safety must be checked and proven manually. 
 
 \section{Rust Async Traits}
-As of this report, the stable branch of the Rust compiler does not support 'Return Position Impl Trait' (RPIT) in traits (RPITIT). It is simply not supported by the type system. \cite{rustRPITIT}
+As of this report, the stable branch of the Rust compiler does not support 'Return Position Impl Trait' (RPIT) in traits (RPITIT). It is simply not supported by the type system \cite{rustRPITIT}.
 
 RPIT is Rust's implementation of existentially quantified types. Functions using RPIT simply return some type that implements the given trait. For example \texttt{fn foo() -> impl Display} is a function that returns some type that can be displayed.
 
@@ -58,18 +58,18 @@ This functionality is necessary in expressing async Rust at the type-level. In R
 
 Our implementation defines a trait for each of the possible callback types. We want library users to be able to supply asynchronous callbacks, and as such, we require RPITIT.
 
-Currently, there is a popular workaround to this that involves utilizing Rust's dynamic dispatch to heap allocate, and then perform type erasure on the future before returning it, as to allow the function to return a concrete type. This workaround is achieved by having the \texttt{async\_trait} crate generate the necessary code, although it could be accomplished without. \cite{asynctrait}
+Currently, there is a popular workaround to this that involves utilizing Rust's dynamic dispatch to heap allocate, and then perform type erasure on the future before returning it, as to allow the function to return a concrete type. This workaround is achieved by having the \texttt{async\_trait} crate generate the necessary code, although it could be accomplished without \cite{asynctrait}. 
 
 This has the obvious downside of incurring an unnecessary heap allocation every time an async function in a trait is called. In our library this is whenever a user defined callback is called, or when an event is added to a schedule.
 
-Fortunately, with the release of the Rust compiler v1.75 on the 28th of December 2023, RPITIT will be stable, and therefore so will async functions in traits. \cite{rust175}
+Fortunately, with the release of the Rust compiler v1.75 on the 28th of December 2023, RPITIT will be stable, and therefore so will async functions in traits \cite{rust175}. 
 
 This comes with a caveat. When async trait functions are declared but not defined, there is no way to infer what bounds on the return type can be relaxed. More specifically, the compiler cannot infer that all implementations of that trait function return a type that can be sent or referenced across thread boundaries (the Rust Send \& Sync traits). The solution to this is in active development, and is referred to as "minimal associated return type notation" \cite{sendboundproblem}.
 
 The Tokio runtime is a 'work-stealing' executor. In practice, this means Rust futures we return must implement the \texttt{Send} trait, and can be sent across thread boundaries. Since we cannot express this using an async function in a trait, we would fallback on what would be the desugared syntax alternative, \texttt{impl Future<Output = T> + Send}. This results in a marginally less ergonomic interface, as implementers of the trait now need to wrap their code in a async block themselves. However, this is still superior to the performance overhead and additional dependency that we require for the current workaround.
 
 \section{Native Rust TLS}
-In section 6.2.3 we discussed how make use of the available \texttt{OpenSSL} Rust bindings to implement the security function set, and so far this has been sufficient. However, we note the 19 reported CVEs in \texttt{OpenSSL} in 2023 alone as a cause for alarm. \cite{OpensslCVE}
+In section 6.2.3 we discussed how make use of the available \texttt{OpenSSL} Rust bindings to implement the security function set, and so far this has been sufficient. However, we note the 19 reported CVEs in \texttt{OpenSSL} in 2023 alone as a cause for alarm \cite{OpensslCVE}. 
 
 However, there exists a project called \texttt{rustls} that eventually aims to compete with \texttt{OpenSSL} by providing a Rust native implementation of TLS for server and client verification, and bulk encryption \cite{rustls}. \texttt{rustls} leverages the \texttt{ring} crate, which provides (almost) native Rust cryptography algorithms \cite{ring}. 
 In early benchmarks, \texttt{rustls} is shaping up to be more performant and more memory efficient than \texttt{OpenSSL}.

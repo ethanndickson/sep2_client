@@ -191,7 +191,7 @@ Using \texttt{xsd-parser-rs} will allow us to better maintain the client, by way
 \end{itemize}
 
 \subsubsection{Integer Bitmaps}
-IEEE 2030.5, for the sake of efficiency, has resources encode many boolean values together in a single integer, a bitmap of booleans (colloquially a 'bitflag'). Whilst we must still maintain how these integers are stored internally, we have the opportunity to provide them in a more ergonomic interface. Thus, we use the \texttt{bitflags} crate, a popular Rust crate that wraps integers and provides convenience functions for comparing them (intersections, unions), and constructing them using enum-like syntax. \cite{bitflags}
+IEEE 2030.5, for the sake of efficiency, has resources encode many boolean values together in a single integer, a bitmap of booleans (colloquially a 'bitflag'). Whilst we must still maintain how these integers are stored internally, we have the opportunity to provide them in a more ergonomic interface. Thus, we use the \texttt{bitflags} crate, a popular Rust crate that wraps integers and provides convenience functions for comparing them (intersections, unions), constructing them using enum-like syntax, whilst retaining support for bitwise operators \cite{bitflags}. 
 
 \subsubsection{Resource Polymorphism}
 As mentioned, we've used \texttt{xsd-parser-rs} to automate the process of resolving an inheritance tree in the XSD. This has enabled us to add polymorphism via base types to our implementation.
@@ -454,11 +454,11 @@ Instead, we provide a \texttt{add} function on all lists that inserts and retain
 \end{figure}
 
 \subsection{CSIP-AUS}
-Implemented in \texttt{sep2\_common} are the IEEE 2030.5 extensions required by CSIP-AUS. These take the form of two additional resources, and additional fields on some existing resources. When extensions are used, IEEE 2030.5 requires that the XML namespace for the extension be included with the resource, and that extension specific fields be prefixed accordingly. For CSIP-AUS this is the \texttt{https://csipaus.org/ns} namespace, and the \texttt{csipaus} prefix. \cite{CSIPAus}
+Implemented in \texttt{sep2\_common} are the IEEE 2030.5 extensions required by CSIP-AUS. These take the form of two additional resources, and additional fields on some existing resources. When extensions are used, IEEE 2030.5 requires that the XML namespace for the extension be included with the resource, and that extension specific fields be prefixed accordingly. For CSIP-AUS this is the \texttt{https://csipaus.org/ns} namespace, and the \texttt{csipaus} prefix  \cite{CSIPAus}.
 
 We make CSIP-AUS extensions available behind the \texttt{csip\_aus} crate feature (library compile flag). When activated, the Rust compiler adds the namespace to existing IEEE 2030.5 resources, and adds the prefix to their respective fields. It also makes the new resources available for use, also with the correct namespace and prefix. Using existing functionality of \texttt{YaSerde}, adding these extensions is straight-forward.
 
-As per the Energy Queensland SEP2 Client Handbook, and the CSIP-AUS publication by ARENA, these resources, and our support for the client aggregation model, are the extent to which we, as library developers, can assist users in developing CSIP-AUS compliant clients. \cite{sep2clienthandbook} \cite{CSIPAus}
+As per the Energy Queensland SEP2 Client Handbook, and the CSIP-AUS publication by ARENA, these resources, and our support for the client aggregation model, are the extent to which we, as library developers, can assist users in developing CSIP-AUS compliant clients \cite{sep2clienthandbook} \cite{CSIPAus}. 
 
 \begin{figure}[H]
     \begin{center}
@@ -684,7 +684,7 @@ For all outgoing requests, our library also ensures spec adherence in terms of r
 \begin{itemize}
     \item GET requests contain an \texttt{Accept} header, specifying that the body of the response should be \texttt{application/sep+xml}.
     \item PUT and POST requests contain appropriately set \texttt{Content-Length} and \texttt{Content-Type} headers.
-    \item All outgoing requests also include the required date header, formatted as specified in RFC 7231, with appropriate accommodations for the Time function set. \cite{rfc7231}
+    \item All outgoing requests also include the required date header, formatted as specified in RFC 7231, with appropriate accommodations for the Time function set  \cite{rfc7231}.
 \end{itemize}
 
 
@@ -1136,7 +1136,7 @@ If an event retrieved from a server has a status that differs from the schedule 
 
 We require that a reference to the Event's program is included in order to mark which program an Event was added from. This allows the schedule to send the "Event aborted due to alternate program event" response status, in Table 27 of IEEE 2030.5.
 
-Similarly, we require that some unique 8 bit integer is provided as a form of server ID, as to mark internally which events were sourced from different servers. The, when an event from one server supersedes an event from another, we can send the "Event aborted due to alternate server event" response status, also in Table 27. \cite{IEEE2030.5}
+Similarly, we require that some unique 8 bit integer is provided as a form of server ID, as to mark internally which events were sourced from different servers. The, when an event from one server supersedes an event from another, we can send the "Event aborted due to alternate server event" response status, also in Table 27 \cite{IEEE2030.5}. 
 
 Finally, we provide a function for cleaning up the Tokio tasks spawned by the Schedule, freeing all allocated resources. This currently requires shutdown to be manually called. In the future, we'd like to have it automatically be called when the Schedule is dropped, which is a straight-forward refactor.
 
@@ -1311,7 +1311,7 @@ Situations that result in a \texttt{INFO} log include:
 \end{itemize}
 
 \subsection{Testing}
-This client library has been built alongside tests with the goal to maximise test coverage. When running LLVM source-based coverage on \texttt{sep2\_client}, the \texttt{grcov} report claims we have 71.11\% coverage, or 1297 \slash 1824 lines of code covered by tests. \cite{grcov} \cite{llvmcov}
+This client library has been built alongside tests with the goal to maximise test coverage. When running LLVM source-based coverage on \texttt{sep2\_client}, the \texttt{grcov} report claims we have 71.11\% coverage, or 1297 \slash 1824 lines of code covered by tests \cite{grcov} \cite{llvmcov}. 
 
 In section TODO we discuss future improvements to testing.
 

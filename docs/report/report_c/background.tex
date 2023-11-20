@@ -14,8 +14,7 @@ The specification defines two methods by which clients retrieve resources from s
 The second, more modern, and more scalable method, has clients 'subscribe' to a resource, after which they will be sent notifications containing any changes to the subscribed resource from the server, without needing to poll.
 
 Despite this, whether a resource can be subscribed to can be further refined by the server exposing the resource.
-For that reason, it is often required that clients employ both polling, and subscriptions when maintaining the latest instance of a resource. \cite{AUSDOE} 
-\cite{IEEE2030.5}
+For that reason, it is often required that clients employ both polling, and subscriptions when maintaining the latest instance of a resource \cite{AUSDOE} \cite{IEEE2030.5}. 
 
 \section{Protocol Design}
 Resources are transmitted between clients and servers using HTTP/1.1, over TCP/IP, optionally using TLS.
@@ -30,7 +29,7 @@ In order to connect to servers, clients must be able to resolve hostnames to IP 
 \section{Usage}
 The IEEE 2030.5 function sets cover a wide range of applications and uses, aiming to support as many end-user energy devices as possible. A subset of these possible use cases are as follows:
 \begin{itemize}
-    \item (Smart) Electricity Meters can use the 'Metering' function set to 'exchange commodity measurement information' using 2030.5 resources. \cite{IEEE2030.5}
+    \item (Smart) Electricity Meters can use the 'Metering' function set to 'exchange commodity measurement information' using 2030.5 resources \cite{IEEE2030.5}. 
     \item Electric Vehicle chargers may wish to have their power usage behaviour influenced by resources belonging to the 'Demand Response and Load Control' function set.
     \item Solar Inverters may use the 'Distributed Energy Resources' function set such that their energy output into the wider grid can be controlled by the utility, as to avoid strain on the grid.
 \end{itemize}
