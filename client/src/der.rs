@@ -39,10 +39,11 @@ fn der_supersedes<'a>(
     a: EIPair<'a, DERControl>,
     b: EIPair<'a, DERControl>,
 ) -> Option<(EIPair<'a, DERControl>, EIPair<'a, DERControl>)> {
-    let same_target = a.0.has_same_target(b.0);
-    if a.0.does_supersede(b.0) && same_target {
+    // lazy since this is somewhat expensive
+    let same_target = || a.0.has_same_target(b.0);
+    if a.0.does_supersede(b.0) && same_target() {
         Some((b, a))
-    } else if b.0.does_supersede(a.0) && same_target {
+    } else if b.0.does_supersede(a.0) && same_target() {
         Some((a, b))
     } else {
         None
