@@ -6,6 +6,8 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
 
 This crate uses async rust, and currently only supports the [`tokio`](https://github.com/tokio-rs/tokio) runtime.
 
+[Documentation](https://ethanndickson.github.io/sep2_client_docs/sep2_client/)
+
 # Contents
 
 [`sep2_client`](sep2_client) - Implementation of an IEEE 2030.5 Client Library, including documentation & examples
@@ -71,7 +73,7 @@ async fn main() {
 }
 ```
 
-More comprehensive examples can be found in the [`client/examples`](client/examples) directory
+More comprehensive examples can be found in the [`client/examples`](client/examples) directory.
 
 # Cargo Features
 Features can be enabled or disabled through your crate's Cargo.toml
