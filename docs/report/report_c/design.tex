@@ -28,15 +28,20 @@ For this reason, instead of developing any single binary application, we've inst
 IEEE 2030.5 resources can be communicated between clients and servers as their XML representations. This means we require the ability to serialise \& deserialise Rust data types to and from XML.
 Fortunately, there already exists a popular Rust crate for this purpose, built for use in embedded communication protocols, called \texttt{YaSerde} \cite[]{YaSerde}.
 
-However, this library does not perfectly fit IEEE 2030.5 requirements. To address this, we have forked YaSerde, and developed a crate \texttt{SEPSerde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to IEEE 2030.5. We do not intend for library users to interact with this crate, it merely forms the basis of our common library implementation.
+However, this library does not perfectly fit IEEE 2030.5 requirements. To address this, we have forked YaSerde, and developed a crate \texttt{SEPSerde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to IEEE 2030.5. 
 
-Note that we are yet to complete the renaming of this library, in all code snippets the library will still be referred to as \texttt{YaSserde}.
+We do not intend for library users to interact directly with this crate, it merely forms the basis of our common library implementation. 
+The source code is available at: \url{https://github.com/ethanndickson/yaserde}
+
+Note that we are yet to complete renaming, in most contexts the library will still be referred to as \texttt{YaSerde}.
 
 \subsubsection{Common Library: \- sep2\_common}
 IEEE 2030.5 resources are used in both clients and servers. For that reason, we've developed a common library with a Rust implementation of the IEEE 2030.5 XSD. This common library includes the code necessary to integrate with our \texttt{SEPSerde} crate, allowing these resources to be serialised and deserialised to and from XML.
 
 This common library, \texttt{sep2\_common}, can then be easily integrated and implemented in a future IEEE 2030.5 server implementation, as to avoid resources being implemented and stored differently on either. 
 For the sake of modularity, and to avoid unnecessarily large binaries when compiled, this crate comes complete with compile-time flags (called Crate 'features') for each of the resource packages in IEEE 2030.5, where packages correspond to function sets.
+
+The source code and documentation for this library is available at: \url{https://github.com/ethanndickson/sep2_common}
 
 \subsubsection{Client Library: \- sep2\_client}
 The potential use cases for IEEE 2030.5 are broad, as it's designed to be able to coordinate as many different types of end-user energy devices as possible.
@@ -48,6 +53,8 @@ Clearly, it is impossible for us as developers to implement the resulting logic 
 We have therefore produced \texttt{sep2\_client}, a framework for developing IEEE 2030.5 Clients, regardless of the specific end-device, and regardless of the model under which it deployed.
 
 Much like \texttt{sep2\_common}, we provide compile-time flags for different function sets. For example, clients that don't run a Subscription / Notification server, need not compile it.
+
+The source code and documentation for this library is available at: \url{https://github.com/ethanndickson/sep2_client}
 
 \subsection{Open-source Software}
 Our implementation aims to address the lack of open-source IEEE 2030.5 software and tooling. Consequently, it's crucial that our codebase is well documented, and well tested, as to encourage and enable users to contribute modifications and fixes, and to reassure potential users of it's correctness.
