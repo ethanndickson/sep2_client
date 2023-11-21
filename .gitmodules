@@ -1,3 +1,3 @@
-[submodule "IEEE-2030.5-Common"]
-	path = IEEE-2030.5-Common
-	url = git@github.com:ethanndickson/IEEE-2030.5-Common.git
+[submodule "sep2_common"]
+	path = sep2_common
+	url = git@github.com:ethanndickson/sep2_common.git
