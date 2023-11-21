@@ -28,7 +28,7 @@ For this reason, instead of developing any single binary application, we've inst
 IEEE 2030.5 resources can be communicated between clients and servers as their XML representations. This means we require the ability to serialise \& deserialise Rust data types to and from XML.
 Fortunately, there already exists a popular Rust crate for this purpose, built for use in embedded communication protocols, called \texttt{YaSerde} \cite[]{YaSerde}.
 
-However, this library does not perfectly fit IEEE 2030.5 requirements. To address this, we have forked YaSerde, and developed a crate \texttt{SEPSerde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to IEEE 2030.5.
+However, this library does not perfectly fit IEEE 2030.5 requirements. To address this, we have forked YaSerde, and developed a crate \texttt{SEPSerde}, operating under a very similar interface to YaSerde, but instead producing XML representations of resources that conform to IEEE 2030.5. We do not intend for library users to interact with this crate, it merely forms the basis of our common library implementation.
 
 Note that we are yet to complete the renaming of this library, in all code snippets the library will still be referred to as \texttt{YaSserde}.
 
