@@ -403,7 +403,7 @@ pub trait Scheduler<E: SEEvent> {
 /// Schedule for a given function set, and a specific server.
 ///
 /// Schedules are bound by the [`SEEvent`] pertaining to a specific function set,
-/// and an [`EventHandler`] that is passed event updates, such that clients can make device changes,
+/// and an [`EventCallback`] that is passed event updates, such that clients can make device changes,
 /// and dictate the response sent to the server.
 ///
 /// Multi-server interactions are handled gracefully as the `replyTo` field on Events contains the hostname of the server.

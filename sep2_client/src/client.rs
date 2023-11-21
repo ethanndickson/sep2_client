@@ -394,7 +394,7 @@ impl Client {
     ///
     /// As per IEEE 2030.5, if a poll rate is not specified, a default of 900 seconds (15 minutes) is used.
     ///
-    /// All poll events created can be forcibly run using [`Client::force_poll`], such as is required when reconnecting to the server after a period of connectivity loss.
+    /// All poll events created can be forcibly run using [`Client::force_polls`], such as is required when reconnecting to the server after a period of connectivity loss.
     pub async fn start_poll<T>(
         &self,
         path: impl Into<String>,
