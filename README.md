@@ -73,7 +73,7 @@ async fn main() {
 }
 ```
 
-More comprehensive examples can be found in the [`client/examples`](client/examples) directory.
+More comprehensive examples can be found in the [`sep2_client/examples`](sep2_client/examples) directory.
 
 # Cargo Features
 Features can be enabled or disabled through your crate's Cargo.toml
