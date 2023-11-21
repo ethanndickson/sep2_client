@@ -8,13 +8,11 @@ This crate uses async rust, and currently only supports the [`tokio`](https://gi
 
 # Contents
 
-[`client`](client) - Implementation of an IEEE 2030.5 Client Library, including documentation & examples
+[`sep2_client`](sep2_client) - Implementation of an IEEE 2030.5 Client Library, including documentation & examples
 
-[`test_server`](test_server) - Dumb IEEE 2030.5 Server for testing
+[`sep2_test_server`](sep2_test_server) - Dumb IEEE 2030.5 Server for testing
 
-[`docs`](docs) - Thesis Project Reports & Seminars
-
-[`IEEE-2030.5-Common`](IEEE-2030.5-Common) - Git submodule for the IEEE 2030.5 Rust server & client common library
+[`thesis`](thesis) - Thesis Project Reports & Seminars
 
 # Progress
 ### Core Features
