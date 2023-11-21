@@ -24,7 +24,7 @@ ahash = "0.8.6"
 
 [dev-dependencies]
 sep2_common = { git = "https://github.com/ethanndickson/sep2_common", features = ["examples","der","edev","fsa","metering","pubsub","dcap"]  }
-sep2_test_server = { path = "../test_server" }
+sep2_test_server = { path = "../sep2_test_server" }
 typemap_rev = "0.3.0"
 simple_logger = "4.2.0"
 clap = "4.4.7"

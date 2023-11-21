@@ -1,8 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "sep2_common/sep2_common",
-    "sep2_common/sep2_common_derive",
-    "client",
-    "test_server",
+    "sep2_client",
+    "sep2_test_server",
 ]

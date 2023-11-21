@@ -12,7 +12,7 @@ This crate uses async rust, and currently only supports the [`tokio`](https://gi
 
 [`sep2_test_server`](sep2_test_server) - Dumb IEEE 2030.5 Server for testing
 
-[`thesis`](thesis) - Thesis Project Reports & Seminars
+[`docs`](docs) - Thesis Project Reports & Seminars
 
 # Progress
 ### Core Features
