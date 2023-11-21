@@ -1,4 +1,4 @@
-# IEEE 2030.5 Client (Smart Energy Profile 2.0) (SEP2)
+# SEP2 Client Library
 
 `sep2_client` is a (WIP) Rust library for developing IEEE 2030.5 compliant clients on Linux[^1] based operating systems.
 
