@@ -39,7 +39,7 @@ Table 7.1 shows a comparison of features and functionality between our implement
 
 One of the biggest differences between the implementations is that the EPRI implementation uses minimal third-party libraries, choosing to implement XML, EXI, HTTP, the XSD parser, and DNS-SD, effectively from scratch, using just low-level Linux interfaces and OpenSSL. This has the advantage of producing more self-contained code. However, since these implementations are not as commonly used as the third party libraries we use for the same functionality, it is unlikely they have been subjected to as extensive testing.
 
-Of note is that our client library does not include an implementation for DNS-SD and EXI Resource Serialisation \& deserialisation. In sections 5.2 and 5.3 we discuss the reasoning behind this. 
+Of note is that our common and client library do not include implementations for DNS-SD and EXI Resource Serialisation \& deserialisation. In sections 5.2 and 5.3 we discuss the reasoning behind this. 
 
 In terms of Event function sets, our client has a more complete implementation. We provide library users with black-box schedulers handling DER, Messaging, Pricing, and Demand Response and Load Control events. The EPRI C implementation only includes a schedule for Distributed Energy Resources. The same goes for applying Time resources at a schedule level, EPRI provides no way to have different schedules use different time resources.
 
@@ -48,6 +48,16 @@ Importantly, EPRI's implementation does NOT include a subscription / notificatio
 However, EPRI's implementation has the benefit of having undergone formal testing provided by QualityLogic, which is a paid, service. Due to the cost of the service, it is unlikely our implementation will have the opportunity to undergo the same testing.
 
 Finally, our implementation has the benefit of being written in a memory safe language, safe Rust. The EPRI implementation is written in C, where memory safety is not proven by the compiler.
+
+\section{EXI Serialisation \& Deserialisation}
+Going forward, we must explore how EXI support can be added to the common library. It's likely that it would be implemented alongside a rewrite / redesign of \texttt{SEPSerde}, such that that the sole library could wrap an EXI library, and an XML library, and produce both as required.
+Though this EXI library could be implemented using FFI to a C library, there are complete implementations of EXI parsers and writers in modern languages, and it would be more appropriate to use those as reference implementations for a memory safe fully Rust EXI library. \cite{exijs}
+
+\section{DNS-SD}
+Although we've deemed this feature not wholly necessary for this iteration of the client, it is required for full IEEE 2030.5 adherence, and as such we must explore ways to implement it going forward. 
+
+Whilst we could implement this from scratch using just Rust standard library UDP sockets, the open-source tool \texttt{Avahi} provides DNS-SD on Linux. There also exists a tool \texttt{xmDNS-avahi} that provides an \texttt{xmDNS} server, required by IEEE 2030.5, by modifying \texttt{Avahi}. Furthermore, \texttt{xmDNS-avahi} cites IEEE 2030.5 as a motivation for requiring an \texttt{xmDNS} server. 
+It's therefore likely wrapping this library using Rust FFI would be the most appropriate approach. \cite{avahi} \cite{xmdnsavahi} 
 
 \section{Rust Async Traits}
 As of this report, the stable branch of the Rust compiler does not support 'Return Position Impl Trait' (RPIT) in traits (RPITIT). It is simply not supported by the type system \cite{rustRPITIT}.
@@ -151,12 +161,7 @@ We currently have no data, or frame of reference, for the performance of the cli
 Going forward, it would be extremely beneficial to perform some form of profiling on an instance of the client in a production context. Particularly, we are interested in what, if any parts of the code are responsible for excessive heap allocations, or uncessecarily complex computations, that may impact performance.
 We are also interested in the memory footprint of the client over an extended period of time, to ensure that memory is being freed appropriately. For example, that schedule garbage collection is occurring. 
 
-Furthermore, we would like to know what parts of our implementation that run most frequently and take the longest time to complete, the 'hot' function calls that we would need to optimise further. It's likely these will be the functionality responsible for serialising \& deserialising resources, and will further incentivise us to rewrite \texttt{SEPserde} from scratch.
+Furthermore, we would like to know what parts of our implementation that run most frequently and take the longest time to complete, the 'hot' function calls that we would need to optimise further. It's likely these will be the functionality responsible for serialising \& deserialising resources, and will further incentivise us to rewrite \texttt{SEPSerde} from scratch.
 
 It would also be sensible to conduct benchmarks of the client when completing a fixed workload, such as several completing several requests simultaneously, and then compare those benchmarks to that of the EPRI C implementation.
-
-
-
-
-
 

@@ -657,6 +657,23 @@ Figure 6.18 shows a HTTPS client being instantiated with the server's address, t
     \end{center}
 \end{figure}
 
+
+\begin{figure}[h]
+    \begin{center}
+        \begin{lstlisting}
+            config.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
+            config.set_certificate_file(cert_path, SslFiletype::PEM)?;
+            config.set_private_key_file(pk_path, SslFiletype::PEM)?;
+            config.set_ca_file(rootca_path)?;
+        \end{lstlisting}
+        \label{fig:httpsclientexample}
+        \vspace{-10pt}
+        \caption{Steps necessary to create an IEEE 2030.5 TLS configuration using OpenSSL.}
+    \end{center}
+\end{figure}
+
+Figure 6.19 shows how we use the client supplied certificates and key to create a TLS configuration using OpenSSL. We note that OpenSSL supports the \texttt{ECDHE-ECDSA-AES128-CCM8} cipher suite.
+
 \subsubsection{X509 Parsing \& Validation}
 Additionally, we provide an interface for library users to verify that the provided X509 certificates adhere to the specification - that they contain the necessary extensions and fields. OpenSSL provides this functionality, however the Rust FFI bindings we use do not expose the corresponding API. Rather than write unsafe Rust FFI, and possibly introduce undefined behaviour to our library, we simply defer to the \texttt{X509-Parser} library, which lets us check these conditions efficiently \cite{x509parser}.
 
@@ -846,7 +863,7 @@ When implementing this interface, we take into consideration it's ergonomics. Th
     \end{center}
 \end{figure}
 
-The first method allows user to implement the trait in Figure 6.24 on a type, and then pass an instance of that ype when starting the poll.
+The first method allows user to implement the trait in Figure 6.24 on a type, and then pass an instance of that type when starting the poll.
 This is useful when users have some thread-safe mutable state they want to share between all poll tasks, as they can implement handlers for multiple resources on a type, and then pass the same underlying instance of the type to multiple poll handlers, and thus access that same state in each handler.
 
 
