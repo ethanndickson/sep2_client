@@ -363,7 +363,7 @@ The protocol's WADL XML document outlines all the routes a IEEE 2030.5 server ca
 
 Regardless, as part of this thesis we explored how this might be accomplished in Rust, in order to determine if it would work to improve the ergonomics of our common library interface.
 
-In order to have a Rust function that deserialise all valid resources, even if the type is not known, we require that the function returns a single concrete type. For this we could use trait objects, Rust dynamic dispatch, which has the function return a 'fat' pointer, which contains a pointer to the resource (usually on the heap) and pointer to the table containing function pointers for the corresponding trait, often called a 'vtable' or 'virtual method table'. 
+In order to have a Rust function that deserialise all valid resources, even if the type is not known, we require that the function returns a single concrete type. For this we could use trait objects, Rust dynamic dispatch, which has the function return a 'fat' pointer, which contains a pointer to the resource (usually on the heap) and pointer to the table containing function pointers for the corresponding trait, often called a 'virtual method table'. 
 
 Implementing this function with a trait object return type would require a significant time investment, adjusting the existing \texttt{YaSerde} code to have it it return a \texttt{Box<T>} (heap allocated), instead of \texttt{T} (stack allocated).
 
@@ -417,9 +417,9 @@ Unfortunately, this is not described in any easily parsable way, and was instead
 
 Figure 6.12 shows our implementation of this, where we first implement a total order, and then use that to implement the required partial order.
 
-To provide an ergonomic way for working with lists, and ensure lists are always sorted, we use our procedural macros to provide a common interface for working with list resources. List resources contain a Rust \texttt{Vec} internally, which can be pushed to directly, but does not retain the sortedness.
+To provide an ergonomic way for working with lists, and ensure lists are always sorted, we use our procedural macros to provide a common interface for working with list resources. 
 
-Instead, we provide a \texttt{add} function on all lists that inserts and retains the intended order. This function also updates the 'all' field of the resource (the length of the list), to ensure it remains consistent with the actual contents of the list. Similarly, we provide a \texttt{remove} function maintaining the same invariants. For all other, less common use cases, library users will be required to update the list invariants as necessary. 
+List resources contain a Rust \texttt{Vec} internally, which can be pushed to directly, but does not retain the sortedness. Instead, we provide a \texttt{add} function on all lists that inserts and retains the intended order. This function also updates the 'all' field of the resource (the length of the list), to ensure it remains consistent with the actual contents of the list. Similarly, we provide a \texttt{remove} function maintaining the same invariants. For all other, less common use cases, library users will be required to update the list invariants as necessary. 
 
 \begin{figure}[H]
     \begin{center}
@@ -637,7 +637,7 @@ The relevant details on these certificate types are in IEEE 2030.5 \texttt{6.11.
 
 Client instances restricted to performing requests via HTTP do not need to supply any certificates, they need only support an absolute URI of the target server. \texttt{hyper} handles DNS resolution, and as such, a hostname can be used. 
 
-Figure 6.18 shows a HTTPS client being instantiated with the server's address, the necessary certificates and key, the defualt \texttt{SO\_KEEPALIVE} value, and the default poll 'tickrate' (see section 6.2.5)/  
+Figure 6.18 shows a HTTPS client being instantiated with the server's address, the necessary certificates and key, the default \texttt{SO\_KEEPALIVE} value, and the default poll 'tickrate' (see section 6.2.5)/  
 
 \begin{figure}[h]
     \begin{center}
@@ -666,7 +666,7 @@ Figure 6.18 shows a HTTPS client being instantiated with the server's address, t
             config.set_private_key_file(pk_path, SslFiletype::PEM)?;
             config.set_ca_file(rootca_path)?;
         \end{lstlisting}
-        \label{fig:httpsclientexample}
+        \label{fig:tlsconfigexample}
         \vspace{-10pt}
         \caption{Steps necessary to create an IEEE 2030.5 TLS configuration using OpenSSL.}
     \end{center}
@@ -1338,7 +1338,7 @@ With the goal of testing the client's ability to make HTTP requests, we required
 We also use this server to conduct system tests. These system tests follow the examples outlined in IEEE 2030.5 Annex C, currently only testing the core client functionality.
 
 \subsubsection{Subscription / Notification}
-In order to send notifications to clients, IEEE 2030.5 need to operate a client capable of making HTTP POST requests. In our client library, a \texttt{Client} instance is seperate from a \texttt{ClientNotifServer} instance, meaning our testing process is straight-forward - we make requests to the notification server using our client. 
+In order to send notifications to clients, IEEE 2030.5 need to operate a client capable of making HTTP POST requests. In our client library, a \texttt{Client} instance is separate from a \texttt{ClientNotifServer} instance, meaning our testing process is straight-forward - we make requests to the notification server using our client. 
 
 Our tests ensure that a client interacting with the server is capable of receiving HTTP POST requests, and that the expected response is received. We also implicitly test that our notification server does not crash during regular use.
 

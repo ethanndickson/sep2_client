@@ -56,7 +56,7 @@ Though this EXI library could be implemented using FFI to a C library, there are
 \section{DNS-SD}
 Although we've deemed this feature not wholly necessary for this iteration of the client, it is required for full IEEE 2030.5 adherence, and as such we must explore ways to implement it going forward. 
 
-Whilst we could implement this from scratch using just Rust standard library UDP sockets, the open-source tool \texttt{Avahi} provides DNS-SD on Linux. There also exists a tool \texttt{xmDNS-avahi} that provides an \texttt{xmDNS} server, required by IEEE 2030.5, by modifying \texttt{Avahi}. Furthermore, \texttt{xmDNS-avahi} cites IEEE 2030.5 as a motivation for requiring an \texttt{xmDNS} server. 
+Whilst we could implement this from scratch using just Rust standard library UDP sockets, the open-source tool \texttt{Avahi} provides DNS-SD on Linux. There also exists a tool \texttt{xmDNS-Avahi} that provides an \texttt{xmDNS} server, required by IEEE 2030.5, by modifying \texttt{Avahi}. Furthermore, \texttt{xmDNS-Avahi} cites IEEE 2030.5 as a motivation for requiring an \texttt{xmDNS} server. 
 It's therefore likely wrapping this library using Rust FFI would be the most appropriate approach. \cite{avahi} \cite{xmdnsavahi} 
 
 \section{Rust Async Traits}
@@ -87,7 +87,7 @@ In early benchmarks, \texttt{rustls} is shaping up to be more performant and mor
 Currently, the \texttt{ring} crate does not support Authenticated Encryption using CCM, as required by IEEE 2030.5, stalling progress on being able to use \texttt{rustls}. As part of our library release, we will inquire with the status of this implementation, and what further work is required to add the functionality to \texttt{ring}. Currently, progress on this feature in ring has stalled, and there may be avenues for us to contribute to ring directly \cite{ringccmpr} \cite{ringccmissue}.
 
 \section{HTTP Implementation Improvements}
-Whilst we use the \texttt{hyper} client as part of our implementation, and not the more commonly used wrapper around it, \texttt{reqwest}, we lose a great deal of functionality that is necessary for both ergonomics, and IEEE 2030.5 \cite{reqwest}. 
+Whilst we use the \texttt{hyper} client as part of our implementation, and not the more commonly used wrapper around it, \texttt{reqwest}, we lose a great deal of functionality that is necessary for both ergonomics, and IEEE 2030.5 requirements \cite{reqwest}. 
 
 One such crucial example is the ability to handle HTTP redirects without having to implement it ourselves.
 With the recent release of \texttt{hyper 1.0}, this problem is exacerbated, with the library requiring more of the lower level details be handled in our implementation, as it aims to provide a more generic, less opinionated, HTTP implementation.   
