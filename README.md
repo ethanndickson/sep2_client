@@ -2,7 +2,7 @@
 
 `sep2_client` is a (WIP) Rust library for developing IEEE 2030.5 compliant clients on Linux[^1] based operating systems.
 
-It relies on, and should be used alongside, the [`sep2_common`](https://github.com/ethanndickson/IEEE-2030.5-Common) crate, and it's implementation of the IEEE 2030.5 XSD.
+It relies on, and should be used alongside, the [`sep2_common`](https://github.com/ethanndickson/sep2_common) crate, and it's implementation of the IEEE 2030.5 XSD.
 
 This crate uses async rust, and currently only supports the [`tokio`](https://github.com/tokio-rs/tokio) runtime.
 
