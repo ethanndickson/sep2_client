@@ -3,26 +3,27 @@
 \section{High-Level Architecture}
 The IEEE 2030.5 protocol follows a REST API architecture, and as such, adopts a client-server model.
 
-Transmitted between clients and servers are 'Resources', all of which are defined in a standardised schema, an XSD. 
-Despite the client-server model, IEEE 2030.5 purposefully does not make distinctions client resources and server resources, as to avoid them having differing behaviours on each. Rather, a server exposes resources to clients, while clients retrieve, update, create and delete resources on servers.
+Transmitted between clients and servers are 'Resources', all of which are defined in a standardised XSD. 
+Despite the client-server model, IEEE 2030.5 purposefully does not make distinctions between client resources and server resources, as to avoid them having differing behaviours on each. Rather, a server exposes resources to clients, while clients retrieve, update, create and delete resources on servers.
 Servers communicate with many clients, and under a set of specified requirements, clients can communicate with multiple servers.
 
 Being the product of existing technologies, the IEEE 2030.5 resources cover a wide range of applications. As such, the specification logically groups resources into discrete 'function sets', of which there are twenty-five. 
-Device manufacturers or electric utilities implementing IEEE 2030.5 need only communicate resources from function sets relevant to the purpose of the device. 
+The device manufacturers or electric utilities implementing IEEE 2030.5 need only communicate resources from function sets relevant to their needs.
 
 The specification defines two methods by which clients retrieve resources from server. The default method has clients 'poll' servers for the latest versions of resources on a timed interval.
 The second, more modern, and more scalable method, has clients 'subscribe' to a resource, after which they will be sent notifications containing any changes to the subscribed resource from the server, without needing to poll.
 
-Despite this, whether a resource can be subscribed to can be further refined by the server exposing the resource.
-For that reason, it is often required that clients employ both polling, and subscriptions when maintaining the latest instance of a resource \cite{AUSDOE} \cite{IEEE2030.5}. 
+Despite this, only some resources can be subscribed to, and of those whether it can be subscribed to can be further restricted by the server.
+For that reason, it is practically always required that clients employ both polling, and subscriptions when maintaining the latest instance of a resource \cite{AUSDOE} \cite{IEEE2030.5}. 
 
 \section{Protocol Design}
-Resources are transmitted between clients and servers using HTTP/1.1, over TCP/IP, optionally using TLS.
+Resources are transmitted between clients and servers using HTTP/1.1, over TCP/IP; optionally using TLS.
 As a result, the protocol employs the HTTP request methods of GET, POST, PUT and DELETE for retrieving, updating, creating and deleting resources, respectively.
 
-The specification requires that SSL/TLS certificates be signed, and all encryption done, using ECC cipher suites, with the ability to use RSA cipher suites as a fallback. Unlike regular TLS, these certificates are not only used to verify a server's identity, but are also used to verify a client's identity, using a protocol colloquially referred to as "Mutual TLS" or mTLS.
+The specification requires that SSL/TLS certificates be signed using ECDSA, that keys be exchanged using ECDHE, and that encryption be done as per AES 128, using the "Counter with CBC-MAC" (CCM) authenticated encryption algorithm. It also requires that the keys be generated using a specific elliptic curve, referred to as "secp256r1". This cipher suite uses "authenticated encryption with associated data" \cite{IEEE2030.5}. 
+Unlike most common implementations of TLS, supplied certificates are not only used to verify a server's identity, but are also used to verify a client's identity, using a protocol colloquially referred to as "Mutual TLS" or mTLS. \cite{AUSDOE}
 
-The standardised resource schema is defined in using XSD, as all transmitted resources are represented using either XML, or EXI, with the HTTP/1.1 \texttt{Content-Type} header set to \texttt{sep+xml} or \texttt{sep-exi}, respectively.
+The standardised resource schema is defined using XSD, as all transmitted resources are represented using either XML, or EXI, with the HTTP/1.1 \texttt{Content-Type} header set to \texttt{sep+xml} or \texttt{sep-exi}, respectively.
 
 In order to connect to servers, clients must be able to resolve hostnames to IP addresses using DNS. Similarly, the specification permits the ability for clients to discover servers on a local network using DNS-SD.
 

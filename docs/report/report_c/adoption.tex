@@ -7,13 +7,13 @@ In this section, we will examine both.
 \section{California Public Utilities Commission}
 'Electric Rule 21' is a tariff put forward by CPUC. Within it are a set of requirements concerning the connection of end-user energy production and storage to the grid. In this tariff, it is explicitly clear that
 "The default application-level protocol shall be IEEE 2030.5, as defined in the California IEEE 2030.5 implementation guide" \cite[]{Rule21}.
-Given that the state of California was among the first to make these considerations to the protocol, it's likely that future writers of legislation or tariffs will be influenced by Rule 21, particularly how they have extended the protocol to achieve scale in the realm of smart inverters.
+Given that the state of California was among the first to adopt the protocol, it's likely that future writers of legislation or tariffs will be influenced by Rule 21, particularly how they have extended the protocol to achieve scale in the realm of smart inverters.
 
 Relating directly to use of the IEEE 2030.5 protocol at scale are the high level architecture models defined in the California SIP implementation guide.
 
 \subsubsection{Individual/Direct Model}
-Under this model there is a direct communication between an IEEE 2030.5 compliant client, in this case a solar inverter, and a IEEE 2030.5 compliant server, hosted by the electric utility.
-This model alone does not impose any additional restrictions over those already existing in Rule 21. It requires the inverter to be a 2030.5 Client, and be managed individually by the server.
+Under the individual / direct model there is direct communication between an IEEE 2030.5 compliant client, in this case a solar inverter, and a IEEE 2030.5 compliant server, hosted by the electric utility.
+This model alone does not impose any additional restrictions over those already existing in Rule 21. It requires the inverter to be a 2030.5 Client, and be managed individually by the server. IEEE 2030.5 already accounts for clients existing on the end-users local area network, and for those devices to have intermittent internet access, or for those devices to regularly idle ('sleepy devices'). \cite{IEEE2030.5}
 
 \begin{figure}[H]
     \begin{center}
@@ -40,7 +40,7 @@ This model alone does not impose any additional restrictions over those already 
 
 
 \subsubsection{Aggregated Clients Model}
-The aggregated clients model, outlined in the implementation guide, is one preferred for use by electric utilities. Under this model, the 2030.5 client is but an aggregator communicating with multiple smart inverters, acting on their behalf.
+The aggregated clients model, outlined in the implementation guide, is preferred for use by electric utilities. Under this model, the 2030.5 client is but an aggregator communicating with multiple smart inverters, acting on their behalf.
 The rationale behind this model is to allow utilities to manage entire geographical areas, or a specific model of end-user energy device as though it were a single entity.
 
 
@@ -104,16 +104,16 @@ The rationale behind this model is to allow utilities to manage entire geographi
 \end{figure}
 
 
+The IEEE 2030.5 server is not aware of this aggregation, as the chosen communication protocol between an aggregator client and an end-user energy device is unspecified and out of scope of the model. \cite{csipimpl} \cite{20305workshop}. 
 
-The IEEE 2030.5 server is not aware of this aggregation, as the chosen communication protocol between an aggregator client and an end-user energy device is unspecified and out of scope of the model, as indicated in Figure 4.2.
-Under this model, aggregators may be communicating with thousands of IEEE 2030.5 compliant clients. For this reason, the California SIP mandates the subscription/notification retrieval method be used by clients, rather than polling.
-This is mandated in order to reduce network traffic, and of course, allow for use of the protocol at scale.
-Given this, the aggregator IEEE 2030.5 client is likely to be hosted in the cloud, or on some form of dedicated server.
+Under this model, aggregators may be communicating with thousands of IEEE 2030.5 compliant clients. For this reason, the California SIP mandates the subscription/notification retrieval method be used by clients, rather than polling, wherever technically possible  \cite{csipimpl}.
+This is done in order to reduce network traffic, and of course, allow for use of the protocol at scale.
+Given this, the aggregating IEEE 2030.5 client is likely to be hosted in the cloud, or on some form of dedicated server.
 
 
 \section{Australian Renewable Energy Agency}
-"Common Smart Inverter Profile" (Common SIP) (CSIP-AUS) is an implementation guide developed by the "DER Integration API Technical Working Group" in order to "promote interoperability amongst DER and DNSPs in Australia".
-The implementation guide requires DER adhere to IEEE 2030.5, whilst also mandating the client aggregator model, and recommending the use of the subscription/notification mechanism, in addition to polling. These are very similar requirements to that of American CSIP \cite[]{CSIPAus}. 
+"Common Smart Inverter Profile" (CSIP-AUS) is an implementation guide developed by the "DER Integration API Technical Working Group" in order to "promote interoperability amongst DER and DNSPs in Australia".
+The implementation guide requires DER adhere to IEEE 2030.5, whilst also mandating the client aggregator model, and recommending the use of the subscription/notification mechanism where possible. These are very similar requirements to that of American CSIP \cite[]{CSIPAus}. 
 
 Importantly, the Australian Common SIP extends upon existing IEEE 2030.5 resources whilst still adhering to IEEE 2030.5.
 As per IEEE 2030.5, resource extensions are to be made under a different XML namespace, in this case \texttt{https://csipaus.org/ns}. Likewise, extension specified fields are to be appropriately prefixed with \texttt{csipaus}. 
@@ -131,34 +131,40 @@ Despite IEEE 2030.5's prevalence and wide-spread adoption, the vast majority of 
 
 For that reason, any and all open-source contributions involving IEEE 2030.5 actively work to lower the cost of developing software in the smart grid ecosystem. These contributions are necessary in ensuring the protocol can be as widely adopted as possible, as to incorporate as many end-user energy devices into the smart grid as possible.
 
-In this section we will discuss existing open-source implementations of the standard, and identify the tradeoffs in each.
+In this section we will discuss existing open-source implementations of the standard for use in client devices.
 
 \subsection{Electric Power Research Institute Client Library: IEEE 2030.5 Client}
 One of the more immediately relevant adoptions of the protocol is the mostly compliant implementation of a client library by EPRI, in the United States of America.
 Released under the BSD-3 license and written in the C programming language, the implementation comes in at just under twenty-thousand lines of C code.
-Given that a IEEE 2030.5 client developed using this library would require extension by a device manufacturer, as to integrate it with the logic of the device itself, EPRI distributed header files as an interface to the codebase.
-For the purpose of demonstration and testing, they also bundled a client binary that can be built and executed, running as per user input.
+Given that a IEEE 2030.5 client developed using this library would require extension by a device manufacturer, as to integrate it with the logic of the device itself, EPRI distributed C header files as an interface to the codebase.
+For the purpose of demonstration and testing, they also bundled a client binary that can be built and executed.
 
 The C codebase includes a program that parses the IEEE 2030.5 XSD and converts it into C data types (structs) with documentation. This is then built with the remainder of the client library.
 
-The implementation targets the Linux operating system, however, for the sake of portability, EPRI defined a set of header file interfaces that contained Linux specific API calls, such that they could be replaced for some other operating system.
+The implementation targets the Linux operating system, however, for the sake of portability, EPRI defined a set of header file interfaces that contained Linux specific APIs, such that they could be replaced for some other operating system.
 
 These replaceable interfaces include those for networking, TCP and UDP, and event-based architecture, using the Linux \texttt{epoll} \texttt{syscall}, among others.
 
-The IEEE 2030.5 Client implementation by EPRI states, in it's User's Manual, that it almost perfectly conforms to IEEE 2030.5 according to tests written by QualityLogic.
-The one exception to this is that the implementation does not support the subscription/notification mechanism for resource retrieval, as of this report.
+Notably, this implementation uses minimal third-party libraries, choosing to implement XML, EXI, HTTP, the XSD parser, and DNS-SD, effectively from scratch, using just low-level linux interfaces and OpenSSL. This has the advantage of producing more self-contained code, and may have allowed for niche optimisations to be made.
+
+However, since these implementations are not as commonly used as more popular third party opens-source libraries it is unlikely they have been subjected to extensive testing.
+
+The implementation states, in it's user manual, that it almost perfectly conforms to IEEE 2030.5 according to tests written by QualityLogic.
+The one exception to this is that the implementation does not support the subscription/notification mechanism for resource retrieval (as of this report).
 This is particularly unusual given that the California SIP mandates the use of subscription/notification under the client aggregator model, a model of which this implementation was targeted for use in.
 
 One potential pain point for developers utilising this library is the ergonomics of the interface provided. The C programming language lacks many features present in modern programming languages that can be used to build more ergonomic and safe interfaces. For instance, the codebase's forced usage of global mutable state for storing retrieved Resources, goes against modern design principles, and would be easily avoided in a more modern programming language. 
 
-Furthermore, being written in a language without polymorphism, be it via monomorphisation, dynamic dispatch or tagged unions, C forgoes a great deal of type checking that could be used to make invalid inputs to the interface compile-time errors, instead of run-time errors or invocations of undefined behaviour. For example, due to the lack of tagged unions (or algebraic sum types) in C, many functions exposed to users accept a untyped (void) pointer, which is then cast to a specific type at runtime, providing no compile-time guarantees that that type conversion is possible, or that the underlying input is interpreted correctly, or even that the given pointer points to memory that the process is capable of reading and/or modifying.
+Furthermore, being written in a language without polymorphism, be it via monomorphisation, dynamic dispatch or tagged unions, C forgoes a great deal of type checking that could be used to make invalid inputs to the interface compile-time errors, instead of run-time errors or invocations of undefined behaviour. 
 
-Regardless, the library is sufficiently modular, providing interfaces across multiple C headers, where users of the library need only compile code that is relevant to their use-case. For example, developers building IEEE 2030.5 clients that need not handle DER function set event resources are not required to compile and work with the code responsible for managing them.
+For example, due to the lack of tagged unions (sum types) in C, many functions exposed to users accept a untyped (void) pointer, which is then cast to a specific type at runtime, providing no compile-time guarantees that that type conversion is possible, or that the underlying input is interpreted correctly, or even that the given pointer points to memory that the process is capable of reading and/or modifying.
 
-Additionally, the usage of the \texttt{epoll} \texttt{syscall} and the library's state-machine centric design lends itself to the scalability of the client, allowing it to handle operations asynchronously, and better perform when operating under the client aggregation model \cite[]{eprimanual}. 
+Regardless, the library is sufficiently modular, providing interfaces across multiple C headers, where users of the library need only compile code that is relevant to their use-case. For example, developers building IEEE 2030.5 clients that do not handle DER function set event resources are not required to compile and work with the code responsible for managing them.
+
+Additionally, the usage of the \texttt{epoll} \texttt{syscall} and the library's state-machine centric design lends itself to the scalability of the client, allowing it to handle operations asynchronously, and better scale when operating under the client aggregation model \cite[]{eprimanual}. 
 
 \subsection{Battery Storage and Grid Integration Program: envoy-client}
-A more modern implementation of the protocol is \texttt{envoy-client}, developed by BSGIP, an initiative of The Australian National University. Of note is that this client has been open-sourced ahead of the release of the IEEE 2030.5 Server library implementation \texttt{envoy}, and provides a very bare implementation of core IEEE 2030.5 client functionality. The library is written in Python, and therefore provides a far more modern interface than that of the EPRI library \cite{envoyclient}. 
+A more modern implementation of the protocol is \texttt{envoy-client}, developed by BSGIP, an initiative of The Australian National University. Of note is that this client has been open-sourced ahead of the release of their IEEE 2030.5 Server library implementation \texttt{envoy}. The release provides a very bare implementation of core IEEE 2030.5 client functionality. The library is written in Python, and therefore provides a far more modern interface than that of the EPRI library \cite{envoyclient}. 
 
 The library was released publicly in 2021, and has seen virtually no updates since. It is possible the client will see a major update when the \texttt{envoy} library is released, as improvements to 2030.5 test tooling were indicated as being developed \cite{DOEAdoption}. 
 

@@ -1,12 +1,12 @@
 \chapter{Evaluation \& Future Work}\label{ch:future}
-Despite all we've accomplished during this thesis, there are many features and improvements we haven't been able to implement purely due to time constraints. Adding some of this functionality is not entirely within our control.
+Despite all we've accomplished during this thesis, there are many features and improvements we haven't been able to implement purely due to time constraints.
 Furthermore, we've been able to identify some flaws in our existing design - potential pain points for developers using our library.
 
 In this chapter we'll compare our implementation to an existing solution, and discuss it's weaknesses and how we plan to improve them. Through this, and our released project, we provide a plan for any and all future work.
 
 \section{Comparison with the EPRI IEEE 2030.5 Client}
 We'll first provide a reference point for our progress on this thesis project by comparing it to that of the EPRI IEEE 2003.5 client library, implemented in C.
-This library is the oldest, and most popular open-source implementation of the client protocol.
+This library is the oldest, and most popular, open-source implementation of the client protocol.
 
 \begin{table}[h]
 	\centering
@@ -37,15 +37,15 @@ This library is the oldest, and most popular open-source implementation of the c
 
 Table 7.1 shows a comparison of features and functionality between our implementation, and EPRI's.
 
-One of the biggest differences between the implementations is that the EPRI implementation uses minimal third-party libraries, choosing to implement XML, EXI, HTTP, the XSD parser, and DNS-SD, effectively from scratch, using just low-level Linux interfaces and OpenSSL. This has the advantage of producing more self-contained code. However, since these implementations are not as commonly used as the third party libraries we use for the same functionality, it is unlikely they have been subjected to as extensive testing.
+Of note is that the EPRI implementation uses minimal third-party libraries, where the security and reliability of required standards (HTTP, XML) is unlikely to have been tested as extensively as the popular open-source libraries used in our implementation.
 
-Of note is that our common and client library do not include implementations for DNS-SD and EXI Resource Serialisation \& deserialisation. In sections 5.2 and 5.3 we discuss the reasoning behind this. 
+Of note is that our common and client library do not include implementations for DNS-SD and EXI resource serialisation \& deserialisation. In sections 5.2 and 5.3 we discuss the reasoning behind this. 
 
 In terms of Event function sets, our client has a more complete implementation. We provide library users with black-box schedulers handling DER, Messaging, Pricing, and Demand Response and Load Control events. The EPRI C implementation only includes a schedule for Distributed Energy Resources. The same goes for applying Time resources at a schedule level, EPRI provides no way to have different schedules use different time resources.
 
 Importantly, EPRI's implementation does NOT include a subscription / notification mechanism, the resource retrieval method mandated as part of CSIP. \cite{20305workshop}. 
 
-However, EPRI's implementation has the benefit of having undergone formal testing provided by QualityLogic, which is a paid, service. Due to the cost of the service, it is unlikely our implementation will have the opportunity to undergo the same testing.
+However, EPRI's implementation has the benefit of having undergone formal testing provided by QualityLogic, which is a paid service. Due to the cost of the service, it is unlikely our implementation will have the opportunity to undergo the same testing.
 
 Finally, our implementation has the benefit of being written in a memory safe language, safe Rust. The EPRI implementation is written in C, where memory safety is not proven by the compiler.
 
@@ -62,13 +62,13 @@ It's therefore likely wrapping this library using Rust FFI would be the most app
 \section{Rust Async Traits}
 As of this report, the stable branch of the Rust compiler does not support 'Return Position Impl Trait' (RPIT) in traits (RPITIT). It is simply not supported by the type system \cite{rustRPITIT}.
 
-RPIT is Rust's implementation of existentially quantified types. Functions using RPIT simply return an opaque type that implements the given trait. e.g. \texttt{fn foo() -> impl Display} is a function that returns some type that can be displayed.
+RPIT is Rust's implementation of existentially quantified types. Functions using RPIT simply return an opaque type that implements a specific trait. e.g. \texttt{fn foo() -> impl Display} is a function that returns some type that can be displayed.
 
 This functionality is necessary in expressing async Rust at the type-level. In Rust, async functions return state machines, types that implement the 'Future' trait. However, these state machines are auto-generated by the compiler and therefore require the use of RPIT to return. Therefore, the async keyword is simply syntactic sugar for \texttt{impl Future<Output = T>}, where T is the final value of the state machine.
 
 Our implementation defines a trait for each of the possible callback types. We want library users to be able to supply asynchronous callbacks, and as such, we require RPITIT.
 
-Currently, there is a popular workaround to this that involves utilizing Rust's dynamic dispatch to heap allocate, and then perform type erasure on the future before returning it, as to allow the function to return a concrete type. This workaround is achieved by having the \texttt{async\_trait} crate generate the necessary code, although it could be accomplished without \cite{asynctrait}. 
+Currently, there is a popular workaround to this that involves utilizing Rust's dynamic dispatch to heap allocate, and then perform type erasure on the future before returning it, as to allow the function to return a concrete type. This workaround is achieved by having the \texttt{async\_trait} crate generate the necessary code, although it could be accomplished by hand also \cite{asynctrait}. 
 
 This has the obvious downside of incurring an unnecessary heap allocation every time an async function in a trait is called. In our library this is whenever a user defined callback is called, or when an event is added to a schedule.
 
@@ -76,7 +76,7 @@ Fortunately, with the release of the Rust compiler v1.75 on the 28th of December
 
 This comes with a caveat. When async trait functions are declared but not defined, there is no way to infer what bounds on the return type can be relaxed. More specifically, the compiler cannot infer that all implementations of that trait function return a type that can be sent or referenced across thread boundaries (the Rust Send \& Sync traits). The solution to this is in active development, and is referred to as "minimal associated return type notation" \cite{sendboundproblem}.
 
-The Tokio runtime is a 'work-stealing' executor. In practice, this means Rust futures we return must implement the \texttt{Send} trait, and can be sent across thread boundaries. Since we cannot express this using an async function in a trait, we would fallback on what would be the desugared syntax alternative, \texttt{impl Future<Output = T> + Send}. This results in a marginally less ergonomic interface, as implementers of the trait now need to wrap their code in a async block themselves. However, this is still an improvement on the performance overhead and additional dependency that we require for the current workaround.
+The Tokio runtime is a 'work-stealing' executor. In practice, this means Rust futures we return must implement the \texttt{Send} trait, this means they can be sent across thread boundaries. Since we cannot express this using an async function in a trait, we would fallback on what would be the desugared syntax alternative, \texttt{impl Future<Output = T> + Send}. This results in a marginally less ergonomic interface, as implementers of the trait now need to wrap their code in a async block themselves. However, this is still an improvement on the performance overhead and additional dependency that we require for the current workaround.
 
 \section{Native Rust TLS}
 In section 6.2.3 we discussed how make use of the available OpenSSL Rust bindings to implement the security function set, and so far this has been sufficient. However, we note the 19 reported CVEs in OpenSSL in 2023 alone as a slight cause for alarm \cite{OpensslCVE}. 
@@ -110,10 +110,10 @@ With the goal of this thesis to produce an IEEE 2030.5 client library implementa
 As of present, this takes the form of:
 
 \begin{itemize}
-    \item Generated 'rustdoc' documentation, as is preferred by the Rust open-source ecosystem.
+    \item Generated 'rustdoc' documentation, as is preferred by the Rust open-source community.
     \item Thorough internal documentation, with explicit references to IEEE 2030.5 to justify behaviours.
     \item Example client binary source-code, showing the DER function set and event scheduler in use under the direct / individual model.
-    \item GitHub project management, detailing planned enhancements and broken functionality as issues.
+    \item GitHub project management, detailing planned enhancements and broken functionality as GitHub issues.
     \item The modular nature of our implementation, with responsibilities delegated to different Rust crates, and compile flags.
 \end{itemize}
 
@@ -127,7 +127,7 @@ In order to ensure our client is maintainable into the future, we will:
 \end{itemize}
 
 \section{Testing}
-As it stands, our client and common library are reasonably well-tested, with code coverage of 73.72\% when measured by lines of code. We would like to improve this going forward by:
+As it stands, our client and common library are reasonably well-tested, with code coverage of 63.79\% when measured by lines of code. Keeping in mind, a large portion of this is compile-time generated code that has already been tested, we would nonetheless like to improve this going forward by:
 
 \begin{itemize}
 	\item Testing our resource serialisation against all remaining example XML in Annex C.
@@ -139,6 +139,8 @@ As it stands, our client and common library are reasonably well-tested, with cod
 Furthermore, we would like to test our implementation against production-ready IEEE 2030.5 servers. There are currently two candidates against which this testing can be done, the \texttt{GridAPPS} IEEE 2030.5 server implementation, and the publicly accessible IEEE 2030.5 Test API hosted by Energy Queensland \cite{sep2clienthandbook} \cite{gridapps}. Both of these servers are poorly advertised, and were discovered very late into this thesis.
 
 Going forward, we will investigate if and how these servers can be used to further test our implementation. Of note, is that the Energy Queensland test server accepts certificate signing requests, and thus gaining access to that server is very much possible.
+
+(A previous figure of 73\% code coverage was previously given, however this figure included the tests as part of the coverage, and was therefore incorrect).
 
 \section{Authenticating Notification / Subscription}
 As of present, a \texttt{ClientNotifServer} can be instantiated without TLS. This is done as to not restrict library users to performing TLS termination at the application, and allowing them to run the notification server behind a reverse proxy or load balancer, such as \texttt{nginx} or \texttt{Apache}. 
@@ -158,10 +160,12 @@ One case where improvements could be easily made are user-defined callbacks. Cur
 \section{Benchmarking \& Profiling}
 We currently have no data, or frame of reference, for the performance of the client. 
 
-Going forward, it would be extremely beneficial to perform some form of profiling on an instance of the client in a production context. Particularly, we are interested in what, if any parts of the code are responsible for excessive heap allocations, or uncessecarily complex computations, that may impact performance.
-We are also interested in the memory footprint of the client over an extended period of time, to ensure that memory is being freed appropriately. For example, that schedule garbage collection is occurring. 
+Going forward, it would be extremely beneficial to perform some form of profiling on an instance of the client in a production context. Particularly, we are interested in what, if any parts of the code are responsible for excessive heap allocations, or uncessecarily complex computations that may impact performance.
+We are also interested in the memory footprint of the client over an extended period of time, to ensure that memory is being freed appropriately. For example, that the schedule garbage collection process is occurring. 
 
-Furthermore, we would like to know what parts of our implementation that run most frequently and take the longest time to complete, the 'hot' function calls that we would need to optimise further. It's likely these will be the functionality responsible for serialising \& deserialising resources, and will further incentivise us to rewrite \texttt{SEPSerde} from scratch.
+Furthermore, we would like to know what parts of our implementation run most frequently and take the longest time to complete, the 'hot' function calls that we would need to optimise further. 
+
+It's likely these will be the functionality responsible for serialising \& deserialising resources, and will further incentivise us to rewrite \texttt{SEPSerde} from scratch.
 
 It would also be sensible to conduct benchmarks of the client when completing a fixed workload, such as several completing several requests simultaneously, and then compare those benchmarks to that of the EPRI C implementation.
 
