@@ -127,7 +127,7 @@ In order to ensure our client is maintainable into the future, we will:
 \end{itemize}
 
 \section{Testing}
-As it stands, our client and common library are reasonably well-tested, with code coverage of 63.79\% when measured by lines of code. Keeping in mind, a large portion of this is compile-time generated code that has already been tested, we would nonetheless like to improve this going forward by:
+As it stands, our client and common library are reasonably well-tested, with code coverage of 63.79\% \footnote{A figure of 73\% code coverage was previously given in the seminar, however this figure included the tests as part of the coverage, and was therefore incorrect.} when measured by lines of code. Keeping in mind, a large portion of this is compile-time generated code that has already been tested, we would nonetheless like to improve this going forward by:
 
 \begin{itemize}
 	\item Testing our resource serialisation against all remaining example XML in Annex C.
@@ -139,8 +139,6 @@ As it stands, our client and common library are reasonably well-tested, with cod
 Furthermore, we would like to test our implementation against production-ready IEEE 2030.5 servers. There are currently two candidates against which this testing can be done, the \texttt{GridAPPS} IEEE 2030.5 server implementation, and the publicly accessible IEEE 2030.5 Test API hosted by Energy Queensland \cite{sep2clienthandbook} \cite{gridapps}. Both of these servers are poorly advertised, and were discovered very late into this thesis.
 
 Going forward, we will investigate if and how these servers can be used to further test our implementation. Of note, is that the Energy Queensland test server accepts certificate signing requests, and thus gaining access to that server is very much possible.
-
-(A previous figure of 73\% code coverage was previously given, however this figure included the tests as part of the coverage, and was therefore incorrect).
 
 \section{Authenticating Notification / Subscription}
 As of present, a \texttt{ClientNotifServer} can be instantiated without TLS. This is done as to not restrict library users to performing TLS termination at the application, and allowing them to run the notification server behind a reverse proxy or load balancer, such as \texttt{nginx} or \texttt{Apache}. 
