@@ -28,7 +28,6 @@ This crate uses async rust, and currently only supports the [`tokio`](https://gi
   - [x] DER
   - [x] DRLC
   - [x] Messaging
-  - [x] Flow Reservation
   - [x] Pricing
   - [x] Per-Schedule Time Offset 
 - [x] Tests / Documentation
