@@ -12,6 +12,7 @@ use sep2_common::packages::flow_reservation::FlowReservationResponse;
 use crate::event::{EventCallback, Schedule};
 
 use std::{
+    future::Future,
     sync::{atomic::AtomicI64, Arc},
     time::Duration,
 };
@@ -25,7 +26,6 @@ use crate::{
 };
 
 // Flow Reservation Schedule
-#[async_trait::async_trait]
 impl Scheduler<FlowReservationResponse> for Schedule<FlowReservationResponse> {
     type Program = ();
 
@@ -52,11 +52,12 @@ impl Scheduler<FlowReservationResponse> for Schedule<FlowReservationResponse> {
     }
 
     #[allow(unused_variables)]
-    async fn add_event(
+    fn add_event(
         &mut self,
         event: FlowReservationResponse,
         program: &Self::Program,
         server_id: u8,
-    ) {
+    ) -> impl Future<Output = ()> + Send {
+        async {}
     }
 }

@@ -51,7 +51,6 @@ struct TextMessageHandler {
     logs: Arc<RwLock<Vec<String>>>,
 }
 
-#[async_trait::async_trait]
 impl EventCallback<TextMessage> for TextMessageHandler {
     async fn event_update(&self, event: &EventInstance<TextMessage>) -> ResponseStatus {
         let log = match event.status() {

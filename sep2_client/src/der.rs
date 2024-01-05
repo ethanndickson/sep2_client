@@ -7,6 +7,7 @@
 //!
 
 use std::{
+    future::Future,
     sync::{atomic::AtomicI64, Arc},
     time::Duration,
 };
@@ -177,7 +178,6 @@ impl Schedule<DERControl> {
 
 /// DER is a function set where events exhibit 'direct control', according to the specification.
 /// Thus, this Schedule will determine when overlapping or superseded events should be superseded based off their target, their primacy, and their creation time and when they are no longer superseded, if their superseding event is cancelled.
-#[async_trait::async_trait]
 impl Scheduler<DERControl> for Schedule<DERControl> {
     type Program = DERProgram;
     /// Create a schedule for the given [`Client`] & it's [`SEDevice`] representation.
@@ -208,132 +208,139 @@ impl Scheduler<DERControl> for Schedule<DERControl> {
         out
     }
 
-    async fn add_event(&mut self, event: DERControl, program: &Self::Program, server_id: u8) {
-        let mrid = event.mrid;
-        let incoming_status = event.event_status.current_status;
-        // Devices SHOULD ignore events that do not indicate their device category.
-        // If not present, all devices SHOULD respond
-        if let Some(category) = event.device_category {
-            if !category.intersects(self.device.read().await.device_categories) {
-                log::warn!("DERControlSchedule: DERControl ({mrid}) does not target this category of device. Not scheduling event.");
-                return;
-            }
-        }
-
-        // If the event already exists in the schedule
-        // "Editing events shall NOT be allowed, except for updating status"
-        let cur = { self.events.read().await.get(&mrid).map(|e| e.status()) };
-        if let Some(current_status) = cur {
-            match (current_status, incoming_status) {
-                // Active -> (Cancelled || CancelledRandom || Superseded)
-                (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
-                    log::info!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
-                    self.cancel_dercontrol(&mrid, current_status, incoming_status.into()).await;
-                },
-                // Scheduled -> (Cancelled || CancelledRandom)
-                (EIStatus::Scheduled, EventStatus::Cancelled | EventStatus::CancelledRandom) => {
-                    log::info!("DERControlSchedule: DERControl ({mrid} has been marked as cancelled by the server. It will not be started");
-                    self.cancel_dercontrol(&mrid, current_status, incoming_status.into()).await;
-                },
-                // Scheduled -> Active
-                (EIStatus::Scheduled, EventStatus::Active) => {
-                    log::info!("DERControlSchedule: DERControl ({mrid}) has entered it's earliest effective start time.")
+    fn add_event(
+        &mut self,
+        event: DERControl,
+        program: &Self::Program,
+        server_id: u8,
+    ) -> impl Future<Output = ()> + Send {
+        async move {
+            let mrid = event.mrid;
+            let incoming_status = event.event_status.current_status;
+            // Devices SHOULD ignore events that do not indicate their device category.
+            // If not present, all devices SHOULD respond
+            if let Some(category) = event.device_category {
+                if !category.intersects(self.device.read().await.device_categories) {
+                    log::warn!("DERControlSchedule: DERControl ({mrid}) does not target this category of device. Not scheduling event.");
+                    return;
                 }
-                // Scheduled -> Superseded
-                (EIStatus::Scheduled, EventStatus::Superseded) =>
-                    log::warn!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is not locally."),
-                // Active -> Scheduled
-                (EIStatus::Active, EventStatus::Scheduled) =>
-                    log::warn!("DERControlSchedule: DERControl ({mrid}) is active locally, and scheduled on the server. Is the client clock ahead?"),
-                // Active -> Active
-                (EIStatus::Active, EventStatus::Active) => (),
-                // Complete -> Any
-                (EIStatus::Complete, _) => (),
-                // (Cancelled | CancelledRandom | Superseded) -> Any
-                (EIStatus::Cancelled | EIStatus::CancelledRandom | EIStatus::Superseded, _) => (),
-                // Scheduled -> Scheduled
-                (EIStatus::Scheduled, EventStatus::Scheduled) => (),
-            }
-        } else {
-            // We intentionally hold this lock for this entire scope
-            let mut events = self.events.write().await;
-            // Inform server event was received
-            self.auto_der_response(&event, ResponseStatus::EventReceived)
-                .await;
-
-            // Event arrives cancelled or superseded
-            if matches!(
-                incoming_status,
-                EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
-            ) {
-                log::warn!("DERControlSchedule: Told to schedule DERControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
-                self.auto_der_response(&event, incoming_status.into()).await;
-                return;
             }
 
-            // Calculate start & end times
-            // TODO: Clamp the duration and start time to remove gaps between successive events
-            let ei = EventInstance::new_rand(
-                program.primacy,
-                event.randomize_duration,
-                event.randomize_start,
-                event,
-                program.mrid,
-                server_id,
-            );
-
-            // The event may have expired already
-            if ei.end_time() <= self.schedule_time().into() {
-                log::warn!("DERControlSchedule: Told to schedule DERControl ({mrid}) which has already ended, sending server response and not scheduling.");
-                // Do not add event to schedule
-                // For function sets with direct control ... Do this response
-                self.auto_der_response(ei.event(), ResponseStatus::EventExpired)
+            // If the event already exists in the schedule
+            // "Editing events shall NOT be allowed, except for updating status"
+            let cur = { self.events.read().await.get(&mrid).map(|e| e.status()) };
+            if let Some(current_status) = cur {
+                match (current_status, incoming_status) {
+                    // Active -> (Cancelled || CancelledRandom || Superseded)
+                    (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
+                        log::info!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
+                        self.cancel_dercontrol(&mrid, current_status, incoming_status.into()).await;
+                    },
+                    // Scheduled -> (Cancelled || CancelledRandom)
+                    (EIStatus::Scheduled, EventStatus::Cancelled | EventStatus::CancelledRandom) => {
+                        log::info!("DERControlSchedule: DERControl ({mrid} has been marked as cancelled by the server. It will not be started");
+                        self.cancel_dercontrol(&mrid, current_status, incoming_status.into()).await;
+                    },
+                    // Scheduled -> Active
+                    (EIStatus::Scheduled, EventStatus::Active) => {
+                        log::info!("DERControlSchedule: DERControl ({mrid}) has entered it's earliest effective start time.")
+                    }
+                    // Scheduled -> Superseded
+                    (EIStatus::Scheduled, EventStatus::Superseded) =>
+                        log::warn!("DERControlSchedule: DERControl ({mrid}) has been marked as superseded by the server, yet it is not locally."),
+                    // Active -> Scheduled
+                    (EIStatus::Active, EventStatus::Scheduled) =>
+                        log::warn!("DERControlSchedule: DERControl ({mrid}) is active locally, and scheduled on the server. Is the client clock ahead?"),
+                    // Active -> Active
+                    (EIStatus::Active, EventStatus::Active) => (),
+                    // Complete -> Any
+                    (EIStatus::Complete, _) => (),
+                    // (Cancelled | CancelledRandom | Superseded) -> Any
+                    (EIStatus::Cancelled | EIStatus::CancelledRandom | EIStatus::Superseded, _) => (),
+                    // Scheduled -> Scheduled
+                    (EIStatus::Scheduled, EventStatus::Scheduled) => (),
+                }
+            } else {
+                // We intentionally hold this lock for this entire scope
+                let mut events = self.events.write().await;
+                // Inform server event was received
+                self.auto_der_response(&event, ResponseStatus::EventReceived)
                     .await;
-                return;
-            }
 
-            // For each event that would be superseded by this event starting:
-            // - inform the client
-            // - inform the server
-            // - mark as superseded
+                // Event arrives cancelled or superseded
+                if matches!(
+                    incoming_status,
+                    EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
+                ) {
+                    log::warn!("DERControlSchedule: Told to schedule DERControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
+                    self.auto_der_response(&event, incoming_status.into()).await;
+                    return;
+                }
 
-            // Determine what events this supersedes
-            let mut target = ei;
-            for (o_mrid, other) in events.iter_mut() {
-                if let Some(((superseded, _), (superseding, superseding_mrid))) =
-                    der_supersedes((&mut target, &mrid), (other, o_mrid))
-                {
-                    // Mark as superseded
-                    let prev_status = superseded.status();
-                    superseded.update_status(EIStatus::Superseded);
-                    superseded.superseded_by(superseding_mrid);
+                // Calculate start & end times
+                // TODO: Clamp the duration and start time to remove gaps between successive events
+                let ei = EventInstance::new_rand(
+                    program.primacy,
+                    event.randomize_duration,
+                    event.randomize_start,
+                    event,
+                    program.mrid,
+                    server_id,
+                );
 
-                    // Determine appropriate status
-                    let status = if prev_status == EIStatus::Active {
-                        // Since the newly superseded event is over, tell the client it's finished
-                        // We override whatever response the client provides to the more correct one
-                        (self.handler)(superseded).await;
-                        if superseded.program_mrid() != superseding.program_mrid() {
-                            // If the two events come from different programs
-                            ResponseStatus::EventAbortedProgram
-                        } else if superseded.server_id() != superseding.server_id() {
-                            // If the two events come from different servers
-                            ResponseStatus::EventAbortedServer
+                // The event may have expired already
+                if ei.end_time() <= self.schedule_time().into() {
+                    log::warn!("DERControlSchedule: Told to schedule DERControl ({mrid}) which has already ended, sending server response and not scheduling.");
+                    // Do not add event to schedule
+                    // For function sets with direct control ... Do this response
+                    self.auto_der_response(ei.event(), ResponseStatus::EventExpired)
+                        .await;
+                    return;
+                }
+
+                // For each event that would be superseded by this event starting:
+                // - inform the client
+                // - inform the server
+                // - mark as superseded
+
+                // Determine what events this supersedes
+                let mut target = ei;
+                for (o_mrid, other) in events.iter_mut() {
+                    if let Some(((superseded, _), (superseding, superseding_mrid))) =
+                        der_supersedes((&mut target, &mrid), (other, o_mrid))
+                    {
+                        // Mark as superseded
+                        let prev_status = superseded.status();
+                        superseded.update_status(EIStatus::Superseded);
+                        superseded.superseded_by(superseding_mrid);
+
+                        // Determine appropriate status
+                        let status = if prev_status == EIStatus::Active {
+                            // Since the newly superseded event is over, tell the client it's finished
+                            // We override whatever response the client provides to the more correct one
+                            (self.handler)(superseded).await;
+                            if superseded.program_mrid() != superseding.program_mrid() {
+                                // If the two events come from different programs
+                                ResponseStatus::EventAbortedProgram
+                            } else if superseded.server_id() != superseding.server_id() {
+                                // If the two events come from different servers
+                                ResponseStatus::EventAbortedServer
+                            } else {
+                                ResponseStatus::EventSuperseded
+                            }
                         } else {
                             ResponseStatus::EventSuperseded
-                        }
-                    } else {
-                        ResponseStatus::EventSuperseded
-                    };
-                    self.auto_der_response(superseded.event(), status).await;
+                        };
+                        self.auto_der_response(superseded.event(), status).await;
+                    }
                 }
-            }
 
-            // Update `next_start` and `next_end`
-            events.update_nexts();
+                // Update `next_start` and `next_end`
+                events.update_nexts();
 
-            // Add it to our schedule
-            events.insert(&mrid, target);
-        };
+                // Add it to our schedule
+                events.insert(&mrid, target);
+            };
+        }
     }
 }

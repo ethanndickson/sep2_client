@@ -51,7 +51,6 @@ struct EndDeviceControlhandler {
     logs: Arc<RwLock<Vec<String>>>,
 }
 
-#[async_trait::async_trait]
 impl EventCallback<EndDeviceControl> for EndDeviceControlhandler {
     async fn event_update(&self, event: &EventInstance<EndDeviceControl>) -> ResponseStatus {
         let log = match event.status() {

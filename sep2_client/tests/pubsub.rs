@@ -4,7 +4,11 @@ use sep2_client::{
     pubsub::{ClientNotifServer, RouteCallback},
 };
 use sep2_common::packages::{dcap::DeviceCapability, edev::EndDevice, pubsub::Notification};
-use std::{convert::Infallible, future, time::Duration};
+use std::{
+    convert::Infallible,
+    future::{self, Future},
+    time::Duration,
+};
 
 fn test_setup() -> Client {
     Client::new_https(
@@ -26,8 +30,8 @@ impl RouteCallback<DeviceCapability> for DCAPHandler {
     fn callback(
         &self,
         _: Notification<DeviceCapability>,
-    ) -> std::pin::Pin<Box<dyn future::Future<Output = SEPResponse> + Send + 'static>> {
-        Box::pin(async move { SEPResponse::Created(None) })
+    ) -> impl Future<Output = SEPResponse> + Send {
+        async move { SEPResponse::Created(None) }
     }
 }
 

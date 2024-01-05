@@ -51,7 +51,6 @@ struct DERControlHandler {
     logs: Arc<RwLock<Vec<String>>>,
 }
 
-#[async_trait::async_trait]
 impl EventCallback<DERControl> for DERControlHandler {
     async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
         let log = match event.status() {

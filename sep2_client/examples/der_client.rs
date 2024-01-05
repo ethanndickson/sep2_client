@@ -37,7 +37,6 @@ impl TypeMapKey for ReadingResource {
 struct Handler {}
 
 // Example definition of how DER event status updates should be handled.
-#[async_trait::async_trait]
 impl EventCallback<DERControl> for Handler {
     async fn event_update(&self, event: &EventInstance<DERControl>) -> ResponseStatus {
         match event.status() {

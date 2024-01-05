@@ -215,8 +215,6 @@ fn randomize(bound: Option<OneHourRangeType>) -> i64 {
     })
 }
 
-// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
-#[async_trait::async_trait]
 /// A Trait specifying a callback for a [`Schedule`]
 pub trait EventCallback<E: SEEvent>: Clone + Send + Sync + 'static {
     /// Called whenever the state of an event is updated such that a response cannot be automatically determined, and the client device must be made aware.
@@ -238,18 +236,20 @@ pub trait EventCallback<E: SEEvent>: Clone + Send + Sync + 'static {
     ///
     /// Currently, calling this function acquires a global lock on the scheduler, stopping it from making progress.
     /// This may be changed in the future.
-    async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus;
+    fn event_update(&self, event: &EventInstance<E>)
+        -> impl Future<Output = ResponseStatus> + Send;
 }
 
-/// Currently useless.
-#[async_trait::async_trait]
 impl<F, R, E: SEEvent> EventCallback<E> for F
 where
     F: Fn(&EventInstance<E>) -> R + Clone + Send + Sync + 'static,
     R: Future<Output = ResponseStatus> + Send + 'static,
 {
-    async fn event_update(&self, event: &EventInstance<E>) -> ResponseStatus {
-        Box::pin(self(event)).await
+    fn event_update(
+        &self,
+        event: &EventInstance<E>,
+    ) -> impl Future<Output = ResponseStatus> + Send {
+        self(event)
     }
 }
 
@@ -368,9 +368,6 @@ pub(crate) type EventHandler<E> = Arc<
 >;
 
 /// A Trait representing the common interface of all schedules.
-///
-// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
-#[async_trait::async_trait]
 pub trait Scheduler<E: SEEvent> {
     /// The type of the program the specific SEEvent belongs to, containing a primacy value and a unique program MRID.
     type Program;
@@ -397,7 +394,12 @@ pub trait Scheduler<E: SEEvent> {
     /// Events from different servers should be added with different server ids, the ids chosen are irrelevant.
     ///
     /// Subsequent retrievals/notifications of any and all [`SEEvent`] resources should call this function.
-    async fn add_event(&mut self, event: E, program: &Self::Program, server_id: u8);
+    fn add_event(
+        &mut self,
+        event: E,
+        program: &Self::Program,
+        server_id: u8,
+    ) -> impl Future<Output = ()> + Send;
 }
 
 /// Schedule for a given function set, and a specific server.

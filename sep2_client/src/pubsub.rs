@@ -15,27 +15,18 @@ use crate::client::SEPResponse;
 use crate::tls::{create_server_tls_config, TlsServerConfig};
 
 /// A trait implemented by types that can be used as a route callback in a [`ClientNotifServer`].
-///
-///
-// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
-pub trait RouteCallback<T: SEResource>: Send + Sync + 'static {
-    fn callback(
-        &self,
-        notif: Notification<T>,
-    ) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>>;
+pub trait RouteCallback<T: SEResource>: Send + Sync + Clone + 'static {
+    fn callback(&self, notif: Notification<T>) -> impl Future<Output = SEPResponse> + Send;
 }
 
 /// Automatically implemented for all [`Fn`] with a matching function signature.
 impl<F, R, T: SEResource> RouteCallback<T> for F
 where
-    F: Fn(Notification<T>) -> R + Send + Sync + 'static,
+    F: Fn(Notification<T>) -> R + Send + Sync + Clone + 'static,
     R: Future<Output = SEPResponse> + Send + 'static,
 {
-    fn callback(
-        &self,
-        notif: Notification<T>,
-    ) -> Pin<Box<dyn Future<Output = SEPResponse> + Send + 'static>> {
-        Box::pin(self(notif))
+    fn callback(&self, notif: Notification<T>) -> impl Future<Output = SEPResponse> + Send {
+        self(notif)
     }
 }
 
@@ -132,7 +123,8 @@ impl ClientNotifServer {
                         log::debug!(
                             "NotifServer: Successfully deserialized a resource on {log_path}"
                         );
-                        Box::pin(callback.callback(resource))
+                        let callback = callback.clone();
+                        Box::pin(async move { callback.callback(resource).await })
                     }
                     Err(err) => {
                         log::error!(

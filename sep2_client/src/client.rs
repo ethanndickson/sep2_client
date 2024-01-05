@@ -171,22 +171,19 @@ async fn into_sepresponse(res: hyper::Response<Body>) -> Result<SEPResponse> {
     }
 }
 
-// This trait uses extra heap allocations while we await stable RPITIT (and eventually async fn with a send bound future)
 /// A trait implemented by types that can be used as a poll callback by [`Client::start_poll`].
-#[async_trait::async_trait]
 pub trait PollCallback<T: SEResource>: Clone + Send + Sync + 'static {
-    async fn callback(&self, resource: T);
+    fn callback(&self, resource: T) -> impl Future<Output = ()> + Send;
 }
 
 /// Automatically implemented for all [`Fn`] with a matching function signature.
-#[async_trait::async_trait]
 impl<F, R, T: SEResource> PollCallback<T> for F
 where
     F: Fn(T) -> R + Send + Sync + Clone + 'static,
     R: Future<Output = ()> + Send + 'static,
 {
-    async fn callback(&self, resource: T) {
-        Box::pin(self(resource)).await
+    fn callback(&self, resource: T) -> impl Future<Output = ()> + Send {
+        self(resource)
     }
 }
 

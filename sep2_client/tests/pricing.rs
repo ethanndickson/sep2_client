@@ -57,7 +57,6 @@ struct TimeTariffIntervalHandler {
     logs: Arc<RwLock<Vec<String>>>,
 }
 
-#[async_trait::async_trait]
 impl EventCallback<TimeTariffInterval> for TimeTariffIntervalHandler {
     async fn event_update(&self, event: &EventInstance<TimeTariffInterval>) -> ResponseStatus {
         let log = match event.status() {

@@ -1,6 +1,7 @@
 //! Pricing Function Set
 
 use std::{
+    future::Future,
     sync::{atomic::AtomicI64, Arc},
     time::Duration,
 };
@@ -147,7 +148,6 @@ impl Schedule<TimeTariffInterval> {
     }
 }
 
-#[async_trait::async_trait]
 impl Scheduler<TimeTariffInterval> for Schedule<TimeTariffInterval> {
     type Program = (TariffProfile, RateComponent);
     fn new(
@@ -175,22 +175,23 @@ impl Scheduler<TimeTariffInterval> for Schedule<TimeTariffInterval> {
         out
     }
 
-    async fn add_event(
+    fn add_event(
         &mut self,
         event: TimeTariffInterval,
         program: &Self::Program,
         server_id: u8,
-    ) {
-        let tariff_profile = &program.0;
-        let rate_component = &program.1;
-        let mrid = event.mrid;
-        let incoming_status = event.event_status.current_status;
+    ) -> impl Future<Output = ()> + Send {
+        async move {
+            let tariff_profile = &program.0;
+            let rate_component = &program.1;
+            let mrid = event.mrid;
+            let incoming_status = event.event_status.current_status;
 
-        // If the event already exists in the schedule
-        // "Editing events shall NOT be allowed, except for updating status"
-        let cur = { self.events.read().await.get(&mrid).map(|e| e.status()) };
-        if let Some(current_status) = cur {
-            match (current_status, incoming_status) {
+            // If the event already exists in the schedule
+            // "Editing events shall NOT be allowed, except for updating status"
+            let cur = { self.events.read().await.get(&mrid).map(|e| e.status()) };
+            if let Some(current_status) = cur {
+                match (current_status, incoming_status) {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
                     log::warn!("TimeTariffIntervalSchedule: TimeTariffInterval ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
@@ -220,86 +221,87 @@ impl Scheduler<TimeTariffInterval> for Schedule<TimeTariffInterval> {
                 // Scheduled -> Scheduled
                 (EIStatus::Scheduled, EventStatus::Scheduled) => (),
             }
-        } else {
-            // We intentionally hold this lock for this entire scope
-            let mut events = self.events.write().await;
-            // Inform server event was received
-            self.auto_pricing_response(&event, ResponseStatus::EventReceived)
-                .await;
-
-            // Event arrives cancelled or superseded
-            if matches!(
-                incoming_status,
-                EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
-            ) {
-                log::warn!("TimeTariffIntervalSchedule: Told to schedule TimeTariffInterval ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
-                self.auto_pricing_response(&event, incoming_status.into())
+            } else {
+                // We intentionally hold this lock for this entire scope
+                let mut events = self.events.write().await;
+                // Inform server event was received
+                self.auto_pricing_response(&event, ResponseStatus::EventReceived)
                     .await;
-                return;
-            }
 
-            // Calculate start & end times
-            // TODO: Clamp the duration and start time to remove gaps between successive events
-            let ei = EventInstance::new_rand(
-                tariff_profile.primacy,
-                event.randomize_duration,
-                event.randomize_start,
-                event,
-                rate_component.mrid,
-                server_id,
-            );
+                // Event arrives cancelled or superseded
+                if matches!(
+                    incoming_status,
+                    EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
+                ) {
+                    log::warn!("TimeTariffIntervalSchedule: Told to schedule TimeTariffInterval ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
+                    self.auto_pricing_response(&event, incoming_status.into())
+                        .await;
+                    return;
+                }
 
-            // The event may have expired already
-            if ei.end_time() <= self.schedule_time().into() {
-                log::warn!("TimeTariffIntervalSchedule: Told to schedule TimeTariffInterval ({mrid}) which has already ended, sending server response and not scheduling.");
-                // Do not add event to schedule
-                // For function sets with direct control ... Do this response
-                self.auto_pricing_response(ei.event(), ResponseStatus::EventExpired)
-                    .await;
-                return;
-            }
+                // Calculate start & end times
+                // TODO: Clamp the duration and start time to remove gaps between successive events
+                let ei = EventInstance::new_rand(
+                    tariff_profile.primacy,
+                    event.randomize_duration,
+                    event.randomize_start,
+                    event,
+                    rate_component.mrid,
+                    server_id,
+                );
 
-            // For each event that would be superseded by this event starting:
-            // - inform the client
-            // - inform the server
-            // - mark as superseded
+                // The event may have expired already
+                if ei.end_time() <= self.schedule_time().into() {
+                    log::warn!("TimeTariffIntervalSchedule: Told to schedule TimeTariffInterval ({mrid}) which has already ended, sending server response and not scheduling.");
+                    // Do not add event to schedule
+                    // For function sets with direct control ... Do this response
+                    self.auto_pricing_response(ei.event(), ResponseStatus::EventExpired)
+                        .await;
+                    return;
+                }
 
-            // Determine what events this supersedes
-            let mut target = ei;
-            for (o_mrid, other) in events.iter_mut() {
-                if let Some(((superseded, _), (superseding, superseding_mrid))) =
-                    pricing_supersedes((&mut target, &mrid), (other, o_mrid))
-                {
-                    // Mark as superseded
-                    let prev_status = superseded.status();
-                    superseded.update_status(EIStatus::Superseded);
-                    superseded.superseded_by(superseding_mrid);
+                // For each event that would be superseded by this event starting:
+                // - inform the client
+                // - inform the server
+                // - mark as superseded
 
-                    // Determine appropriate status
-                    let status = if prev_status == EIStatus::Active {
-                        // Since the newly superseded event is over, tell the client it's finished
-                        (self.handler)(superseded).await;
-                        if superseded.program_mrid() != superseding.program_mrid() {
-                            // If the two events come from different programs
-                            ResponseStatus::EventAbortedProgram
-                        } else if superseded.server_id() != superseding.server_id() {
-                            // If the two events come from different servers
-                            ResponseStatus::EventAbortedServer
+                // Determine what events this supersedes
+                let mut target = ei;
+                for (o_mrid, other) in events.iter_mut() {
+                    if let Some(((superseded, _), (superseding, superseding_mrid))) =
+                        pricing_supersedes((&mut target, &mrid), (other, o_mrid))
+                    {
+                        // Mark as superseded
+                        let prev_status = superseded.status();
+                        superseded.update_status(EIStatus::Superseded);
+                        superseded.superseded_by(superseding_mrid);
+
+                        // Determine appropriate status
+                        let status = if prev_status == EIStatus::Active {
+                            // Since the newly superseded event is over, tell the client it's finished
+                            (self.handler)(superseded).await;
+                            if superseded.program_mrid() != superseding.program_mrid() {
+                                // If the two events come from different programs
+                                ResponseStatus::EventAbortedProgram
+                            } else if superseded.server_id() != superseding.server_id() {
+                                // If the two events come from different servers
+                                ResponseStatus::EventAbortedServer
+                            } else {
+                                ResponseStatus::EventSuperseded
+                            }
                         } else {
                             ResponseStatus::EventSuperseded
-                        }
-                    } else {
-                        ResponseStatus::EventSuperseded
-                    };
-                    self.auto_pricing_response(superseded.event(), status).await;
+                        };
+                        self.auto_pricing_response(superseded.event(), status).await;
+                    }
                 }
-            }
 
-            // Update `next_start` and `next_end`
-            events.update_nexts();
+                // Update `next_start` and `next_end`
+                events.update_nexts();
 
-            // Add it to our schedule
-            events.insert(&mrid, target);
-        };
+                // Add it to our schedule
+                events.insert(&mrid, target);
+            };
+        }
     }
 }
