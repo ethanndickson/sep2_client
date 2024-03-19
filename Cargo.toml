@@ -4,5 +4,4 @@ members = [
     "sep2_client",
     "sep2_test_server",
 ]
-exclude = ["sep2_common"]
 

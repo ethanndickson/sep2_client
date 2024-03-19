@@ -1,5 +1,8 @@
 # SEP2 Client Library
 
+[![crates.io](https://img.shields.io/crates/v/sep2_client.svg)](https://crates.io/crates/sep2_client)
+![GitHub repo size](https://img.shields.io/github/repo-size/ethanndickson/sep2_client)
+
 `sep2_client` is a (WIP) Rust library for developing IEEE 2030.5 compliant clients on Linux[^1] based operating systems.
 
 It relies on, and should be used alongside, the [`sep2_common`](https://github.com/ethanndickson/sep2_common) crate, and it's implementation of the IEEE 2030.5 XSD.
