@@ -1,17 +1,20 @@
 [package]
 name = "sep2_client"
+description = "A Rust library for building IEEE 2030.5 Clients"
 version = "0.1.0"
 authors = ["Ethan Dickson <ethanndickson@gmail.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 readme = "../README.md"
+repository = "https://github.com/ethanndickson/sep2_client"
+keywords = ["energy","DER","20305","SEP2","IEEE2030"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.72"
 async-trait = "0.1.72"
-sep2_common = { git = "https://github.com/ethanndickson/sep2_common", features = ["edev","time"] }
+sep2_common = { version = "0.1.0", features = ["edev","time"] }
 hyper = { version = "0.14.26", features = ["http1","client","runtime","tcp","server"] }
 hyper-openssl = "0.9.2"
 log = "0.4.17"
@@ -24,7 +27,7 @@ httpdate = "1.0.3"
 ahash = "0.8.6"
 
 [dev-dependencies]
-sep2_common = { git = "https://github.com/ethanndickson/sep2_common", features = ["examples","der","edev","fsa","metering","pubsub","dcap"]  }
+sep2_common = { version = "0.1.0", features = ["examples","der","edev","fsa","metering","pubsub","dcap"]  }
 sep2_test_server = { path = "../sep2_test_server" }
 typemap_rev = "0.3.0"
 simple_logger = "4.2.0"

@@ -6,7 +6,7 @@ It relies on, and should be used alongside, the [`sep2_common`](https://github.c
 
 This crate uses async rust, and currently only supports the [`tokio`](https://github.com/tokio-rs/tokio) runtime.
 
-[Documentation](https://ethanndickson.github.io/sep2_client_docs/sep2_client/)
+[Documentation](https://docs.rs/sep2_client/)
 
 # Contents
 
