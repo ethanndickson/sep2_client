@@ -2,17 +2,25 @@
 
 use std::path::Path;
 
-use anyhow::Result;
-use openssl::sha::Sha256;
+use anyhow::{anyhow, Result};
 use sep2_common::packages::{primitives::HexBinary160, types::SFDIType};
+use sha2::{Digest, Sha256};
+use x509_parser::{parse_x509_certificate, pem::parse_x509_pem};
 
-/// Generate a LFDI hash value from a certificate file
+/// Generate a LFDI hash value from a PEM or DER certificate file
 pub fn lfdi_gen(cert_path: impl AsRef<Path>) -> Result<HexBinary160> {
     let cert = std::fs::read(cert_path)?;
+    let der = match parse_x509_pem(&cert) {
+        Ok((_, pem)) => pem.contents,
+        Err(_) => match parse_x509_certificate(&cert) {
+            Ok(_) => cert,
+            Err(_) => Err(anyhow!("Unknown certificate format, expected DER or PEM"))?,
+        },
+    };
     let mut hasher = Sha256::new();
-    hasher.update(&cert);
+    hasher.update(&der);
     let mut out: [u8; 20] = Default::default();
-    out.copy_from_slice(&hasher.finish()[0..20]);
+    out.copy_from_slice(&hasher.finalize()[0..20]);
     Ok(HexBinary160(out))
 }
 
@@ -26,7 +34,7 @@ pub fn sfdi_gen(lfdi: &HexBinary160) -> SFDIType {
     SFDIType::new(sfdi * 10 + check_digit(sfdi)).unwrap()
 }
 
-/// Given the path to a client certificate, generate a LFDI Hash value, and the corresponding SFDI value.
+/// Given the path to a client PEM or DER certificate, generate a LFDI Hash value, and the corresponding SFDI value.
 pub fn security_init(cert_path: impl AsRef<Path>) -> Result<(HexBinary160, SFDIType)> {
     let lfdi = lfdi_gen(cert_path)?;
     let sfdi = sfdi_gen(&lfdi);

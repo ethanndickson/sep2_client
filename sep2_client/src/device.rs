@@ -40,7 +40,7 @@ pub struct SEDevice {
 }
 
 impl SEDevice {
-    /// Create a new SEDevice representation, using a certificate at the given path to generate the SFDI & LFDI and a bitmap representation of the device's category
+    /// Create a new SEDevice representation, using a DER or PEM certificate at the given path to generate the SFDI & LFDI and a bitmap representation of the device's category
     pub fn new_from_cert(
         cert_path: impl AsRef<Path>,
         device_category: DeviceCategoryType,

@@ -1,7 +1,3 @@
 [workspace]
 resolver = "2"
-members = [
-    "sep2_client",
-    "sep2_test_server",
-]
-
+members = ["sep2_client", "sep2_test_server"]
