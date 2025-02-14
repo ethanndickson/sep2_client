@@ -469,7 +469,7 @@ impl Client {
     ) -> Result<SEPResponse> {
         log::info!("POST {} to {}", R::name(), abs_path);
         let rsrce = serialize(resource)?;
-        let rsrce_size = rsrce.as_bytes().len();
+        let rsrce_size = rsrce.len();
         let req = Request::builder()
             .method(method)
             .header(CONTENT_TYPE, "application/sep+xml")
