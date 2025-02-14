@@ -4,7 +4,6 @@
 //!
 
 use std::{
-    future::Future,
     sync::{atomic::AtomicI64, Arc},
     time::Duration,
 };
@@ -165,21 +164,15 @@ impl Scheduler<TextMessage> for Schedule<TextMessage> {
         out
     }
 
-    fn add_event(
-        &mut self,
-        event: TextMessage,
-        program: &Self::Program,
-        server_id: u8,
-    ) -> impl Future<Output = ()> + Send {
-        async move {
-            let mrid = event.mrid;
-            let incoming_status = event.event_status.current_status;
+    async fn add_event(&mut self, event: TextMessage, program: &Self::Program, server_id: u8) {
+        let mrid = event.mrid;
+        let incoming_status = event.event_status.current_status;
 
-            // If the event already exists in the schedule
-            // "Editing events shall NOT be allowed, except for updating status"
-            let cur = { self.events.read().await.get(&mrid).map(|e| e.status()) };
-            if let Some(current_status) = cur {
-                match (current_status, incoming_status) {
+        // If the event already exists in the schedule
+        // "Editing events shall NOT be allowed, except for updating status"
+        let cur = { self.events.read().await.get(&mrid).map(|e| e.status()) };
+        if let Some(current_status) = cur {
+            match (current_status, incoming_status) {
                 // Active -> (Cancelled || CancelledRandom || Superseded)
                 (EIStatus::Active, EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded) => {
                     log::warn!("TextMessageSchedule: TextMessage ({mrid}) has been marked as superseded by the server, yet it is active locally. The event will be cancelled");
@@ -209,36 +202,35 @@ impl Scheduler<TextMessage> for Schedule<TextMessage> {
                 // Scheduled -> Scheduled
                 (EIStatus::Scheduled, EventStatus::Scheduled) => (),
             }
-            } else {
-                let mut events = self.events.write().await;
+        } else {
+            let mut events = self.events.write().await;
 
-                self.auto_msg_response(&event, ResponseStatus::EventReceived)
-                    .await;
+            self.auto_msg_response(&event, ResponseStatus::EventReceived)
+                .await;
 
-                // Event arrives cancelled or superseded
-                if matches!(
-                    incoming_status,
-                    EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
-                ) {
-                    log::warn!("TextMessageSchedule: Told to schedule DERControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
-                    self.auto_msg_response(&event, incoming_status.into()).await;
-                    return;
-                }
-
-                let ei = EventInstance::new(program.primacy, event, program.mrid, server_id);
-                // The event may have expired already
-                if ei.end_time() <= self.schedule_time().into() {
-                    log::warn!("TextMessageSchedule: Told to schedule TextMessage ({mrid}) which has already ended, ignoring.");
-                    // We do NOT send a response, as required by the spec
-                    return;
-                }
-
-                // Update `next_start` and `next_end`
-                events.update_nexts();
-
-                // Add it to our schedule
-                events.insert(&mrid, ei);
+            // Event arrives cancelled or superseded
+            if matches!(
+                incoming_status,
+                EventStatus::Cancelled | EventStatus::CancelledRandom | EventStatus::Superseded
+            ) {
+                log::warn!("TextMessageSchedule: Told to schedule DERControl ({mrid}) which is already {:?}, sending server response and not scheduling.", incoming_status);
+                self.auto_msg_response(&event, incoming_status.into()).await;
+                return;
             }
+
+            let ei = EventInstance::new(program.primacy, event, program.mrid, server_id);
+            // The event may have expired already
+            if ei.end_time() <= self.schedule_time().into() {
+                log::warn!("TextMessageSchedule: Told to schedule TextMessage ({mrid}) which has already ended, ignoring.");
+                // We do NOT send a response, as required by the spec
+                return;
+            }
+
+            // Update `next_start` and `next_end`
+            events.update_nexts();
+
+            // Add it to our schedule
+            events.insert(&mrid, ei);
         }
     }
 }

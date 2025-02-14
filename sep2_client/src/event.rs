@@ -209,9 +209,9 @@ impl<E: SEEvent> EventInstance<E> {
 fn randomize(bound: Option<OneHourRangeType>) -> i64 {
     bound.map_or(0, |val| {
         let val = val.get();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let sign = val.signum() as i64;
-        rng.gen_range(0..=val.abs().into()) * sign
+        rng.random_range(0..=val.abs().into()) * sign
     })
 }
 
