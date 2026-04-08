@@ -3,11 +3,14 @@
 //! Provides an interface for parsing & verifying 2030.5 certificates, as per IEEE 2030.5 section 6.11
 //!
 
+use std::future::Future;
 use std::path::Path;
+use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Result};
-use hyper::client::{HttpConnector, ResponseFuture};
+use hyper::client::HttpConnector;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod, SslVerifyMode};
@@ -21,17 +24,35 @@ pub(crate) type HTTPSClient = Client<HTTPSConnector, Body>;
 pub(crate) type HTTPClient = Client<HttpConnector, Body>;
 pub(crate) type TlsClientConfig = SslConnectorBuilder;
 
-#[derive(Clone, Debug)]
+/// A trait for custom HTTP request handling, useful for mocking.
+pub trait HttpRequester: Send + Sync {
+    fn request(
+        &self,
+        req: Request<Body>,
+    ) -> Pin<
+        Box<
+            dyn Future<Output = std::result::Result<hyper::Response<Body>, hyper::Error>> + Send,
+        >,
+    >;
+}
+
+#[derive(Clone)]
 pub(crate) enum ClientInner {
     Https(HTTPSClient),
     Http(HTTPClient),
+    Custom(Arc<dyn HttpRequester>),
 }
 
 impl ClientInner {
-    pub(crate) fn request(&self, req: Request<Body>) -> ResponseFuture {
+    pub(crate) fn request(
+        &self,
+        req: Request<Body>,
+    ) -> Pin<Box<dyn Future<Output = std::result::Result<hyper::Response<Body>, hyper::Error>> + Send>>
+    {
         match self {
-            ClientInner::Https(c) => c.request(req),
-            ClientInner::Http(c) => c.request(req),
+            ClientInner::Https(c) => Box::pin(c.request(req)),
+            ClientInner::Http(c) => Box::pin(c.request(req)),
+            ClientInner::Custom(c) => c.request(req),
         }
     }
 }

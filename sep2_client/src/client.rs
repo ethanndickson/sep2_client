@@ -26,7 +26,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     time::{current_time_with_offset, SEPTime},
-    tls::{create_client, create_client_tls_cfg, create_http_client, ClientInner},
+    tls::{create_client, create_client_tls_cfg, create_http_client, ClientInner, HttpRequester},
 };
 
 #[cfg(feature = "event")]
@@ -292,6 +292,26 @@ impl Client {
                 .poll_task(tickrate.unwrap_or(Self::DEFAULT_TICKRATE)),
         );
         Ok(out)
+    }
+
+    /// Construct an IEEE 2030.5 Client instance that uses a custom [`HttpRequester`] implementation.
+    ///
+    /// This is useful for testing or mocking HTTP interactions.
+    pub fn new_custom(
+        server_addr: &str,
+        requester: impl HttpRequester + 'static,
+        tickrate: Option<Duration>,
+    ) -> Self {
+        let out = Client {
+            addr: server_addr.to_owned().into(),
+            inner: ClientInner::Custom(Arc::new(requester)),
+            polls: Arc::new(Mutex::new(BinaryHeap::new())),
+        };
+        tokio::spawn(
+            out.clone()
+                .poll_task(tickrate.unwrap_or(Self::DEFAULT_TICKRATE)),
+        );
+        out
     }
 
     async fn poll_task(self, tickrate: Duration) {
