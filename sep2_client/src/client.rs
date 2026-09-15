@@ -191,19 +191,21 @@ where
 }
 
 type PollHandler = Box<
-    dyn Fn(Duration) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + Sync + 'static,
+    dyn Fn() -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> + Send + Sync + 'static,
 >;
 
-/// Identifies a poll job created by [`Client::start_poll`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PollId(
-    // A u64 for an id means it is virtually impossible to run out of ids, even
-    // if the client is spin-locking and allocating new ids constantly.
-    u64,
-);
+/// A handle returned by [`Client::start_poll`].
+///
+/// Note that dropping the handle does not cancel the poll automatically.
+pub struct PollHandle {
+    id: u64,
+    client: Client,
+}
 
 struct PollJob {
-    id: PollId,
+    // A u64 for an id means it is virtually impossible to run out of ids, even
+    // if the client is spin-locking and allocating new ids constantly.
+    id: u64,
     handler: PollHandler,
     interval: Duration,
     // Since poll intervals are duration based,
@@ -214,7 +216,13 @@ struct PollJob {
 impl PollJob {
     /// Run the stored handler, and increment the `next` Instant
     async fn execute(&mut self) {
-        tokio::spawn((self.handler)(self.interval));
+        let fut = (self.handler)();
+        let interval_secs = self.interval.as_secs();
+        tokio::spawn(async move {
+            if let Err(err) = fut.await {
+                log::warn!("Client: {:#}. Retrying in {} seconds.", err, interval_secs);
+            }
+        });
         self.next = Instant::now() + self.interval;
     }
 
@@ -338,8 +346,8 @@ impl Client {
         }
     }
 
-    fn next_poll_id(&self) -> PollId {
-        PollId(self.poll_id_counter.fetch_add(1, Ordering::Relaxed))
+    fn next_poll_id(&self) -> u64 {
+        self.poll_id_counter.fetch_add(1, Ordering::Relaxed)
     }
 
     /// Retrieve the [`SEResource`] at the given relative path.
@@ -418,7 +426,7 @@ impl Client {
 
     /// Begin polling the given route by performing GET requests on a regular interval. Passes the returned [`SEResource`] to the given callback.
     ///
-    /// Returns an id for the poll job that can be used to cancel or update it.
+    /// Returns a [`PollHandle`] for the poll job that can be used to cancel or update it.
     ///
     /// The callback will not be run if the GET request fails, or the resource cannot be deserialized.
     ///
@@ -430,14 +438,14 @@ impl Client {
         path: impl Into<String>,
         poll_rate: Option<Uint32>,
         callback: impl PollCallback<T>,
-    ) -> PollId
+    ) -> PollHandle
     where
         T: SEResource,
     {
         let new: PollHandler = Box::new({
             let client = self.clone();
             let path: String = path.into();
-            move |interval| {
+            move || {
                 Box::pin({
                     let path = path.clone();
                     let client = client.clone();
@@ -452,17 +460,16 @@ impl Client {
                                     T::name()
                                 );
                                 callback.callback(rsrc).await;
+                                Ok(())
                             }
-                            Err(err) => {
-                                log::warn!(
-                            "Client: Scheduled poll for Resource {} at {} failed with reason {}. Retrying in {} seconds.",
-                            T::name(),
-                            &path,
-                            err,
-                            interval.as_secs()
-                        );
-                            }
-                        };
+                            Err(err) => Err(err).with_context(|| {
+                                format!(
+                                    "Scheduled poll for Resource {} at {} failed",
+                                    T::name(),
+                                    path,
+                                )
+                            }),
+                        }
                     }
                 })
             }
@@ -477,7 +484,7 @@ impl Client {
             next: Instant::now() + interval,
         };
         self.polls.lock().await.push(poll);
-        poll_id
+        PollHandle::new(poll_id, self.clone())
     }
 
     /// Forcibly poll & run the callbacks of all routes polled using [`Client::start_poll`]
@@ -494,32 +501,6 @@ impl Client {
     /// Cancel all poll tasks created using [`Client::start_poll`]
     pub async fn cancel_polls(&self) {
         self.polls.lock().await.clear();
-    }
-
-    /// Cancel a poll given a poll id. If no poll with the given id exists, no change occurs.
-    pub async fn cancel_poll(&self, poll_id: PollId) {
-        self.polls.lock().await.retain(|poll| poll.id != poll_id);
-    }
-
-    /// Changes a poll's interval to a new value. If no poll with the given id
-    /// exists, no change occurs.
-    ///
-    /// The poll's next polling time will either remain its previous value, or
-    /// be changed to be `poll_rate` seconds from now, whichever is earlier.
-    pub async fn update_poll_rate(&self, poll_id: PollId, poll_rate: Uint32) {
-        // This is a little awkward because a BinaryHeap can't pop a single item
-        // at random. Instead we must pull all jobs out of the heap and then
-        // reconstruct it. We are also not allowed to update the `next` value in
-        // place, as that would invalidate the ordering of the BinaryHeap.
-
-        let interval = Duration::from_secs(u64::from(poll_rate.get()));
-
-        let mut polls = self.polls.lock().await;
-        let mut items: Vec<_> = polls.drain().collect();
-        if let Some(poll) = items.iter_mut().find(|poll| poll.id == poll_id) {
-            poll.update_interval(interval);
-        }
-        *polls = BinaryHeap::from(items);
     }
 
     // Create a PUT or POST request
@@ -735,6 +716,47 @@ impl Client {
     }
 }
 
+impl PollHandle {
+    fn new(id: u64, client: Client) -> Self {
+        PollHandle { id, client }
+    }
+
+    /// Cancel the poll. Consumes the `PollHandle`.
+    ///
+    /// Note that the poll may have already been cancelled by
+    /// [`Client::cancel_polls`] in which case this function will do nothing.
+    pub async fn cancel(self) {
+        self.client
+            .polls
+            .lock()
+            .await
+            .retain(|poll| poll.id != self.id);
+    }
+
+    /// Changes the poll's interval to a new value.
+    ///
+    /// The poll's next polling time will either remain its previous value, or
+    /// be changed to be `poll_rate` seconds from now, whichever is earlier.
+    ///
+    /// Note that if the poll has been cancelled by [`Client::cancel_polls`] then
+    /// this function is a no-op.
+    pub async fn update_poll_rate(&self, poll_rate: Uint32) {
+        // This is a little awkward because a BinaryHeap can't pop a single item
+        // at random. Instead we must pull all jobs out of the heap and then
+        // reconstruct it. We are also not allowed to update the `next` value in
+        // place, as that would invalidate the ordering of the BinaryHeap.
+
+        let interval = Duration::from_secs(u64::from(poll_rate.get()));
+
+        let mut polls = self.client.polls.lock().await;
+        let mut items: Vec<_> = polls.drain().collect();
+        if let Some(poll) = items.iter_mut().find(|poll| poll.id == self.id) {
+            poll.update_interval(interval);
+        }
+        *polls = BinaryHeap::from(items);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -746,13 +768,13 @@ mod tests {
         Client::new("http://127.0.0.1:0", None, None).unwrap()
     }
 
-    async fn start_noop_poll(client: &Client, rate: u32) -> PollId {
+    async fn start_noop_poll(client: &Client, rate: u32) -> PollHandle {
         client
             .start_poll("/edev", Some(Uint32(rate)), |_: EndDevice| async {})
             .await
     }
 
-    async fn job_state(client: &Client, id: PollId) -> Option<(Duration, Instant)> {
+    async fn job_state(client: &Client, id: u64) -> Option<(Duration, Instant)> {
         client
             .polls
             .lock()
@@ -768,7 +790,7 @@ mod tests {
         let a = start_noop_poll(&client, 900).await;
         let b = start_noop_poll(&client, 900).await;
         let c = start_noop_poll(&client.clone(), 900).await;
-        assert!(a != b && b != c && a != c);
+        assert!(a.id != b.id && b.id != c.id && a.id != c.id);
         assert_eq!(client.polls.lock().await.len(), 3);
     }
 
@@ -778,23 +800,21 @@ mod tests {
         let a = start_noop_poll(&client, 900).await;
         let b = start_noop_poll(&client, 900).await;
 
-        client.cancel_poll(a).await;
-        assert!(job_state(&client, a).await.is_none());
-        assert!(job_state(&client, b).await.is_some());
-
-        // Cancelling an already-cancelled poll is a no-op
-        client.cancel_poll(a).await;
-        assert_eq!(client.polls.lock().await.len(), 1);
+        // Store the id for us to get the job_state afterwards because cancel() consumes the handle.
+        let a_id = a.id;
+        a.cancel().await;
+        assert!(job_state(&client, a_id).await.is_none());
+        assert!(job_state(&client, b.id).await.is_some());
     }
 
     #[tokio::test]
     async fn update_poll_rate_shorter_brings_next_forward() {
         let client = test_client();
-        let id = start_noop_poll(&client, 900).await;
-        let (_, old_next) = job_state(&client, id).await.unwrap();
+        let handle = start_noop_poll(&client, 900).await;
+        let (_, old_next) = job_state(&client, handle.id).await.unwrap();
 
-        client.update_poll_rate(id, Uint32(10)).await;
-        let (interval, next) = job_state(&client, id).await.unwrap();
+        handle.update_poll_rate(Uint32(10)).await;
+        let (interval, next) = job_state(&client, handle.id).await.unwrap();
         assert_eq!(interval, Duration::from_secs(10));
         assert!(next < old_next);
         assert!(next <= Instant::now() + Duration::from_secs(10));
@@ -803,11 +823,11 @@ mod tests {
     #[tokio::test]
     async fn update_poll_rate_longer_keeps_next() {
         let client = test_client();
-        let id = start_noop_poll(&client, 10).await;
-        let (_, old_next) = job_state(&client, id).await.unwrap();
+        let handle = start_noop_poll(&client, 10).await;
+        let (_, old_next) = job_state(&client, handle.id).await.unwrap();
 
-        client.update_poll_rate(id, Uint32(900)).await;
-        let (interval, next) = job_state(&client, id).await.unwrap();
+        handle.update_poll_rate(Uint32(900)).await;
+        let (interval, next) = job_state(&client, handle.id).await.unwrap();
         assert_eq!(interval, Duration::from_secs(900));
         assert_eq!(next, old_next);
     }
@@ -817,9 +837,9 @@ mod tests {
         let client = test_client();
         let a = start_noop_poll(&client, 900).await;
         let b = start_noop_poll(&client, 600).await;
-        assert_eq!(client.polls.lock().await.peek().unwrap().id, b);
+        assert_eq!(client.polls.lock().await.peek().unwrap().id, b.id);
 
-        client.update_poll_rate(a, Uint32(10)).await;
-        assert_eq!(client.polls.lock().await.peek().unwrap().id, a);
+        a.update_poll_rate(Uint32(10)).await;
+        assert_eq!(client.polls.lock().await.peek().unwrap().id, a.id);
     }
 }
