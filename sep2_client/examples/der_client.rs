@@ -198,7 +198,7 @@ async fn main() -> Result<()> {
 
     // Create a Notificaton server listening on 1338
     // Make it listen for reading resources on "/reading"
-    let notifs = ClientNotifServer::new(&format!("{}:{}", &args.notif_addr, &args.notif_port))?
+    let notifs = ClientNotifServer::new(format!("{}:{}", args.notif_addr, args.notif_port))?
         .with_https(&args.cert, &args.key, &args.ca)?
         // Example route that adds to some thread-safe state
         .add("/reading", {

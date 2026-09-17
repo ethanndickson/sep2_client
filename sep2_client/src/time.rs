@@ -104,8 +104,10 @@ fn septime_add() {
 
 #[test]
 fn septime_offset() {
-    let mut some_time = Time::default();
-    some_time.current_time = (current_time() + 100).into();
+    let some_time = Time {
+        current_time: (current_time() + 100).into(),
+        ..Default::default()
+    };
     update_time_offset(some_time);
     assert!(current_time_with_offset() > current_time());
 }

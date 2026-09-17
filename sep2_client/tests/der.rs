@@ -13,8 +13,8 @@ use sep2_common::{
         der::{DERControl, DERProgram},
         identification::ResponseStatus,
         objects::EventStatusType,
-        primitives::{HexBinary128, Int64, Uint32},
-        types::{DeviceCategoryType, PrimacyType},
+        primitives::{Int64, Uint32},
+        types::{DeviceCategoryType, MRIDType, PrimacyType},
     },
     traits::SEIdentifiedObject,
 };
@@ -81,9 +81,11 @@ impl EventCallback<DERControl> for DERControlHandler {
 
 // Create an event, as would be acquired from the server
 fn create_event(status: EventStatusType, count: i64, start: i64, duration: u32) -> DERControl {
-    let mut out = DERControl::default();
-    out.mrid = HexBinary128(count.try_into().unwrap());
-    out.creation_time = Int64(count);
+    let mut out = DERControl {
+        mrid: MRIDType(count.try_into().unwrap()),
+        creation_time: Int64(count),
+        ..Default::default()
+    };
     out.event_status.current_status = status;
     out.interval.start = Int64(start);
     out.interval.duration = Uint32(duration);

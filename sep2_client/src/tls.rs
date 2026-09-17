@@ -10,7 +10,9 @@ use anyhow::{bail, Result};
 use hyper::client::{HttpConnector, ResponseFuture};
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
-use openssl::ssl::{SslConnector, SslConnectorBuilder, SslFiletype, SslMethod, SslVerifyMode};
+use openssl::ssl::{
+    SslConnector, SslConnectorBuilder, SslFiletype, SslMethod, SslVerifyMode, SslVersion,
+};
 
 #[cfg(feature = "pubsub")]
 use openssl::ssl::{SslAcceptor, SslAcceptorBuilder};
@@ -42,6 +44,11 @@ pub(crate) fn create_client_tls_cfg(
     rootca_path: impl AsRef<Path>,
 ) -> Result<TlsClientConfig> {
     let mut builder = SslConnector::builder(SslMethod::tls_client())?;
+    // IEEE 2030.5 mandates ECDHE-ECDSA-AES128-CCM8, which OpenSSL 3.2+ rates at 64-bit
+    // security strength and therefore excludes at the default security level (1).
+    builder.set_security_level(0);
+    // Level 0 lifts the protocol floor too, so pin it back to TLS 1.2 explicitly.
+    builder.set_min_proto_version(Some(SslVersion::TLS1_2))?;
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
     log::debug!("Loading Certificate File");
@@ -87,6 +94,11 @@ pub(crate) fn create_server_tls_config(
     // we wouldn't need to double up on configs here
 
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server())?;
+    // IEEE 2030.5 mandates ECDHE-ECDSA-AES128-CCM8, which OpenSSL 3.2+ rates at 64-bit
+    // security strength and therefore excludes at the default security level (1).
+    builder.set_security_level(0);
+    // Level 0 lifts the protocol floor too, so pin it back to TLS 1.2 explicitly.
+    builder.set_min_proto_version(Some(SslVersion::TLS1_2))?;
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
     log::debug!("Loading Certificate File");

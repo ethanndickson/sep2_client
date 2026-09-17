@@ -14,8 +14,8 @@ use sep2_common::{
         identification::ResponseStatus,
         objects::EventStatusType,
         pricing::{RateComponent, TariffProfile, TimeTariffInterval},
-        primitives::{HexBinary128, Int64, Uint32},
-        types::{DeviceCategoryType, PrimacyType},
+        primitives::{Int64, Uint32},
+        types::{DeviceCategoryType, MRIDType, PrimacyType},
     },
     traits::SEIdentifiedObject,
 };
@@ -92,9 +92,11 @@ fn create_event(
     start: i64,
     duration: u32,
 ) -> TimeTariffInterval {
-    let mut out = TimeTariffInterval::default();
-    out.mrid = HexBinary128(count.try_into().unwrap());
-    out.creation_time = Int64(count);
+    let mut out = TimeTariffInterval {
+        mrid: MRIDType(count.try_into().unwrap()),
+        creation_time: Int64(count),
+        ..Default::default()
+    };
     out.event_status.current_status = status;
     out.interval.start = Int64(start);
     out.interval.duration = Uint32(duration);
