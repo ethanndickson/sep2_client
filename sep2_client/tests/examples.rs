@@ -22,12 +22,16 @@ use sep2_test_server::TestServer;
 
 // Supplied to client as starting resources (out of band)
 fn test_setup() -> (EndDevice, Registration, Client) {
-    let mut edr = EndDevice::default();
-    edr.changed_time = Int64(1379905200);
-    edr.sfdi = SFDIType::new(987654321005).unwrap();
-    let mut reg = Registration::default();
-    reg.date_time_registered = Int64(1364774400);
-    reg.pin = PINType::new(123455).unwrap();
+    let edr = EndDevice {
+        changed_time: Int64(1379905200),
+        sfdi: SFDIType::new(987654321005).unwrap(),
+        ..Default::default()
+    };
+    let reg = Registration {
+        date_time_registered: Int64(1364774400),
+        pin: PINType::new(123455).unwrap(),
+        ..Default::default()
+    };
     // Create client
     let client = Client::new_https(
         "https://127.0.0.1:1337",

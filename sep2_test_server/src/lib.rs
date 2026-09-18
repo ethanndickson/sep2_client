@@ -9,7 +9,9 @@ use hyper::{
     header::LOCATION, server::conn::Http, service::service_fn, Body, Method, Request, Response,
     StatusCode,
 };
-use openssl::ssl::{Ssl, SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod, SslVerifyMode};
+use openssl::ssl::{
+    Ssl, SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod, SslVerifyMode, SslVersion,
+};
 
 use sep2_common::examples::{
     DC_16_04_11, EDL_16_02_08, ED_16_01_08, ED_16_03_06, ER_16_04_06, FSAL_16_03_11, REG_16_01_10,
@@ -24,6 +26,11 @@ fn create_server_tls_config(
     rootca_path: impl AsRef<Path>,
 ) -> Result<TlsServerConfig> {
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
+    // IEEE 2030.5 mandates ECDHE-ECDSA-AES128-CCM8, which OpenSSL 3.2+ rates at 64-bit
+    // security strength and therefore excludes at the default security level (1).
+    builder.set_security_level(0);
+    // Level 0 lifts the protocol floor too, so pin it back to TLS 1.2 explicitly.
+    builder.set_min_proto_version(Some(SslVersion::TLS1_2))?;
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
     log::debug!("Loading Certificate File");

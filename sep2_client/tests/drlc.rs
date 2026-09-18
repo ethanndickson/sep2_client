@@ -13,8 +13,8 @@ use sep2_common::{
         drlc::{DemandResponseProgram, EndDeviceControl},
         identification::ResponseStatus,
         objects::EventStatusType,
-        primitives::{HexBinary128, Int64, Uint32},
-        types::{DeviceCategoryType, PrimacyType},
+        primitives::{Int64, Uint32},
+        types::{DeviceCategoryType, MRIDType, PrimacyType},
     },
     traits::SEIdentifiedObject,
 };
@@ -86,10 +86,12 @@ fn create_event(
     start: i64,
     duration: u32,
 ) -> EndDeviceControl {
-    let mut out = EndDeviceControl::default();
-    out.device_category = DeviceCategoryType::all();
-    out.mrid = HexBinary128(count.try_into().unwrap());
-    out.creation_time = Int64(count);
+    let mut out = EndDeviceControl {
+        device_category: DeviceCategoryType::all(),
+        mrid: MRIDType(count.try_into().unwrap()),
+        creation_time: Int64(count),
+        ..Default::default()
+    };
     out.event_status.current_status = status;
     out.interval.start = Int64(start);
     out.interval.duration = Uint32(duration);

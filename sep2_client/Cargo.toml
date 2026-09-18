@@ -13,7 +13,7 @@ keywords = ["energy", "DER", "20305", "SEP2", "IEEE2030"]
 
 [dependencies]
 anyhow = "1.0.72"
-sep2_common = { version = "0.1.0", features = ["edev", "time"] }
+sep2_common = { version = "0.2.0", features = ["edev", "time"] }
 hyper = { version = "0.14.26", features = [
     "http1",
     "client",
@@ -33,7 +33,7 @@ ahash = "0.8.11"
 sha2 = "0.10.8"
 
 [dev-dependencies]
-sep2_common = { version = "0.1.0", features = [
+sep2_common = { version = "0.2.0", features = [
     "examples",
     "der",
     "edev",
