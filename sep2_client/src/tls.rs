@@ -52,7 +52,7 @@ pub(crate) fn create_client_tls_cfg(
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
     log::debug!("Loading Certificate File");
-    builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
+    builder.set_certificate_chain_file(cert_path)?;
     log::debug!("Loading Private Key File");
     builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
     log::debug!("Loading Certificate Authority File");
@@ -102,7 +102,7 @@ pub(crate) fn create_server_tls_config(
     log::debug!("Setting CipherSuite");
     builder.set_cipher_list("ECDHE-ECDSA-AES128-CCM8")?;
     log::debug!("Loading Certificate File");
-    builder.set_certificate_file(cert_path, SslFiletype::PEM)?;
+    builder.set_certificate_chain_file(cert_path)?;
     log::debug!("Loading Private Key File");
     builder.set_private_key_file(pk_path, SslFiletype::PEM)?;
     log::debug!("Loading Certificate Authority File");
